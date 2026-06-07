@@ -1,4 +1,4 @@
-# Browser Engine Notes
+# Browser Engine Essay
 
 FYI: I've definitely missed something writing this, so feel free to correct me; anything helps!
 
