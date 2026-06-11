@@ -1,0 +1,75 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A146F9AB-7E6F-4F5C-80A8-E2EB45CA36B9}|ConsoleApplication1\\ConsoleApplication1.vcxproj|C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConnectSocket.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{A146F9AB-7E6F-4F5C-80A8-E2EB45CA36B9}|ConsoleApplication1\\ConsoleApplication1.vcxproj|solutionrelative:ConsoleApplication1\\ConnectSocket.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A146F9AB-7E6F-4F5C-80A8-E2EB45CA36B9}|ConsoleApplication1\\ConsoleApplication1.vcxproj|C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConsoleApplication1.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{A146F9AB-7E6F-4F5C-80A8-E2EB45CA36B9}|ConsoleApplication1\\ConsoleApplication1.vcxproj|solutionrelative:ConsoleApplication1\\ConsoleApplication1.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A146F9AB-7E6F-4F5C-80A8-E2EB45CA36B9}|ConsoleApplication1\\ConsoleApplication1.vcxproj|C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConnectSocket.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{A146F9AB-7E6F-4F5C-80A8-E2EB45CA36B9}|ConsoleApplication1\\ConsoleApplication1.vcxproj|solutionrelative:ConsoleApplication1\\ConnectSocket.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ConnectSocket.h",
+              "DocumentMoniker": "C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConnectSocket.h",
+              "RelativeDocumentMoniker": "ConsoleApplication1\\ConnectSocket.h",
+              "ToolTip": "C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConnectSocket.h",
+              "RelativeToolTip": "ConsoleApplication1\\ConnectSocket.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAAgAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2026-06-11T01:21:18.008Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ConnectSocket.cpp",
+              "DocumentMoniker": "C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConnectSocket.cpp",
+              "RelativeDocumentMoniker": "ConsoleApplication1\\ConnectSocket.cpp",
+              "ToolTip": "C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConnectSocket.cpp",
+              "RelativeToolTip": "ConsoleApplication1\\ConnectSocket.cpp",
+              "ViewState": "AgIAAFQAAAAAAAAAAAAowFsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2026-06-11T01:11:03.235Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ConsoleApplication1.cpp",
+              "DocumentMoniker": "C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConsoleApplication1.cpp",
+              "RelativeDocumentMoniker": "ConsoleApplication1\\ConsoleApplication1.cpp",
+              "ToolTip": "C:\\Users\\K754a\\Desktop\\C-Plus-Plus-Web-Engine\\C\u002B\u002BWebEngine\\ConsoleApplication1\\ConsoleApplication1.cpp",
+              "RelativeToolTip": "ConsoleApplication1\\ConsoleApplication1.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAAZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2026-06-10T22:58:36.094Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

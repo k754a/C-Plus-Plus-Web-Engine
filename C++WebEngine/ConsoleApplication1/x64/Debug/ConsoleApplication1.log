@@ -1,0 +1,6 @@
+﻿  ConnectSocket.cpp
+C:\Users\K754a\Desktop\C-Plus-Plus-Web-Engine\C++WebEngine\ConsoleApplication1\ConnectSocket.h(1,9): warning C4068: unknown pragma 'onc'
+  (compiling source file 'ConnectSocket.cpp')
+  
+C:\Users\K754a\Desktop\C-Plus-Plus-Web-Engine\C++WebEngine\ConsoleApplication1\ConnectSocket.cpp(86,63): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+  ConsoleApplication1.vcxproj -> C:\Users\K754a\Desktop\C-Plus-Plus-Web-Engine\C++WebEngine\x64\Debug\ConsoleApplication1.exe
