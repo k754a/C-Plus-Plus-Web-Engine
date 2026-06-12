@@ -22,10 +22,12 @@ int main()
     //note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
     if (std::regex_match(input, pattern)) {
         std::cout << "valid url";
-    }
-    //now that we understand its a valid url, lets attempt a socket connect.
-    ConnectSocket(input);
 
+        //now that we understand its a valid url, lets attempt a socket connect.
+        //[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
+    }
+   
+    ConnectSocket(input);
     EndWinSock();
     return(0); 
 }
