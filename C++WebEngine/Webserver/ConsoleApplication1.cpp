@@ -1,91 +1,42 @@
-//NOTE THIS HAS BEEN MODIFIED WITH AI
-//this is because i didnt want to learn a bunch of things i wont need lol, and want to keep up development.
-
-
-
-#include <iostream>
+// ConsoleApplication1.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
 #include <regex>
-#include <thread>
-#include <vector>
-#include <string>
-#include <mutex>
+#include <iostream>
+#include "ConnectSocket.h" //pulls our validate string global libary
 
-#include "ConnectSocket.h"
-
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-
-const std::regex pattern(
-    "((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)"
-);
-
-std::mutex coutMutex;
-
-// handles each client separately
-void handleClient(int clientSocket)
-{
-    char buffer[1024];
-
-    while (true)
-    {
-        int bytes = read(clientSocket, buffer, sizeof(buffer) - 1);
-
-        if (bytes <= 0)
-            break;
-
-        buffer[bytes] = '\0';
-        std::string input(buffer);
-
-        {
-            std::lock_guard<std::mutex> lock(coutMutex);
-            std::cout << "Client sent: " << input << std::endl;
-        }
-
-        if (std::regex_match(input, pattern))
-        {
-            std::string response = "valid url\n";
-            send(clientSocket, response.c_str(), response.size(), 0);
-
-            // your backend call
-            ConnectSocket(input);
-        }
-        else
-        {
-            std::string response = "invalid url\n";
-            send(clientSocket, response.c_str(), response.size(), 0);
-        }
-    }
-
-    close(clientSocket);
-}
+//this checks if a url is valid or not.
+const std::regex pattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 
 int main()
 {
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    StartWinSock();
+    std::string input = "";
+    
+    //CHANGED WITH AI: Infinite loop to keep the engine running for continuous use
+    while (true) {
+        //First, we need to prompt the user, what URL are they attempting to connect too?
+        std::cout << "\n\nType the URL to open it (must be http): ";
 
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(8080);
-
-    bind(server_fd, (sockaddr*)&address, sizeof(address));
-    listen(server_fd, 10);
-
-    std::cout << "Server running on port 8080...\n";
-
-    std::vector<std::thread> threads;
-
-    while (true)
-    {
-        int clientSocket = accept(server_fd, nullptr, nullptr);
-
-        if (clientSocket >= 0)
-        {
-            threads.emplace_back(handleClient, clientSocket);
+        //pulls the input, then creates a new line for cleaness
+        if (!(std::cin >> input)) {
+            // Disconnected or EOF
+            break;
         }
-    }
+        std::cout << std::endl;
 
-    close(server_fd);
-    return 0;
+        //check if this is a valid url
+        //note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
+        if (std::regex_match(input, pattern)) {
+            std::cout << "valid url\n";
+
+            //now that we understand its a valid url, lets attempt a socket connect.
+            //[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
+        }
+       
+        ConnectSocket(input);
+    }
+    
+    EndWinSock();
+    return(0); 
 }
+

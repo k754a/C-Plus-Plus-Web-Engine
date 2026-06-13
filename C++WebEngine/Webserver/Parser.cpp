@@ -40,7 +40,8 @@ std::string StripTags(std::string htmldata)
 			
 		}
 	}
-	system("cls"); //this cleans our muddled terminal with all our debug stuff.
+	//CHANGED WITH AI: Used ANSI escape instead of system("cls") for cross-platform support
+	std::cout << "\033[2J\033[1;1H"; //this cleans our muddled terminal with all our debug stuff.
 	std::cout << "Parsed output: " << htmldata << std::endl;
 
 
@@ -54,13 +55,12 @@ std::string ManageCSS(std::string htmldata)
 {
 	//Currently all we want to do in this is to just remove all the CSS, so lets find the css tags, and remove them.
 	//super simple, look for the style parts, (as they are constant across all websites) and remove everything inbetween.
-	//however some sites may not have a stylesheet, so we should check.
-	if (htmldata.find("<style>") == std::string::npos)
+	//CHANGED WITH AI: Used a loop to remove all style blocks
+	while (htmldata.find("<style>") != std::string::npos && htmldata.find("</style>") != std::string::npos)
 	{
-		return htmldata; //dont change nothin, just prevent an error
+		htmldata.erase(htmldata.find("<style>"), (htmldata.find("</style>") + 8) - htmldata.find("<style>"));
 	}
-	//if we are good, return this.
-	return htmldata.erase(htmldata.find("<style>"), (htmldata.find("</style>") + 8) - htmldata.find("<style>"));
+	return htmldata;
 }
 
 
@@ -68,13 +68,12 @@ std::string ManageJSON(std::string htmldata)
 {
 	//Currently all we want to do in this is to just remove all the JSON, so lets find the json tags, and remove them.
 	//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
-	//however some sites may not have json, so we should check.
-	if (htmldata.find("<scirpt>") == std::string::npos)
+	//CHANGED WITH AI: Fixed typo in <script> and used a loop to remove all script blocks
+	while (htmldata.find("<script>") != std::string::npos && htmldata.find("</script>") != std::string::npos)
 	{
-		return htmldata; //dont change nothin, just prevent an error
+		htmldata.erase(htmldata.find("<script>"), (htmldata.find("</script>") + 9) - htmldata.find("<script>"));
 	}
-	//if we are good, return this.
-	return htmldata.erase(htmldata.find("<scirpt>"), (htmldata.find("</scirpt>") + 8) - htmldata.find("<scirpt>"));
+	return htmldata;
 }
 
 

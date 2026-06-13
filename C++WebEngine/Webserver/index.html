@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal</title>
+    <style>
+        body {
+            background-color: #0c0c0c;
+            color: #cccccc;
+            font-family: Consolas, "Courier New", monospace;
+            padding: 10px;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        #output {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        #input-container {
+            display: flex;
+            align-items: center;
+        }
+        #input {
+            flex-grow: 1;
+            background: transparent;
+            color: #cccccc;
+            border: none;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+            caret-color: #cccccc;
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+<body onclick="document.getElementById('input').focus()">
+    <div id="output"></div>
+    <div id="input-container">
+        <input type="text" id="input" autofocus spellcheck="false" autocomplete="off">
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        const input = document.getElementById('input');
+        
+        const ws = new WebSocket(`ws://${window.location.host}`);
+        
+        ws.onmessage = (event) => {
+            let text = event.data;
+            if (text.includes('\x1b[2J\x1b[1;1H')) {
+                output.textContent = '';
+                text = text.replace('\x1b[2J\x1b[1;1H', '');
+            }
+            output.textContent += text;
+            window.scrollTo(0, document.body.scrollHeight);
+        };
+
+        ws.onopen = () => {
+            output.textContent += 'Connected to server.\n';
+        };
+
+        ws.onclose = () => {
+            output.textContent += '\nConnection closed.\n';
+        };
+
+        input.onkeypress = (e) => {
+            if (e.key === 'Enter') {
+                if (input.value) {
+                    output.textContent += input.value + '\n';
+                    ws.send(input.value);
+                    input.value = '';
+                    window.scrollTo(0, document.body.scrollHeight);
+                }
+            }
+        };
+    </script>
+</body>
+</html>

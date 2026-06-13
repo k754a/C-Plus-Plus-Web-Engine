@@ -1,0 +1,3 @@
+This project has been modified to run on a Linux server and handle multiple web clients simultaneously.
+Please note that AI has only been used to assist with this specific server porting and web frontend integration. 
+AI has NOT been used for the rest of the original C++ browser engine project.
