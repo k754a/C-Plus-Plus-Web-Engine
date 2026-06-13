@@ -4,6 +4,7 @@
 #define GET_ValidateString
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <string> // for stoi
 #include <iostream>
 #include <winsock2.h>
 #include <ws2tcpip.h> //for pton

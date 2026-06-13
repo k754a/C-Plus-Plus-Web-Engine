@@ -19,6 +19,7 @@ int StartWinSock()
 	else {
 		//worked
 		std::cout << "Winsock has been init" << std::endl;
+	
 	}
 	return 0;
 }
@@ -178,12 +179,19 @@ int ConnectSocket(std::string input)
 	//now we define our 
 	//pull for data, say its http
 	//we ask for the homepage, using http 1.1, then we tell the server what host we want (because some servers like aws have multiple), then we say send data and close
-	std::string request = std::string("GET / HTTP/1.1\r\n") + "Host: " + std::string(inet_ntoa(addr)) + "\r\n" + "Connection: close\r\n\r\n";
+	if (URLPath.empty()) { URLPath = "/"; } 
+	//replaced std::string(inet_ntoa(addr)) with host_name, just to work for servers with diffrent ip's
+
+	std::string request = std::string("GET ") + URLPath + std::string(" HTTP/1.1\r\n") + "Host: " + host_name + "\r\n" + "Connection: close\r\n\r\n"; 
 
 	//now we need to connect
-
 	//we connect with our client, stating our adress, and the size of the adress
 	if(connect(client, (sockaddr*)&server_address, sizeof(server_address)) == SOCKET_ERROR) { std::cout << "Error connecting to server" << std::endl; return 1; }
+
+
+
+	//we have now connected, anything below this is interfacing with the server.
+
 
 
 	//send some bytes and see if we get an error
@@ -197,16 +205,97 @@ int ConnectSocket(std::string input)
 	//now we want to recive a response
 	//first we build a buffer
 	char buffer[4096];
+	int bytesR;
 
+	std::string fulldata = "";
+	
 	//we call recv to pull data from the socket connected, into our buffer
 	//this takes our socket (client) the buffer, the size of the buffer, and flags
-	int bytesR = recv(client, buffer, sizeof(buffer) - 1, 0);
-	buffer[bytesR] = '\0';
+	//we check the number of bytes recived, when we get all of them, we will recive 0 bytes, so we can stop, we also do > 0, as if we dont do that, if we have an error, we will need to keep going.
+	while ((bytesR = recv(client, buffer, sizeof(buffer) - 1, 0)) > 0)
+	{
+		//we append the buffer with our data, and make sure we put in the length of it.
+		//we dont do -1 like above, because we are trying to get all the bytes, and not a size.
+		fulldata.append(buffer, bytesR);
+		//print how many bytes
+		std::cout << "pulled " << bytesR << " Bytes..." << std::endl;
 
+	}
+	
 	//move down the terminal so its a bit cleaner
 	std::cout << "\033[2J\033[1;1H";
 
-	//print what we got from the buffer.
-	std::cout <<"\n\n" << buffer << std::endl;
+
+	///--- OVERALL THIS STUFF IS CHECKING IF WE GOT EVERYTHING PULLED CORRECTLY.
+
+
+	//ok now that we have pulled the data, its time to split the junk,however we want to keep some of it, especally the Content length.
+	//lets find that content length first.
+	int count = fulldata.find("Content-Length:");
+	if (count == std::string::npos) {std::cout << "ERROR - COULD NOT FIND Content-Length" << std::endl;  return -1;}
+
+	//after finding our content length lets extract some of the data past that
+	//we create a one call content length, we create a branch of the string, off of this, pulling the value, we check between the context length, and the next part, to pull our data correctly.
+	std::string contentlength = fulldata.substr((count + 16), fulldata.find("\r\n", count) - (count + 16));
+
+	//debug.
+	std::cout << "the content len is: " << contentlength << std::endl;
+
+
+
+	//ok now we need an error check. we need to make sure that we have pulled the full thing before splitting, so we can compare the bytesR to the contentlength.
+	//we check the content length, and if its not the same as the full data (minus the infomation part, (thats why we do fulldata.find(and that byte structure to tell it if its past that point)
+	if (std::stoi(contentlength) != (fulldata.length() - (fulldata.find("\r\n\r\n") + 4)))
+	{
+		//if we detect a problem lets attempt to pull again
+		std::cout << "Error!, bytes missmatch (" << contentlength << " to " << (fulldata.length() - (fulldata.find("\r\n\r\n") + 4)) << ") attempting to pull again."  << std::endl;
+		fulldata = "";
+		while ((bytesR = recv(client, buffer, sizeof(buffer) - 1, 0)) > 0)
+		{
+			fulldata.append(buffer, bytesR); std::cout << "pulled " << bytesR << " Bytes..." << std::endl;
+		}
+	}
+
+	//if we fail once more, just error out.
+	if (std::stoi(contentlength) != (fulldata.length() - (fulldata.find("\r\n\r\n") + 4))){ std::cout << "Error!, bytes missmatch, cannot continue withour a risk of errors. Exiting." << std::endl; return -1; }
+
+
+
+
+	//---
+
+
+
+
+
+
+
+
+	//now lets use our count data to split it from everything else.
+	count = fulldata.find("\r\n\r\n");
+	if (count == std::string::npos){ std::cout << "ERROR - CORRUP DATA - COULD NOT FIND \r\n\r\n" << std::endl; return -1; }
+
+
+	//HOWEVER, IF WE CANT FIND THIS (corrupt data) WE RETURN std::string::npos (no pos, basicly -1), lets do an error check.
+	
+
+	fulldata = fulldata.erase(0, count + 4); //we do count + 4 because we remove the \r\n\r\n (each \r or \n is one character)
+	std::cout << count << std::endl;
+	//print what we got from the buffer, after spliting junk
+	std::cout << "\n\n" << fulldata << std::endl;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	return 0;
 }
