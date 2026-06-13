@@ -1,4 +1,4 @@
-#pragma onc
+#pragma once
 //define class and include a guard to make sure its not used multiple times
 #ifndef  GET_ValidateString
 #define GET_ValidateString

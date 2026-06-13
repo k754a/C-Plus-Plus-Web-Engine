@@ -1,4 +1,5 @@
 #include "ConnectSocket.h"
+#include "Parser.h"
 //THIS IS A GLOBAL SCRIPT.
 
 //this gives compiler specific instructions to c++, telling it to link the winsock libary to our main libary
@@ -209,16 +210,23 @@ int ConnectSocket(std::string input)
 
 	std::string fulldata = "";
 	
+
+	std::cout << "Loading Website data: \n" << std::endl;
 	//we call recv to pull data from the socket connected, into our buffer
 	//this takes our socket (client) the buffer, the size of the buffer, and flags
 	//we check the number of bytes recived, when we get all of them, we will recive 0 bytes, so we can stop, we also do > 0, as if we dont do that, if we have an error, we will need to keep going.
 	while ((bytesR = recv(client, buffer, sizeof(buffer) - 1, 0)) > 0)
 	{
-		//we append the buffer with our data, and make sure we put in the length of it.
-		//we dont do -1 like above, because we are trying to get all the bytes, and not a size.
-		fulldata.append(buffer, bytesR);
+		
 		//print how many bytes
 		std::cout << "pulled " << bytesR << " Bytes..." << std::endl;
+
+		//we append the buffer with our data, and make sure we put in the length of it.
+		//we dont do -1 like above, because we are trying to get all the bytes, and not a size.
+
+		fulldata.append(buffer, bytesR);
+		
+		
 
 	}
 	
@@ -290,7 +298,8 @@ int ConnectSocket(std::string input)
 
 
 
-
+	// Now lets hand it off to the parser for the hard part (with the combed data)
+	Parser(fulldata);
 
 
 
