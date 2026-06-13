@@ -1,6 +1,13 @@
 #include "ConnectSocket.h"
 #include "Parser.h"
+#include <iostream>
+#include <string>
+#include <cstring>     // FIX memset
+#include <netdb.h>      // FIX gethostbyname + hostent
 
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 // THIS IS A GLOBAL SCRIPT (still global vibes but now cross platform friendly)
 
 // this gives compiler specific instructions to c++, telling it to link libs if needed
