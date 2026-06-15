@@ -1,7 +1,7 @@
 //THIS WILL PARSE THE DATA GOTTEN FROM THE NETWORK SOCKET.
 #include "Parser.h"
 #include <vector>
-
+#include <list>
 
 
 
@@ -41,8 +41,14 @@ bool iswhitespace(std::string& input)
 
 
 
+
+
+
+
+
 std::string StripTags(std::string htmldata)
 {
+	std::cout << "Running Striptags" << std::endl;
 	//first lets remove the htmldata \r\n\r\n, this is a index, so we will just start from this point in our loop.
 	size_t htmlStart = htmldata.find("\r\n\r\n") + 4;
 	int len = htmldata.length(); //get the length of the html data
@@ -51,29 +57,104 @@ std::string StripTags(std::string htmldata)
 	//size_t is much better than int.
 	size_t i = htmlStart;
 
-	//Ok, this is the plan, we find the first html data token, the <html> and we store it in a 
-	//while (i < len)
-	//{
-	//	//we start past this spot.
-	//	size_t nextTag = htmldata.find('<', i);
+	//Ok, this is the plan, we find the first html data token, the <html> and we store it in a stack. then when we find another tag like <css>
+	//We check the stack, because we dont have it in the current stack, we understand that we should add it to the stack, so we do.
+	// Ok, then we run into a </css> tag, we understand that it needs to link to a css tag, so we loop through our stack, and because we have a css tag, we grab the 2 values, and link them together, and remove them from the stack.
+	// But lets say we have a <json> but we dont have the ending </json> what we need to do is that if we have leftover things in our stack that dont fit, we just remove and forget about them.
+	// because we do this, this allows us to avoid things like compile errors because html is a very loose structure format.
+	
+	std::string Savevar; //we will use this in our loop to add to our stack.
 
-	//	if (nextTag == std::string::npos) //if we cant find any (if we make it to the end, or an error)
-	//	{
-	//		//TODO, save any text after this point (if we have any)
-	//		return "NULL";
-	//	}
-
-	//	if (nextTag > i)
-	//	{
-	//		
-	//		std::string textContent = htmldata.substr(i, nextTag - i);
-	//		std::cout << textContent << std::endl;
-	//		i = nextTag;
-	//	}
+	//I orignaly was going to use std::stack, however, there is no native lookup, and i cant edit things in the stack, then i was going to use a list, but i cant search a std::list, so we are using a vector
+	//so we are going to use a list, we use a list because we can check everything, and if they match, we remove from the list.
+	std::vector < std::string > TokenStack;
 
 
 
-	//}
+
+	//first lets build the loop.
+	while (i < len) //while our i is greater then our len
+	{
+		
+		//we first find the first spot.
+		i = htmldata.find('<', i);
+		//we need this because i lowky forgot it, and it ended up crashing lol
+		if (i == std::string::npos)
+		{
+			break; //we have finished.	
+		}
+
+
+
+		//we have to add this, because what ended up happin is that we could find the < but not the > so it would freeze
+		size_t closePos = htmldata.find('>', i);
+		if (closePos == std::string::npos) {
+			break; 
+		}
+
+
+
+		
+
+
+		//if we are good: 
+		//a mistake to watch out for, is that substr, looks for starting char, and length of char, not startpoint and endpoint (i keep messing that up lol)
+		Savevar = htmldata.substr(i, (closePos - i + 1)); //this basicly splits and grabs the data between i and our end '>'
+		//std::cout << Savevar << std::endl; //little telem
+		
+		
+
+		//Ok, now lets add it to our stack list (lets compare to see if it exists first, before adding it, because it will be more effecent that way).
+		
+		if (!TokenStack.empty()) //ok, now we need to check if this is empty
+		{
+			bool matchfound = false;
+			//because <list> has a search method like <stack> we can loop through and check everything
+			//if we cant find a match, we add it to the list, and if we find it (the top stack = our current token) we print it out and remove it. (for now)
+			for (int t = 0; t < TokenStack.size(); t++)
+			{
+				//check if it exists,or its the end version
+				//something i messed up is i directly compared, and you should NOT do that as we want to find pairs lol
+				if ("<" + ("/" + TokenStack[t]) + ">" == Savevar)
+				{
+					//we now assume the we found it!
+					
+					//first we print it
+					std::cout << "Match found! " << Savevar << " + " << TokenStack[t] << std::endl;
+					//because we dont have a erase[i] what we need to do, is to find our first one, and add our index onto it
+					TokenStack.erase(TokenStack.begin() + t);
+				}
+				
+			}
+			//if we went through everything and didnt find it
+			//this is more effecent, because then we dont gotta check for 2 conditions every cycle.
+			if(!matchfound)
+			{
+				//if it does not exist
+				//we clean off the </> stuff
+				std::string tagName = Savevar.substr(1, Savevar.length() - 2);
+				TokenStack.push_back(tagName);
+			}
+
+
+		}
+		else { //this will only be used once, because of the starting one.
+
+			// the token stack was empty, so we will push our token on
+			//we clean off the </> stuff
+			std::string tagName = Savevar.substr(1, Savevar.length() - 2);
+			TokenStack.push_back(tagName);
+		}
+		
+
+
+		i = i + Savevar.length(); //to not index the same thing again, we set the next i point, past the <, so that we find the next point
+
+
+	}
+
+	std::cout << "Done!" << std::endl;
+
 	
 	return "NULL";
 
