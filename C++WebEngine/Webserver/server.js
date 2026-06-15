@@ -46,20 +46,28 @@ wss.on('connection', (ws) => {
     }
 
     engineProcess.stdout.on('data', (data) => {
-        ws.send(data.toString());
+        if (ws.readyState === 1) { // 1 is OPEN
+            ws.send(data.toString());
+        }
     });
 
     engineProcess.stderr.on('data', (data) => {
-        ws.send(`ERROR: ${data.toString()}`);
+        if (ws.readyState === 1) {
+            ws.send(`ERROR: ${data.toString()}`);
+        }
     });
 
     engineProcess.on('error', (err) => {
-        ws.send(`Failed to start subprocess: ${err}\n`);
+        if (ws.readyState === 1) {
+            ws.send(`Failed to start subprocess: ${err}\n`);
+        }
     });
 
     engineProcess.on('close', (code) => {
-        ws.send(`\nEngine exited with code ${code}`);
-        ws.close();
+        if (ws.readyState === 1) {
+            ws.send(`\nEngine exited with code ${code}`);
+            ws.close();
+        }
     });
 
     ws.on('message', (message) => {

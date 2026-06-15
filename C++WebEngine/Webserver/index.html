@@ -49,30 +49,43 @@
         const output = document.getElementById('output');
         const input = document.getElementById('input');
         
-        const ws = new WebSocket(`ws://${window.location.host}`);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
         
+        // CHANGED WITH AI: Switched to innerHTML-safe rendering so links display correctly in the terminal
+        function appendText(text) {
+            const span = document.createElement('span');
+            span.textContent = text;
+            output.appendChild(span);
+        }
+
         ws.onmessage = (event) => {
             let text = event.data;
             if (text.includes('\x1b[2J\x1b[1;1H')) {
-                output.textContent = '';
+                output.innerHTML = '';
                 text = text.replace('\x1b[2J\x1b[1;1H', '');
             }
-            output.textContent += text;
+            appendText(text);
             window.scrollTo(0, document.body.scrollHeight);
         };
 
         ws.onopen = () => {
-            output.textContent += 'Connected to server.\n';
+            // CHANGED WITH AI: Added copyright and project links to the welcome message
+            output.innerHTML +=
+                'Connected to server.\n' +
+                'copyright k754a 2026\n' +
+                'Check out the GitHub: <a href="https://github.com/k754a/C-Plus-Plus-Web-Engine/graphs/traffic" target="_blank" style="color:inherit;">https://github.com/k754a/C-Plus-Plus-Web-Engine/graphs/traffic</a>\n' +
+                'Project page: <a href="https://stardance.hackclub.com/projects/5003" target="_blank" style="color:inherit;">https://stardance.hackclub.com/projects/5003</a>\n\n';
         };
 
         ws.onclose = () => {
-            output.textContent += '\nConnection closed.\n';
+            appendText('\nConnection closed.\n');
         };
 
         input.onkeypress = (e) => {
             if (e.key === 'Enter') {
                 if (input.value) {
-                    output.textContent += input.value + '\n';
+                    appendText(input.value + '\n');
                     ws.send(input.value);
                     input.value = '';
                     window.scrollTo(0, document.body.scrollHeight);
