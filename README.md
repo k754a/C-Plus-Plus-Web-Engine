@@ -1,3 +1,4 @@
-Hi! this is my custum c++ web engine, build from sctratch!
+Hi! This is my custom C++ web engine, built from scratch!
 
-This readme is still in the works, but ill update it once i add more things!
+This readme is still in the works, but I'll update it once I add more things!
+
