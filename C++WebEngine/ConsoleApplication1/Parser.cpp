@@ -42,17 +42,25 @@ bool iswhitespace(std::string& input)
 
 
 
-
-
-
-
-std::string StripTags(std::string htmldata)
+//Full striptags code, does not handle things like <a href="link">
+std::vector<Token> StripTags(std::string htmldata)
 {
+	std::vector<Token> tokenList; //saves our tokens, we do a vector to save multiple instances!
+
+	//DEFINE SOME VOID TAGS
+	//some tags are allowed to be single, so we will also check for that!
+	//i got the tags from https://developer.mozilla.org/en-US/docs/Glossary/Void_element however it was missing br/ so that was added
+	std::vector<std::string> voidTags = { "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr", "br/", "<!--", "-->", "!DOCTYPE"};
+
+
+
+
+
 	std::cout << "Running Striptags" << std::endl;
 	//first lets remove the htmldata \r\n\r\n, this is a index, so we will just start from this point in our loop.
 	size_t htmlStart = htmldata.find("\r\n\r\n") + 4;
 	int len = htmldata.length(); //get the length of the html data
-	std::vector<Token> tokenList; //create the list for the token.
+
 
 	//size_t is much better than int.
 	size_t i = htmlStart;
@@ -77,14 +85,36 @@ std::string StripTags(std::string htmldata)
 	{
 		
 		//we first find the first spot.
-		i = htmldata.find('<', i);
+		size_t nextTag = htmldata.find('<', i);
 		//we need this because i lowky forgot it, and it ended up crashing lol
-		if (i == std::string::npos)
+		if (nextTag == std::string::npos)
 		{
 			break; //we have finished.	
 		}
 
+		//We do this because text is stored between chars like for example <Hello> the index of < is 0 and the index of > is 6.
+		//if nexttag is bigger, it means we have text inbetween!
+		//this works for nested tags because <><> has no space! even if it does <> <> we ignore whitespaces
+		if (nextTag > i)
+		{
+			std::string text = htmldata.substr(i, nextTag - i);//we grab the data between our "i" and a certain amount of chars after
 
+				if (!iswhitespace(text)) //our funct to check if we have whitespace
+				{
+					//now that we know there is valid text
+					Token textT;
+					textT.type = TokenType::TEXT;
+					textT.value = text;
+
+					tokenList.push_back(textT);
+
+					std::cout << "Found Text: " << text << std::endl;
+				}
+		}
+
+		//now we move our i to our next token, because we just found one!
+
+		i = nextTag;
 
 		//we have to add this, because what ended up happin is that we could find the < but not the > so it would freeze
 		size_t closePos = htmldata.find('>', i);
@@ -92,6 +122,7 @@ std::string StripTags(std::string htmldata)
 			break; 
 		}
 
+		
 
 
 		
@@ -108,6 +139,8 @@ std::string StripTags(std::string htmldata)
 		
 		if (!TokenStack.empty()) //ok, now we need to check if this is empty
 		{
+			Token currenttoken; //build a temp class
+
 			bool matchfound = false;
 			//because <list> has a search method like <stack> we can loop through and check everything
 			//if we cant find a match, we add it to the list, and if we find it (the top stack = our current token) we print it out and remove it. (for now)
@@ -115,15 +148,35 @@ std::string StripTags(std::string htmldata)
 			{
 				//check if it exists,or its the end version
 				//something i messed up is i directly compared, and you should NOT do that as we want to find pairs lol
-				if ("<" + ("/" + TokenStack[t]) + ">" == Savevar)
+				if (("</" + TokenStack[t] + ">")  == Savevar)
 				{
+					
 					//we now assume the we found it!
 					
 					//first we print it
 					std::cout << "Match found! " << Savevar << " + " << TokenStack[t] << std::endl;
+					
+
+					
+					//now lets save it to our tokenlist
+					//because we know the start+end, we can save both
+
+					//because we know the start+end, we can save both
+					currenttoken.type = TokenType::START;
+					currenttoken.value = "<" + TokenStack[t] + ">";
+					tokenList.push_back(currenttoken);
+
+					currenttoken.type = TokenType::END;
+					currenttoken.value = Savevar;
+					tokenList.push_back(currenttoken);
+
 					//because we dont have a erase[i] what we need to do, is to find our first one, and add our index onto it
 					TokenStack.erase(TokenStack.begin() + t);
+					//because we found a match we break, and that allows us to fix a bug!
+					matchfound = true;
+					break;
 				}
+
 				
 			}
 			//if we went through everything and didnt find it
@@ -133,8 +186,27 @@ std::string StripTags(std::string htmldata)
 				//if it does not exist
 				//we clean off the </> stuff
 				std::string tagName = Savevar.substr(1, Savevar.length() - 2);
+				size_t spacePos = tagName.find(' ');
+				if (spacePos != std::string::npos)
+				{
+					//we have a space! because we do lets find and remove it.
+					tagName = tagName.substr(0, spacePos);
+				}
+
+				//before we throw in the towel, lets check to see if its one of our void tags
+				//we check if its not = to voidtags.end() because if we get to the end of a vector and cant find nothing, we are ok with that!
+				if (std::find(voidTags.begin(), voidTags.end(), tagName) != voidTags.end())
+				{
+					//currently we do nothing with this, but thats ok
+					std::cout << "Void Tag Found! " << Savevar << std::endl;
+				}
+
+
+
 				TokenStack.push_back(tagName);
+
 			}
+			
 
 
 		}
@@ -143,6 +215,22 @@ std::string StripTags(std::string htmldata)
 			// the token stack was empty, so we will push our token on
 			//we clean off the </> stuff
 			std::string tagName = Savevar.substr(1, Savevar.length() - 2);
+			//HOWEVER, WE NEED TO REMOVE THE a href="link.html" if it exists
+			size_t spacePos = tagName.find(' ');
+			if (spacePos != std::string::npos)
+			{
+				//we have a space! because we do lets find and remove it.
+				tagName = tagName.substr(0, spacePos);
+			}
+
+			//before we throw in the towel, lets check to see if its one of our void tags
+			//we check if its not = to voidtags.end() because if we get to the end of a vector and cant find nothing, we are ok with that!
+			if (std::find(voidTags.begin(), voidTags.end(), tagName) != voidTags.end())
+			{
+				//currently we do nothing with this, but thats ok.
+				std::cout << "Void Tag Found! " << Savevar << std::endl;
+			}
+
 			TokenStack.push_back(tagName);
 		}
 		
@@ -150,13 +238,46 @@ std::string StripTags(std::string htmldata)
 
 		i = i + Savevar.length(); //to not index the same thing again, we set the next i point, past the <, so that we find the next point
 
+		
 
 	}
 
-	std::cout << "Done!" << std::endl;
+	//cleanness
+	std::cout << "-------------" << std::endl;
+	//For debug (and fun) lets print the tags without a partner :(
 
-	
-	return "NULL";
+	if (TokenStack.size() <= 0)
+	{
+		std::cout << "No extra tags found. :)" << std::endl;
+	}
+	else
+	{
+		//turns out we end up saving a few tags just with a bug, it doesn't effect the main thing, so if it aint broke, dont fix it!
+
+		//UPDATE the bug has been fixed!
+			std::copy(TokenStack.begin(), TokenStack.end(), std::ostream_iterator<std::string>(std::cout, " "));
+
+			std::cout << std::endl;
+			std::cout << "Extra tags found. This wont be a problem." << std::endl;
+	}
+
+	std::cout << "Done!" << std::endl;
+	//cleanness
+	std::cout << "-------------" << std::endl;
+
+
+	std::cout << "Final Tokens:" << std::endl;
+	//we want to print the token combos, just as a debug!
+	for (int i = 0; i < tokenList.size(); i++)
+	{
+		//ok now we loop through and print
+		//as our final thing
+		std::cout << tokenList[i].value << std::endl;
+	}
+
+	std::cout << std::endl;
+
+	return tokenList;
 
 }
 
@@ -253,24 +374,50 @@ std::string ManageCSS(std::string htmldata)
 	return htmldata.erase(htmldata.find("<style>"), (htmldata.find("</style>") + 8) - htmldata.find("<style>"));
 }
 
-
-std::string ManageJSON(std::string htmldata)
+//we wont work with JAVASCIRPT right now (we might if i run out of things on this project)
+std::string ManageJAVASCIRPT(std::string htmldata)
 {
 	//Currently all we want to do in this is to just remove all the JSON, so lets find the json tags, and remove them.
 	//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
 	//however some sites may not have json, so we should check.
-	if (htmldata.find("<scirpt>") == std::string::npos)
+	if (htmldata.find("<script>") == std::string::npos)
 	{
 		return htmldata; //dont change nothin, just prevent an error
 	}
 	//if we are good, return this.
-	return htmldata.erase(htmldata.find("<scirpt>"), (htmldata.find("</scirpt>") + 8) - htmldata.find("<scirpt>"));
+	return htmldata.erase(htmldata.find("<script>"), (htmldata.find("</script>") + 8) - htmldata.find("<script>"));
+}
+
+//this is to remove comments as we dont need them in the engine
+std::string ManageCOMMENTS(std::string htmldata)
+{
+	while (true) //we loot forever just to be simple, once we cant find any more <!== tags we just return
+	{
+		//Currently all we want to do in this is to just remove all the COMMENTS, so lets find the comment tags, and remove them.
+			//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
+			//however some sites may not have json, so we should check.
+		if (htmldata.find("<!--") == std::string::npos)
+		{
+			break;
+		}
+		if (htmldata.find("-->") == std::string::npos)
+		{
+			break;
+			
+		}
+		htmldata.erase(htmldata.find("<!--"), (htmldata.find("-->") + 3) - htmldata.find("<!--"));
+		//if we are good, return this.
+	}
+
+	//we dont check again, because we found everything!
+	return htmldata;
 }
 
 
 int Parser(std::string input)
 {
 	//all this is doing, is removing, the json part, then the css part, then all of the tags, just to get the final text for this basic parser.
-	StripTags(ManageCSS(ManageJSON(input))); //not great to nest, will be fixed
+	std::vector<Token> TokenList = StripTags(ManageCOMMENTS(ManageCSS(ManageJAVASCIRPT(input)))); //not great to nest, will be fixed, but its ok
+	
 	return 0;
 }
