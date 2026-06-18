@@ -139,9 +139,9 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ConsoleApplication1.cpp" />
     <ClCompile Include="ConnectSocket.cpp" />
     <ClCompile Include="Parser.cpp" />
+    <ClCompile Include="Webengine.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ConnectSocket.h" />
