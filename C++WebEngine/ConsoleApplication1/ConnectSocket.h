@@ -10,7 +10,8 @@
 #include <ws2tcpip.h> //for pton
 
 //pull the validate string
-int ConnectSocket(std::string input);
+int ConnectSocketHTTP(std::string input);
+int ConnectSocketHTTPS(std::wstring input);
 int EndWinSock();
 int StartWinSock();
 

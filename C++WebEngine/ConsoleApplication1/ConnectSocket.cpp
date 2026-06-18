@@ -1,9 +1,27 @@
 #include "ConnectSocket.h"
 #include "Parser.h"
 //THIS IS A GLOBAL SCRIPT.
+#include <windows.h>
+#include <wininet.h>
+#include <iostream>
+#include <string>
+#include <vector>
 
 //this gives compiler specific instructions to c++, telling it to link the winsock libary to our main libary
 #pragma comment(lib, "ws2_32.lib")
+
+//this is for HTTPS
+#pragma comment(lib, "wininet.lib")
+
+
+
+
+
+
+
+
+
+
 
 WSAData wsaData; //structure to hold our network data, across our diffrent voids and ints
 //this starts up our winsock at the begining
@@ -83,7 +101,128 @@ std::string Cleanup(std::string linkinput)
 }
 
 
-int ConnectSocket(std::string input)
+
+//Connect for https.
+int ConnectSocketHTTPS(std::wstring input)
+{
+	//we make a string to get our full response for now lets print it out
+	std::string response = "";
+
+	//Ok build the hInterent, hInternet is a libary already in windows, this will create a sesion handle for the internet
+	//this is like how crome opens a site!
+	//first convert it so we are good
+
+
+	std::string temp(input.begin(), input.end());
+
+	//convert to wstr from our cleanup.
+	std::string cleaned = Cleanup(temp);
+	std::wstring host_name(cleaned.begin(), cleaned.end());
+	//arguments (What type of browser), (type of accsess), (info abrout your proxy), (proxy bypass), (flags). we will set the last 3 to NULL NULL 0.
+	HINTERNET hInternet = InternetOpen(L"Browse++", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+
+
+	//then lets check, to make sure we got this part working
+	if (hInternet != NULL)
+	{
+		//we now open a TCP connection to the cite, but we do not connect yet
+		//it wants the url, we copy the parsing above for it
+		//the INTERNET_DEFAULT_HTTPS_PORT is port 443
+		//then it asks for username and password (we dont need)
+		//the next one i dont understand, but the last 2 are flags and context
+		HINTERNET hconnect = InternetConnect(hInternet, host_name.c_str(), INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+
+		if (hconnect != NULL)
+		{
+			//if what we just did was good
+			//we build our http request
+			//we send like our std::string request = std::string("GET ") + URLPath + std::string(" HTTP/1.1\r\n") + "Host: " + host_name + "\r\n" + "Connection: close\r\n\r\n"; 
+			//connection handle, http method, url path (convert to wstring), version, referrer, and acount types (we dont care), how we get https, is we use INTERNET FLAG SECURE
+			std::wstring temp1(URLPath.begin(), URLPath.end());
+			HINTERNET hRequest = HttpOpenRequest(hconnect, L"GET", temp1.c_str(), NULL, NULL, NULL, INTERNET_FLAG_SECURE, 0);
+
+			//we check to make sure
+			if (hRequest != NULL)
+			{
+				//we send our packet of info, and just set everything else to 0 or NULL
+				//we make an if and when it runs the if it sees if it returns true, and it works
+				if (HttpSendRequest(hRequest, NULL, 0, NULL, 0))
+				{
+					//like how we do it in http.
+					char buffer[4096];
+					DWORD bytesread = 0;//how many bytes read
+
+
+
+					//now lets read!
+
+					while (InternetReadFile(hRequest, buffer, sizeof(buffer), &bytesread) && bytesread > 0)
+					{
+						//keep adding onto our full response
+						response.append(buffer, bytesread);
+					}
+
+
+
+					//ok now that we have everything, apparently these network nodes will leak resorces untill we close them
+					
+
+				}
+				else {
+					std::cout << "Something failed" << std::endl;
+					return -1;
+				}
+				InternetCloseHandle(hRequest);  //DISCONNECT
+			}
+			
+		}
+
+		else {
+			std::cout << "ERROR - hconnect is Null, thats all we know :(" << std::endl;
+			return -1;
+		}
+		InternetCloseHandle(hconnect); //DISCONNECT
+
+		InternetCloseHandle(hInternet); //DISCONNECT
+		
+		
+	}
+
+
+
+	
+
+	std::cout << "this is what we got! " << response << std::endl;
+
+
+	//IF it works, lets send it.
+	Parser(response);
+	return 0;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int ConnectSocketHTTP(std::string input)
 {
 	//SOCKET id, for our client file descirptor
 	//setting AF_INET, means we set it to ipv4, and that tells windows we want somthin like 192.168.43.1

@@ -2,7 +2,7 @@
 #include "Parser.h"
 #include <vector>
 #include <list>
-
+#include <unordered_set> //for the check to make it faster
 
 
 
@@ -50,15 +50,27 @@ std::vector<Token> StripTags(std::string htmldata)
 	//DEFINE SOME VOID TAGS
 	//some tags are allowed to be single, so we will also check for that!
 	//i got the tags from https://developer.mozilla.org/en-US/docs/Glossary/Void_element however it was missing br/ so that was added
-	std::vector<std::string> voidTags = { "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr", "br/", "<!--", "-->", "!DOCTYPE"};
-
+	//this is faster because we can check as if there is no order at all!
+	std::unordered_set<std::string> voidTags = {
+	"area", "base", "br", "col", "embed", "hr", "img", "input",
+	"link", "meta", "param", "source", "track", "wbr"
+	};
 
 
 
 
 	std::cout << "Running Striptags" << std::endl;
+	size_t htmlStart = 0;
 	//first lets remove the htmldata \r\n\r\n, this is a index, so we will just start from this point in our loop.
-	size_t htmlStart = htmldata.find("\r\n\r\n") + 4;
+	//we check, because if we have https this wont work, and we will pull some random tags lol
+	if (htmldata.find("\r\n\r\n") == std::string::npos)
+	{
+		htmlStart = 0; //we do this because using winInet, it alr removes that stuff, so we dont have to do it!
+	}
+	else {
+		 htmlStart = htmldata.find("\r\n\r\n") + 4; //http does not, so we still do.
+	}
+	
 	int len = htmldata.length(); //get the length of the html data
 
 
@@ -144,41 +156,42 @@ std::vector<Token> StripTags(std::string htmldata)
 			bool matchfound = false;
 			//because <list> has a search method like <stack> we can loop through and check everything
 			//if we cant find a match, we add it to the list, and if we find it (the top stack = our current token) we print it out and remove it. (for now)
-			for (int t = 0; t < TokenStack.size(); t++)
-			{
+			
 				//check if it exists,or its the end version
 				//something i messed up is i directly compared, and you should NOT do that as we want to find pairs lol
-				if (("</" + TokenStack[t] + ">")  == Savevar)
-				{
+			//first we check if the tokenstack is empty, and our last token in the loop is a pair to the save var
+			if (!TokenStack.empty() && ("</" + TokenStack.back() + ">") == Savevar)
+			{
 					
-					//we now assume the we found it!
+				//we now assume the we found it!
 					
-					//first we print it
-					std::cout << "Match found! " << Savevar << " + " << TokenStack[t] << std::endl;
+				//first we print it
+				std::cout << "Match found! " << std::endl;
 					
 
 					
-					//now lets save it to our tokenlist
-					//because we know the start+end, we can save both
+				//now lets save it to our tokenlist
+				//because we know the start+end, we can save both
 
-					//because we know the start+end, we can save both
-					currenttoken.type = TokenType::START;
-					currenttoken.value = "<" + TokenStack[t] + ">";
-					tokenList.push_back(currenttoken);
+				//because we know the start+end, we can save both
+				currenttoken.type = TokenType::START;
+				currenttoken.value = "<" + TokenStack.back() + ">";
+				tokenList.push_back(currenttoken);
 
-					currenttoken.type = TokenType::END;
-					currenttoken.value = Savevar;
-					tokenList.push_back(currenttoken);
+				currenttoken.type = TokenType::END;
+				currenttoken.value = Savevar;
+				tokenList.push_back(currenttoken);
 
-					//because we dont have a erase[i] what we need to do, is to find our first one, and add our index onto it
-					TokenStack.erase(TokenStack.begin() + t);
-					//because we found a match we break, and that allows us to fix a bug!
-					matchfound = true;
-					break;
-				}
-
+				//because we dont have a erase[i] what we need to do, is to find our first one, and add our index onto it
+				//NOW we can do     TokenStack.pop_back(); as this is better than the erase and does the same thing
+				TokenStack.pop_back();
+				//because we found a match we break, and that allows us to fix a bug!
+				matchfound = true;
 				
 			}
+
+				
+			
 			//if we went through everything and didnt find it
 			//this is more effecent, because then we dont gotta check for 2 conditions every cycle.
 			if(!matchfound)
@@ -195,7 +208,7 @@ std::vector<Token> StripTags(std::string htmldata)
 
 				//before we throw in the towel, lets check to see if its one of our void tags
 				//we check if its not = to voidtags.end() because if we get to the end of a vector and cant find nothing, we are ok with that!
-				if (std::find(voidTags.begin(), voidTags.end(), tagName) != voidTags.end())
+				if ((voidTags.contains(tagName)))
 				{
 					//currently we do nothing with this, but thats ok
 					std::cout << "Void Tag Found! " << Savevar << std::endl;
@@ -357,67 +370,194 @@ std::vector<Token> StripTags(std::string htmldata)
 //}
 
 
-
+//now all functions can parse much faster than before.
 
 
 //these classes will be populate eventualy, to actully tokenize, and render css, but not today.
-std::string ManageCSS(std::string htmldata)
+//this was updated to a loop, because https sites can have more than one stylesheet.
+std::string ManageCSS(const std::string& htmldata)
 {
-	//Currently all we want to do in this is to just remove all the CSS, so lets find the css tags, and remove them.
+	
+	std::string returnhtmldata;
+	returnhtmldata.reserve(htmldata.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
+
+	//we do the same for strip tags, instead of scanning everything, we just find and remove!
+	size_t i = 0;
+	const size_t len = htmldata.size();
+
+	while (i < len) //same as strip tags
+	{
+		size_t startpos = htmldata.find("<style", i); //find the first half, from the i (so we dont check back from the start)
+		if (startpos == std::string::npos)
+		{
+			//we need to make sure we save it
+			returnhtmldata.append(htmldata, i, len - i); //we return our data, taking from htmldata, and going from i to out
+			break;
+		}
+
+		returnhtmldata.append(htmldata, i, startpos - i);  //we return our data, taking from htmldata, and going from i to out
+
+		size_t endpos = htmldata.find("</style>", startpos);
+		if (endpos == std::string::npos)
+		{
+			break;
+
+		}
+		//Currently all we want to do in this is to just remove all the CSS, so lets find the css tags, and remove them.
 	//super simple, look for the style parts, (as they are constant across all websites) and remove everything inbetween.
 	//however some sites may not have a stylesheet, so we should check.
-	if (htmldata.find("<style>") == std::string::npos)
-	{
-		return htmldata; //dont change nothin, just prevent an error
-	}
-	//if we are good, return this.
-	return htmldata.erase(htmldata.find("<style>"), (htmldata.find("</style>") + 8) - htmldata.find("<style>"));
-}
 
-//we wont work with JAVASCIRPT right now (we might if i run out of things on this project)
-std::string ManageJAVASCIRPT(std::string htmldata)
-{
-	//Currently all we want to do in this is to just remove all the JSON, so lets find the json tags, and remove them.
-	//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
-	//however some sites may not have json, so we should check.
-	if (htmldata.find("<script>") == std::string::npos)
-	{
-		return htmldata; //dont change nothin, just prevent an error
-	}
-	//if we are good, return this.
-	return htmldata.erase(htmldata.find("<script>"), (htmldata.find("</script>") + 8) - htmldata.find("<script>"));
-}
 
-//this is to remove comments as we dont need them in the engine
-std::string ManageCOMMENTS(std::string htmldata)
-{
-	while (true) //we loot forever just to be simple, once we cant find any more <!== tags we just return
-	{
-		//Currently all we want to do in this is to just remove all the COMMENTS, so lets find the comment tags, and remove them.
-			//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
-			//however some sites may not have json, so we should check.
-		if (htmldata.find("<!--") == std::string::npos)
-		{
-			break;
-		}
-		if (htmldata.find("-->") == std::string::npos)
-		{
-			break;
-			
-		}
-		htmldata.erase(htmldata.find("<!--"), (htmldata.find("-->") + 3) - htmldata.find("<!--"));
+		i = endpos + std::string("</style>").length(); //same as the erase but we dont erase anything, and its dynamic now!
 		//if we are good, return this.
 	}
 
-	//we dont check again, because we found everything!
-	return htmldata;
+	
+	return returnhtmldata;
+
+}
+
+//we wont work with JAVASCIRPT right now (we might if i run out of things on this project)
+//this was updated as https can have more than one <script> area
+
+std::string ManageJAVASCIRPT(const std::string& htmldata)
+{
+
+	std::string returnhtmldata;
+	returnhtmldata.reserve(htmldata.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
+
+	//we do the same for strip tags, instead of scanning everything, we just find and remove!
+	size_t i = 0;
+	const size_t len = htmldata.size();
+
+	while (i < len) //same as strip tags
+	{
+		size_t startpos = htmldata.find("<script", i); //find the first half, from the i (so we dont check back from the start)
+		if (startpos == std::string::npos)
+		{
+			//we need to make sure we save it
+			returnhtmldata.append(htmldata, i, len - i); //we return our data, taking from htmldata, and going from i to out
+			break;
+		}
+
+		returnhtmldata.append(htmldata, i, startpos - i);  //we return our data, taking from htmldata, and going from i to out
+
+		size_t endpos = htmldata.find("</script>", startpos);
+		if (endpos == std::string::npos)
+		{
+			break;
+
+		}
+		//Currently all we want to do in this is to just remove all the JAVA, so lets find the JAVA tags, and remove them.
+	//super simple, look for the style parts, (as they are constant across all websites) and remove everything inbetween.
+	//however some sites may not have a stylesheet, so we should check.
+
+
+		i = endpos + std::string("</script>").length(); //same as the erase but we dont erase anything, and its dynamic now!
+		//if we are good, return this.
+	}
+
+
+	return returnhtmldata;
+
+}
+
+
+
+std::string ManageCOMMENTS(const std::string& htmldata)
+{
+
+	std::string returnhtmldata;
+	returnhtmldata.reserve(htmldata.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
+
+	//we do the same for strip tags, instead of scanning everything, we just find and remove!
+	size_t i = 0;
+	const size_t len = htmldata.size();
+
+	while (i < len) //same as strip tags
+	{
+		size_t startpos = htmldata.find("<!--", i); //find the first half, from the i (so we dont check back from the start)
+		if (startpos == std::string::npos)
+		{
+			//we need to make sure we save it
+			returnhtmldata.append(htmldata, i, len - i); //we return our data, taking from htmldata, and going from i to out
+			break;
+		}
+
+		returnhtmldata.append(htmldata, i, startpos - i);  //we return our data, taking from htmldata, and going from i to out
+
+		size_t endpos = htmldata.find("-->", startpos);
+		if (endpos == std::string::npos)
+		{
+			break;
+
+		}
+		//Currently all we want to do in this is to just remove all the comments, so lets find the comment tags, and remove them.
+	//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
+	//however some sites may not have comments , so we should check.
+
+
+		i = endpos + std::string("-->").length(); //same as the erase but we dont erase anything, and its dynamic now!
+		//if we are good, return this.
+	}
+
+
+	return returnhtmldata;
+
+}
+
+std::string ManageNoScript(const std::string& htmldata)
+{
+
+	std::string returnhtmldata;
+	returnhtmldata.reserve(htmldata.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
+
+	//we do the same for strip tags, instead of scanning everything, we just find and remove!
+	size_t i = 0;
+	const size_t len = htmldata.size();
+
+	while (i < len) //same as strip tags
+	{
+		size_t startpos = htmldata.find("<noscript", i); //find the first half, from the i (so we dont check back from the start)
+		if (startpos == std::string::npos)
+		{
+			//we need to make sure we save it
+			returnhtmldata.append(htmldata, i, len - i); //we return our data, taking from htmldata, and going from i to out
+			break;
+		}
+
+		returnhtmldata.append(htmldata, i, startpos - i);  //we return our data, taking from htmldata, and going from i to out
+
+		size_t endpos = htmldata.find("</noscript>", startpos);
+		if (endpos == std::string::npos)
+		{
+			break;
+
+		}
+		//Currently all we want to do in this is to just remove all the No scirpt tags, so lets find the json tags, and remove them.
+		//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
+		//however some sites may not have json, so we should check.
+
+
+		i = endpos + std::string("</noscript>").length(); //same as the erase but we dont erase anything, and its dynamic now!
+		//if we are good, return this.
+	}
+
+
+	return returnhtmldata;
+
 }
 
 
 int Parser(std::string input)
 {
 	//all this is doing, is removing, the json part, then the css part, then all of the tags, just to get the final text for this basic parser.
-	std::vector<Token> TokenList = StripTags(ManageCOMMENTS(ManageCSS(ManageJAVASCIRPT(input)))); //not great to nest, will be fixed, but its ok
+	std::vector<Token> TokenList = StripTags(ManageNoScript(ManageCOMMENTS(ManageCSS(ManageJAVASCIRPT(input))))); //not great to nest, will be fixed, but its ok
 	
+
+
+
+
+
 	return 0;
 }
