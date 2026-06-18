@@ -1,0 +1,115 @@
+# =========================
+# Prerequisites / deps
+# =========================
+*.d
+
+# =========================
+# Compiled Object files
+# =========================
+*.slo
+*.lo
+*.o
+*.obj
+
+# =========================
+# Precompiled Headers
+# =========================
+*.gch
+*.pch
+
+# =========================
+# Linker / build intermediates
+# =========================
+*.ilk
+*.idb
+*.iobj
+*.ipdb
+
+# =========================
+# Debug / profiling files
+# =========================
+*.pdb
+*.log
+*.tlog
+*.lastbuildstate
+
+# =========================
+# Libraries / binaries
+# =========================
+*.so
+*.dylib
+*.dll
+*.so.*
+*.a
+*.lib
+
+# =========================
+# Executables
+# =========================
+*.exe
+*.out
+*.app
+
+# =========================
+# Build directories (IMPORTANT)
+# =========================
+build/
+Build/
+build-*/
+**/x64/
+**/Debug/
+**/Release/
+
+# =========================
+# CMake generated files
+# =========================
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+install_manifest.txt
+compile_commands.json
+
+# =========================
+# Visual Studio / MSVC junk
+# =========================
+.vs/
+*.VC.db
+*.VC.VC.opendb
+
+# =========================
+# Node.js / Web stuff
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# vcpkg
+# =========================
+vcpkg_installed/
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.bak
+*.swp
+
+# =========================
+# Debug info / compiler extras
+# =========================
+*.dwo
+
+# =========================
+# Test / cache
+# =========================
+Testing/
+.cache/
+
+# =========================
+# OS junk (optional but nice)
+# =========================
+.DS_Store
+Thumbs.db
