@@ -140,6 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ConnectSocket.cpp" />
+    <ClCompile Include="DOMTree.cpp" />
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="Webengine.cpp" />
   </ItemGroup>

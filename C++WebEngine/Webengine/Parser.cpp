@@ -11,7 +11,8 @@
 //currently we want to have a start tag, a text, and a end tag
 //we say enum just to tell the complier that we wont be changing this
 //this is saying class tokentype( start (like <p>), text (like "this is a test"), and end (like <p>))
-enum class TokenType { START, TEXT, END};
+//i added a VOID tag, and COMMENT, just for the dom tree
+enum class TokenType { START, TEXT, END, VOID};
 
 //lets build the token structure
 struct Token
@@ -41,7 +42,6 @@ bool iswhitespace(std::string& input)
 
 
 
-
 //Full striptags code, does not handle things like <a href="link">
 std::vector<Token> StripTags(std::string htmldata)
 {
@@ -53,14 +53,15 @@ std::vector<Token> StripTags(std::string htmldata)
 	//this is faster because we can check as if there is no order at all!
 	std::unordered_set<std::string> voidTags = {
 	"area", "base", "br", "col", "embed", "hr", "img", "input",
-	"link", "meta", "param", "source", "track", "wbr"
+	"link", "meta", "param", "source", "track", "wbr", "!doctype html"
 	};
 
 
 
+	
+	std::cout << "Running Striptags" << std::endl; //just some debug
+	size_t htmlStart = 0; //this var sets where i starts (changes if its HTTPS or just HTTP)
 
-	std::cout << "Running Striptags" << std::endl;
-	size_t htmlStart = 0;
 	//first lets remove the htmldata \r\n\r\n, this is a index, so we will just start from this point in our loop.
 	//we check, because if we have https this wont work, and we will pull some random tags lol
 	if (htmldata.find("\r\n\r\n") == std::string::npos)
@@ -71,34 +72,48 @@ std::vector<Token> StripTags(std::string htmldata)
 		 htmlStart = htmldata.find("\r\n\r\n") + 4; //http does not, so we still do.
 	}
 	
+
+	size_t i = htmlStart; 	//size_t is much better than int. This is our starting spot, from the stuff above
+
+
 	int len = htmldata.length(); //get the length of the html data
 
 
-	//size_t is much better than int.
-	size_t i = htmlStart;
 
-	//Ok, this is the plan, we find the first html data token, the <html> and we store it in a stack. then when we find another tag like <css>
-	//We check the stack, because we dont have it in the current stack, we understand that we should add it to the stack, so we do.
-	// Ok, then we run into a </css> tag, we understand that it needs to link to a css tag, so we loop through our stack, and because we have a css tag, we grab the 2 values, and link them together, and remove them from the stack.
-	// But lets say we have a <json> but we dont have the ending </json> what we need to do is that if we have leftover things in our stack that dont fit, we just remove and forget about them.
-	// because we do this, this allows us to avoid things like compile errors because html is a very loose structure format.
-	
+
+
+
+
+
+
+
+
+
+
 	std::string Savevar; //we will use this in our loop to add to our stack.
 
-	//I orignaly was going to use std::stack, however, there is no native lookup, and i cant edit things in the stack, then i was going to use a list, but i cant search a std::list, so we are using a vector
-	//so we are going to use a list, we use a list because we can check everything, and if they match, we remove from the list.
-	std::vector < std::string > TokenStack;
 
-
+	
+	std::vector < std::string > TokenStack; //so we are going to use a list, we use a list because we can check everything, and if they match, we remove from the list. but ofc we add it to the Tokenlist above
 
 
 	//first lets build the loop.
-	while (i < len) //while our i is greater then our len
+
+	//MAIN CHANGE
+	//ok, the main thing that i changed, is i went from fufuling multiple conditions with one if, to looping through each <> or <\> and checking if it meets the condtions for a TEXT block
+	//a START or and END, this allows it to work so much better, and order the text, because before we printed <> TEXT </> together, now we dont.
+
+
+
+	while (i < len) //while our i is greater then our len, so we keep going till our i cant find anymore
 	{
 		
-		//we first find the first spot.
-		size_t nextTag = htmldata.find('<', i);
+		
+		size_t nextTag = htmldata.find('<', i); //we first find the first spot.
+
+
 		//we need this because i lowky forgot it, and it ended up crashing lol
+		//it checks to make sure that we have found all our things, and if we have we exit.
 		if (nextTag == std::string::npos)
 		{
 			break; //we have finished.	
@@ -109,23 +124,26 @@ std::vector<Token> StripTags(std::string htmldata)
 		//this works for nested tags because <><> has no space! even if it does <> <> we ignore whitespaces
 		if (nextTag > i)
 		{
-			std::string text = htmldata.substr(i, nextTag - i);//we grab the data between our "i" and a certain amount of chars after
+			std::string text = htmldata.substr(i, nextTag - i);//we grab the data between our "i" and a certain amount of chars after, making sure we grab all our text
 
 				if (!iswhitespace(text)) //our funct to check if we have whitespace
 				{
-					//now that we know there is valid text
-					Token textT;
-					textT.type = TokenType::TEXT;
-					textT.value = text;
 
+
+					//we do this lower now
+					Token textT;
+
+					//we just made a temp token, now we need to do 
+					textT.value = text;
+					textT.type = TokenType::TEXT;
 					tokenList.push_back(textT);
 
 					std::cout << "Found Text: " << text << std::endl;
 				}
 		}
 
-		//now we move our i to our next token, because we just found one!
 
+		//now we move our i to our next token, because we just found one!
 		i = nextTag;
 
 		//we have to add this, because what ended up happin is that we could find the < but not the > so it would freeze
@@ -147,113 +165,79 @@ std::vector<Token> StripTags(std::string htmldata)
 		
 		
 
-		//Ok, now lets add it to our stack list (lets compare to see if it exists first, before adding it, because it will be more effecent that way).
 		
-		if (!TokenStack.empty()) //ok, now we need to check if this is empty
-		{
 			Token currenttoken; //build a temp class
 
-			bool matchfound = false;
-			//because <list> has a search method like <stack> we can loop through and check everything
-			//if we cant find a match, we add it to the list, and if we find it (the top stack = our current token) we print it out and remove it. (for now)
-			
-				//check if it exists,or its the end version
-				//something i messed up is i directly compared, and you should NOT do that as we want to find pairs lol
-			//first we check if the tokenstack is empty, and our last token in the loop is a pair to the save var
-			if (!TokenStack.empty() && ("</" + TokenStack.back() + ">") == Savevar)
-			{
-					
-				//we now assume the we found it!
-					
-				//first we print it
-				std::cout << "Match found! " << std::endl;
-					
 
-					
-				//now lets save it to our tokenlist
-				//because we know the start+end, we can save both
+			//ok this checks that it contains the full tag, then also checks if there is a / at the end
+			//these both need to be true, so if its somthing like <div> it will return false, running the else!
+			if(Savevar.length() > 1 && Savevar[1] == '/'){
 
-				//because we know the start+end, we can save both
-				currenttoken.type = TokenType::START;
-				currenttoken.value = "<" + TokenStack.back() + ">";
-				tokenList.push_back(currenttoken);
+				//ok now we know there is, we first check if the tokenstack is empty (this was for our starting stuff)
+				//then we check that our token we are trying to match is the same as our savevar, and that our savevar is a <\> tag
+				if (!TokenStack.empty() && ("</" + TokenStack.back() + ">") == Savevar)
+				{
 
-				currenttoken.type = TokenType::END;
-				currenttoken.value = Savevar;
-				tokenList.push_back(currenttoken);
+					//we now assume the we found it!
+					//first we print it
+					std::cout << "Match found! " << std::endl;
 
-				//because we dont have a erase[i] what we need to do, is to find our first one, and add our index onto it
-				//NOW we can do     TokenStack.pop_back(); as this is better than the erase and does the same thing
-				TokenStack.pop_back();
-				//because we found a match we break, and that allows us to fix a bug!
-				matchfound = true;
-				
+					//because its a <\> we are good!
+
+					currenttoken.type = TokenType::END;
+					currenttoken.value = Savevar;
+					tokenList.push_back(currenttoken);
+
+					//because we dont have a erase[i] what we need to do, is to find our first one, and add our index onto it
+					//NOW we can do     TokenStack.pop_back(); as this is better than the erase and does the same thing
+					TokenStack.pop_back();
+					//because we found a match we break, and that allows us to fix a bug!
+
+				}
 			}
-
-				
+			else { //ok this is NOT a closing tag
 			
-			//if we went through everything and didnt find it
-			//this is more effecent, because then we dont gotta check for 2 conditions every cycle.
-			if(!matchfound)
-			{
-				//if it does not exist
-				//we clean off the </> stuff
+			
+				//first we need just the tag name
 				std::string tagName = Savevar.substr(1, Savevar.length() - 2);
+				 
+				//this checks to see if we have any other properties like <a href="google.com">
 				size_t spacePos = tagName.find(' ');
-				if (spacePos != std::string::npos)
+				if (spacePos != std::string::npos) //make sure thats not null lol
 				{
 					//we have a space! because we do lets find and remove it.
 					tagName = tagName.substr(0, spacePos);
 				}
 
+
 				//before we throw in the towel, lets check to see if its one of our void tags
 				//we check if its not = to voidtags.end() because if we get to the end of a vector and cant find nothing, we are ok with that!
 				if ((voidTags.contains(tagName)))
 				{
-					//currently we do nothing with this, but thats ok
+					//currently we do nothing with this, but thats ok, we have a VOID tag, so we will in the future!
 					std::cout << "Void Tag Found! " << Savevar << std::endl;
+				}
+				else {
+
+					//now we save it as a start token! Now that we know its not a void tag
+					currenttoken.type = TokenType::START;
+					currenttoken.value = Savevar;
+					tokenList.push_back(currenttoken);
+
+					//we also push it into our other stack, to match with a closing tag later.
+					TokenStack.push_back(tagName);
 				}
 
 
-
-				TokenStack.push_back(tagName);
-
+				
 			}
+				
+
 			
-
-
-		}
-		else { //this will only be used once, because of the starting one.
-
-			// the token stack was empty, so we will push our token on
-			//we clean off the </> stuff
-			std::string tagName = Savevar.substr(1, Savevar.length() - 2);
-			//HOWEVER, WE NEED TO REMOVE THE a href="link.html" if it exists
-			size_t spacePos = tagName.find(' ');
-			if (spacePos != std::string::npos)
-			{
-				//we have a space! because we do lets find and remove it.
-				tagName = tagName.substr(0, spacePos);
-			}
-
-			//before we throw in the towel, lets check to see if its one of our void tags
-			//we check if its not = to voidtags.end() because if we get to the end of a vector and cant find nothing, we are ok with that!
-			if (std::find(voidTags.begin(), voidTags.end(), tagName) != voidTags.end())
-			{
-				//currently we do nothing with this, but thats ok.
-				std::cout << "Void Tag Found! " << Savevar << std::endl;
-			}
-
-			TokenStack.push_back(tagName);
-		}
-		
-
-
-		i = i + Savevar.length(); //to not index the same thing again, we set the next i point, past the <, so that we find the next point
-
-		
-
+			i = i + Savevar.length(); //to not index the same thing again, we set the next i point, past the <, so that we find the next point
 	}
+		
+	
 
 	//cleanness
 	std::cout << "-------------" << std::endl;
@@ -294,81 +278,7 @@ std::vector<Token> StripTags(std::string htmldata)
 
 }
 
-
-
-//old tokenizer, this really doesnt work well lol, so this next one i build should.
-//std::string StripTags(std::string htmldata)
-//{
-//	//system("cls"); //debug for clean
-//	//UPDATED. We do the same thing first
-//	//first we want to locate the start of a tag. for example <html></html>
-//	
-//	int len = htmldata.length();
-//
-//	//we will check 
-//	bool flag = false;
-//	int current = 0;
-//	int startPeice = 0; // this will tell us the value of the first part.
-//	//we first create the list to store the token
-//	std::vector<Token> tokenList;
-//	//we build a var just to pass it back when ready.
-//	Token currenttoken;
-//	
-//	for (int i = 0; i < len; i++) {
-//		//however instead of removing, when the conditions are met, we start to set the tokens
-//
-//		if (htmldata[i] == '<') {
-//			current = i;
-//		}
-//		if (htmldata[i] == '>')
-//		{
-//
-//
-//
-//			flag = !flag; //this checks to see if this is our second <> <>
-//			std::string currenttag = htmldata.substr(current + 1, i - current - 1);
-//			if (currenttag[0] == '/') {
-//				std::cout << "END "; //what this is going to do, is assign what the END is, we dont do std::endl, because we want this to be injected for the token.
-//				currenttoken.type = TokenType::END; //set that we are changing the end one
-//				currenttag.erase(0, 1); //remove the /
-//			}
-//			else
-//			{
-//				std::cout << "START "; //what this is going to do, is assign what the START is, we dont do std::endl, because we want this to be injected for the token.
-//				currenttoken.type = TokenType::START; //set that we are changing the start one
-//			}
-//			//lets now pull the data from the middle.
-//			if (flag)
-//			{
-//				currenttoken.type = TokenType::TEXT; //set that we are changing the middle one
-//				std::cout << "TEXT "; //what this is going to do, is assign what the text is, we dont do std::endl, because we want this to be injected for the token.
-//				currenttag = htmldata.substr(startPeice + 1, current - startPeice - 1);
-//			}
-//			else{ startPeice = i; }
-//
-//			if (!iswhitespace(currenttag))
-//			{
-//				currenttoken.value = currenttag; //this gets our token val
-//				std::cout << "Token: " << currenttoken.value << std::endl;
-//			}
-//			
-//			
-//			
-//		
-//			
-//
-//
-//		}
-//
-//
-//
-//
-//	}
-//	return "test";
-//	
-//		
-//}
-
+//removed old stuff
 
 //now all functions can parse much faster than before.
 
@@ -556,7 +466,7 @@ int Parser(std::string input)
 	
 
 
-
+	//Sending to a DOM class
 
 
 	return 0;
