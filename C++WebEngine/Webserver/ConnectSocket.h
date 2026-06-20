@@ -23,7 +23,8 @@
 #include <iostream>
 
 //pull the validate string
-int ConnectSocket(std::string input);
+int ConnectSocketHTTP(std::string input);
+int ConnectSocketHTTPS(std::string input);
 int EndWinSock();
 int StartWinSock();
 

@@ -4,7 +4,7 @@
 #include <vector>
 #include <list>
 #include <unordered_set> //for the check to make it faster
-
+#include <iterator>
 
 
 
@@ -227,7 +227,7 @@ std::vector<Token> StripTags(std::string htmldata)
 
 			//before we throw in the towel, lets check to see if its one of our void tags
 			//we check if its not = to voidtags.end() because if we get to the end of a vector and cant find nothing, we are ok with that!
-			if ((voidTags.contains(tagName)))
+			if (voidTags.find(tagName) != voidTags.end())
 			{
 				//currently we do nothing with this, but thats ok, we have a VOID tag, so we will in the future!
 				//std::cout << "Void Tag Found! " << Savevar << std::endl;
