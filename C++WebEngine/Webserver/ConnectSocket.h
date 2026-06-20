@@ -17,6 +17,7 @@
 #define SOCKET int
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
+typedef unsigned long u_long;
 #endif
 
 #include <string> // for stoi
