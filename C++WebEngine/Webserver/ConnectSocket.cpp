@@ -98,6 +98,11 @@ std::string Cleanup(std::string linkinput)
 #include <string>
 #include <iostream>
 
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
+
 
 int ConnectSocketHTTPS(std::string input)
 {
@@ -107,7 +112,7 @@ int ConnectSocketHTTPS(std::string input)
 	std::array<char, 4096> buffer;
 	std::string response;
 
-	if (input.find_first_of(";&|`$<>^") != std::string::npos) {
+	if (input.find_first_of("\";&|`$<>^\\") != std::string::npos) {
 		std::cout << "Security Alert: Invalid characters detected in URL." << std::endl;
 		return -1;
 	}

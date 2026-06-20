@@ -142,10 +142,12 @@
     <ClCompile Include="ConsoleApplication1.cpp" />
     <ClCompile Include="ConnectSocket.cpp" />
     <ClCompile Include="Parser.cpp" />
+    <ClCompile Include="DOMTree.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ConnectSocket.h" />
     <ClInclude Include="Parser.h" />
+    <ClInclude Include="DOMTree.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
