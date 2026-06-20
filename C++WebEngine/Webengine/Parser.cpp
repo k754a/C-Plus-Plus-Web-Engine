@@ -135,7 +135,7 @@ std::vector<Token> StripTags(std::string htmldata)
 					textT.type = TokenType::TEXT;
 					tokenList.push_back(textT);
 
-					std::cout << "Found Text: " << text << std::endl;
+					//std::cout << "Found Text: " << text << std::endl;
 				}
 		}
 
@@ -202,7 +202,7 @@ std::vector<Token> StripTags(std::string htmldata)
 
 				if (matchFound)
 				{
-					std::cout << "Match found! " << std::endl;
+					//std::cout << "Match found! " << std::endl;
 					currenttoken.type = TokenType::END;
 					currenttoken.value = Savevar;
 					tokenList.push_back(currenttoken);
@@ -230,7 +230,7 @@ std::vector<Token> StripTags(std::string htmldata)
 				if ((voidTags.contains(tagName)))
 				{
 					//currently we do nothing with this, but thats ok, we have a VOID tag, so we will in the future!
-					std::cout << "Void Tag Found! " << Savevar << std::endl;
+					//std::cout << "Void Tag Found! " << Savevar << std::endl;
 					currenttoken.type = TokenType::START;
 					currenttoken.value = "<" + tagName + ">";
 					tokenList.push_back(currenttoken);
@@ -290,12 +290,12 @@ std::vector<Token> StripTags(std::string htmldata)
 
 	std::cout << "Final Tokens:" << std::endl;
 	//we want to print the token combos, just as a debug!
-	for (int i = 0; i < tokenList.size(); i++)
-	{
-		//ok now we loop through and print
-		//as our final thing
-		std::cout << tokenList[i].value << std::endl;
-	}
+	//for (int i = 0; i < tokenList.size(); i++)
+	//{
+	//	//ok now we loop through and print
+	//	//as our final thing
+	//	std::cout << tokenList[i].value << std::endl;
+	//}
 
 	std::cout << std::endl;
 

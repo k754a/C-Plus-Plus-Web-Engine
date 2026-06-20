@@ -16,7 +16,7 @@
 //this checks if a url is valid or not.
 const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-bool USELOCALFILE = TRUE; //use internet, set this to false.
+bool USELOCALFILE = FALSE; //use internet, set this to false.
 
 
 int main()

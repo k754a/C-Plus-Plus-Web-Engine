@@ -92,7 +92,82 @@ std::string Cleanup(std::string linkinput)
 }
 
 
-int ConnectSocket(std::string input)
+#include <cstdio>
+#include <memory>
+#include <array>
+#include <string>
+#include <iostream>
+
+
+int ConnectSocketHTTPS(std::string input)
+{
+	
+	Cleanup(input); // make sure we clean the input first (we may not have to tho)
+
+	std::array<char, 4096> buffer;
+	std::string response;
+
+	if (input.find_first_of(";&|`$<>^") != std::string::npos) {
+		std::cout << "Security Alert: Invalid characters detected in URL." << std::endl;
+		return -1;
+	}
+
+	//i will need to install curl tho
+	std::string command =
+		"curl -sSL \"" + input + "\"";
+
+	std::unique_ptr<FILE, decltype(&pclose)>
+		pipe(popen(command.c_str(), "r"), pclose);
+
+	
+	if (!pipe)
+	{
+		std::cout << "ERROR - Failed to start curl." << std::endl;
+		return -1;
+	}
+
+	while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr)
+	{
+		response += buffer.data();
+	}
+
+	std::cout << "Received "
+		<< response.size()
+		<< " bytes." << std::endl;
+
+	// Send straight to your parser
+	Parser(response);
+
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int ConnectSocketHTTP(std::string input)
 {
 	//SOCKET id, for our client file descirptor
 	//setting AF_INET, means we set it to ipv4, and that tells windows we want somthin like 192.168.43.1
