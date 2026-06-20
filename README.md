@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/k754a/C-Plus-Plus-Web-Engine/blob/main/traced.png?raw=true" alt="Browse++ Logo" width="100">
+  <img src="https://github.com/k754a/C-Plus-Plus-Web-Engine/blob/main/image%20(2).png?raw=true" alt="Browse++ Logo" width="100">
 </p>
 
 # Browse++ A C++ Browser Engine from scratch.
