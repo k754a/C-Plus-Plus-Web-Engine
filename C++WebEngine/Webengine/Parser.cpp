@@ -1,5 +1,6 @@
 //THIS WILL PARSE THE DATA GOTTEN FROM THE NETWORK SOCKET.
 #include "Parser.h"
+#include "DOMTree.h" //included for the DOM in the dom tree
 #include <vector>
 #include <list>
 #include <unordered_set> //for the check to make it faster
@@ -7,21 +8,18 @@
 
 
 
-//ok, lets first define our strucutre
-//currently we want to have a start tag, a text, and a end tag
-//we say enum just to tell the complier that we wont be changing this
-//this is saying class tokentype( start (like <p>), text (like "this is a test"), and end (like <p>))
-//i added a VOID tag, and COMMENT, just for the dom tree
-enum class TokenType { START, TEXT, END, VOID};
+//THIS IS ADDED/DEFINED IN THE DOM
 
-//lets build the token structure
-struct Token
-{
-	//we do the type and the value, as then we can identify the start middle or end to a real value.
-	//all tokens follow the format "type"
-	TokenType type;
-	std::string value; //hold the actual text
-};
+//enum class TokenType { START, TEXT, END, VOID};
+//
+////lets build the token structure
+//struct Token
+//{
+//	//we do the type and the value, as then we can identify the start middle or end to a real value.
+//	//all tokens follow the format "type"
+//	TokenType type;
+//	std::string value; //hold the actual text
+//};
 
 
 //we currently have a bug where blank text is getting through.
@@ -52,10 +50,9 @@ std::vector<Token> StripTags(std::string htmldata)
 	//i got the tags from https://developer.mozilla.org/en-US/docs/Glossary/Void_element however it was missing br/ so that was added
 	//this is faster because we can check as if there is no order at all!
 	std::unordered_set<std::string> voidTags = {
-	"area", "base", "br", "col", "embed", "hr", "img", "input",
+	"area", "base", "br", "br/", "col", "embed", "hr", "img", "input", 
 	"link", "meta", "param", "source", "track", "wbr", "!doctype html"
 	};
-
 
 
 	
@@ -162,11 +159,7 @@ std::vector<Token> StripTags(std::string htmldata)
 		//a mistake to watch out for, is that substr, looks for starting char, and length of char, not startpoint and endpoint (i keep messing that up lol)
 		Savevar = htmldata.substr(i, (closePos - i + 1)); //this basicly splits and grabs the data between i and our end '>'
 		//std::cout << Savevar << std::endl; //little telem
-		
-		
-
-		
-			Token currenttoken; //build a temp class
+		Token currenttoken; //build a temp class
 
 
 			//ok this checks that it contains the full tag, then also checks if there is a / at the end
@@ -175,26 +168,47 @@ std::vector<Token> StripTags(std::string htmldata)
 
 				//ok now we know there is, we first check if the tokenstack is empty (this was for our starting stuff)
 				//then we check that our token we are trying to match is the same as our savevar, and that our savevar is a <\> tag
-				if (!TokenStack.empty() && ("</" + TokenStack.back() + ">") == Savevar)
+				std::string closeName = Savevar.substr(2, Savevar.length() - 3);
+
+				size_t spacePos = closeName.find(' ');
+				if (spacePos != std::string::npos) //make sure thats not null lol
 				{
+					//std::cout << "FOUND ONE! ";
+					//we have a space! because we do lets find and remove it.
+					closeName = closeName.substr(0, spacePos);
+				}
 
-					//we now assume the we found it!
-					//first we print it
+				bool matchFound = false;
+
+				//if we have stuff in our tokenstack
+				while (!TokenStack.empty())
+				{
+					//check if our top current TokenStack "Token" is the same as the one we are looking for
+					if (TokenStack.back() == closeName)
+					{
+						//we found a match! we add it to the list at the end
+						matchFound = true;
+						//we delate the matched tag!
+						TokenStack.pop_back();
+						break;
+
+					}
+					
+					
+					//because we found a match we break, and that allows us to fix a bug!
+					//it catches if we have open tags
+					TokenStack.pop_back();
+				}
+
+				if (matchFound)
+				{
 					std::cout << "Match found! " << std::endl;
-
-					//because its a <\> we are good!
-
 					currenttoken.type = TokenType::END;
 					currenttoken.value = Savevar;
 					tokenList.push_back(currenttoken);
-
-					//because we dont have a erase[i] what we need to do, is to find our first one, and add our index onto it
-					//NOW we can do     TokenStack.pop_back(); as this is better than the erase and does the same thing
-					TokenStack.pop_back();
-					//because we found a match we break, and that allows us to fix a bug!
-
 				}
 			}
+
 			else { //ok this is NOT a closing tag
 			
 			
@@ -205,6 +219,7 @@ std::vector<Token> StripTags(std::string htmldata)
 				size_t spacePos = tagName.find(' ');
 				if (spacePos != std::string::npos) //make sure thats not null lol
 				{
+					//std::cout << "FOUND ONE! ";
 					//we have a space! because we do lets find and remove it.
 					tagName = tagName.substr(0, spacePos);
 				}
@@ -216,15 +231,25 @@ std::vector<Token> StripTags(std::string htmldata)
 				{
 					//currently we do nothing with this, but thats ok, we have a VOID tag, so we will in the future!
 					std::cout << "Void Tag Found! " << Savevar << std::endl;
+					currenttoken.type = TokenType::START;
+					currenttoken.value = "<" + tagName + ">";
+					tokenList.push_back(currenttoken);
+
+					// close the tag right after, i didnt do this before and it just wreaked everything.
+					Token CloseToken;
+					CloseToken.type = TokenType::END;
+					CloseToken.value = "</" + tagName + ">";
+					tokenList.push_back(CloseToken);
+
+
+
 				}
 				else {
 
-					//now we save it as a start token! Now that we know its not a void tag
 					currenttoken.type = TokenType::START;
-					currenttoken.value = Savevar;
+					currenttoken.value = "<" + tagName + ">";
 					tokenList.push_back(currenttoken);
 
-					//we also push it into our other stack, to match with a closing tag later.
 					TokenStack.push_back(tagName);
 				}
 
@@ -462,7 +487,7 @@ std::string ManageNoScript(const std::string& htmldata)
 int Parser(std::string input)
 {
 	//all this is doing, is removing, the json part, then the css part, then all of the tags, just to get the final text for this basic parser.
-	std::vector<Token> TokenList = StripTags(ManageNoScript(ManageCOMMENTS(ManageCSS(ManageJAVASCIRPT(input))))); //not great to nest, will be fixed, but its ok
+	DOM(StripTags(ManageNoScript(ManageCOMMENTS(ManageCSS(ManageJAVASCIRPT(input))))));//not great to nest, will be fixed, but its ok
 	
 
 
