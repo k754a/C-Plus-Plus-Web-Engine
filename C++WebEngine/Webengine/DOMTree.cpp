@@ -5,15 +5,16 @@
 #include <iostream>
 #include "DOMTree.h"
 #include <string>
+#include "Layout.h"
 
-enum class NODETYPE { START, TEXT, END };
-struct Node {
-	NODETYPE tag; //our tag (START, TEXT, END)
-	std::string tagValue; //the cleaned value, like "a" 
-	std::vector<Node*> children; //make this node so that we can have depth, like stuff inside the tag
-	Node* Parent = nullptr; // so we can track the parent
-
-};
+//enum class NODETYPE { START, TEXT, END };
+//struct Node {
+//	NODETYPE tag; //our tag (START, TEXT, END)
+//	std::string tagValue; //the cleaned value, like "a" 
+//	std::vector<Node*> children; //make this node so that we can have depth, like stuff inside the tag
+//	Node* Parent = nullptr; // so we can track the parent
+//
+//};
 
 void PrintDomTree(Node* node, int debth = 0)
 {
@@ -188,8 +189,13 @@ int DOM(std::vector<Token> tokens)
 
 
 	}
+
 	std::cout << std::endl << "DOM TREE" << std::endl;
-	PrintDomTree(Root, 0);
+	//PrintDomTree(Root, 0); //to improve performace
+
+
+	//ok send it to the layout
+	LayoutTree(Root);
 	
 	return 0;
 }

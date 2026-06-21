@@ -5,8 +5,8 @@
 
 //we include the parser for the using a file
 #include "Parser.h"
-
-
+#include <thread>
+#include "GUI.h"
 
 #include <regex>
 #include <iostream>
@@ -18,7 +18,7 @@ const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256
 const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 bool USELOCALFILE = FALSE; //use internet, set this to false.
 
-
+std::atomic<bool> running = true; //we connect to change the bool in GUI.h
 int main()
 {
     //this is used for a higher performace gain, it removes some of the checks for std::cout
@@ -27,6 +27,27 @@ int main()
     std::cin.tie(NULL);
 
     SetConsoleOutputCP(CP_UTF8); //we do this for ╨á╤â
+
+
+
+    //before we do anything, we need to load our screen.
+
+
+
+    //however we have stuff to run, so we make a thread
+    std::thread GUITHREAD(GUIRENDER); //Dont have parentheses, because we are passing the funct, not running it
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     //THERE IS NOW A SETTING SO THAT YOU CAN TEST IT WITH JUST HTML FILES DIRECTLY!
@@ -88,6 +109,22 @@ int main()
 
 
     }
+
+    //kill the thread
+    running = false;
+    GUITHREAD.join(); //join the main thread up with this, to end it nicely
+
+
+    //if we dont do this, we get errors lol
+
+
+
+
+
+
+
+
+
 
     
     return(0); 
