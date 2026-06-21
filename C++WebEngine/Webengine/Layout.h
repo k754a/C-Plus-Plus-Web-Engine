@@ -5,6 +5,8 @@
 #include <string> 
 #include <iostream>
 #include <vector>
+#include <SDL3/SDL.h> //include the SDL3 lib
+#include <SDL3_ttf/SDL_ttf.h>
 
 
 
@@ -26,6 +28,18 @@ struct Node {
 };
 
 
+struct Layout
+{
+	Node* node;
+
+	int x; int y; //the x and y pos
+
+	int width; int hight; //handle the width and hight of the text
+
+	int fontSize; 
+
+	SDL_Texture* textTex; //we are gonna prerender the text, so we dont gotta do it on the fly.
+};
 //pull the tokendata
 int LayoutTree(Node* node);
 

@@ -5,58 +5,88 @@
 #include <string>
 #include <vector>
 #include "Layout.h"
+#include "GUI.h"
 //lets bild a basic loop and stuff.
 
 //first we assign the node from the dom tree
 
 
 
-struct Layout
-{
-	Node* node;
-
-	int x; int y; //the x and y pos
-
-	int width; int hight; //handle the width and hight of the text
-};
 
 std::vector<Layout> layoutList; //list to store the layout
 
-void GenerateLayoutTree(Node* node, int& currentYpos)
+void GenerateLayoutTree(Node* node, int& currentYpos, int fontsize)
 {
-	//make a var that resets every run
-	Layout layouttree;
+	
+	if (node->tag == NODETYPE::START)
+	{
+		if (node->tagValue == "h1")
+		{
+			fontsize = 96;
+		}
+		else if (node->tagValue == "p") {
+			fontsize = 48; 
+		}
+		else if (node->tagValue == "a") {
+			fontsize = 36;
+		}
+		else if (node->tagValue == "span") {
+			fontsize = 36;
+		}
+		else if (node->tagValue == "div") {
+			
+			currentYpos += 5;
+		}
+		
+	}
+	
 
-	layouttree.x = 0; //set the x to 0
-	layouttree.y = currentYpos;
-	layouttree.hight = 12; //12 point font
-	layouttree.width = 2000; //doesnt really matter rn, cause we dont got no boxes or nothin
+	if (node->tag == NODETYPE::TEXT)
+	{
+		//make a var that resets every run
+		Layout layouttree;
+		layouttree.x = 10; 
+		layouttree.y = currentYpos;
+
+
+		layouttree.node = node;
+
+		//when i code css, this will get replaced merging the data.
+
+
+
+
+		layouttree.fontSize = fontsize;
 
 	
-	layouttree.node = node;
 
-	//send back the node to our layout list, to save
-	layoutList.push_back(layouttree);
+		//send back the node to our layout list, to save
+		layoutList.push_back(layouttree);
+		std::cout << layouttree.fontSize << std::endl;
 
-	currentYpos += 20;
+		currentYpos += (fontsize + 10);
 
+	}
 	
 
 	for (Node* child : node->children)
 	{
-		GenerateLayoutTree(child, currentYpos);
+		GenerateLayoutTree(child, currentYpos, fontsize);
 	}
+	
 }
 
 int LayoutTree(Node* node)
 {
 	int currentY = 0;
+	int startingfontsize = 14;
 	//ok first we assing the node val to our new layout list
 	//now we set it to add the node
-	GenerateLayoutTree(node, currentY);
+	GenerateLayoutTree(node, currentY, startingfontsize);
 
 	std::cout << "Layout Compleate." << std::endl;
 	
+	IMPORT(layoutList);
 	return 0;
 }
 

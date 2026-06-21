@@ -5,9 +5,10 @@
 
 #include <iostream>
 #include <atomic>
+#include "Layout.h" //need for the structs
 
 extern std::atomic<bool> running; //this is for the thread, so we can kill it at the end.
 int GUIRENDER();
-
+int IMPORT(std::vector<Layout> layoutList);
 #endif // ! GUI
 #pragma once

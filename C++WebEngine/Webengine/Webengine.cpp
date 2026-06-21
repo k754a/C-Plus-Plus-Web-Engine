@@ -110,20 +110,25 @@ int main()
 
     }
 
+  
+    
+
+
+
+
+
+
+
+
+    while (true)
+    {
+        //temp lock
+    }
+
     //kill the thread
     running = false;
     GUITHREAD.join(); //join the main thread up with this, to end it nicely
-
-
     //if we dont do this, we get errors lol
-
-
-
-
-
-
-
-
 
 
     
