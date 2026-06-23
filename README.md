@@ -30,11 +30,11 @@ https://k754a.hackclub.app/
 
 - Add a Layout tree 🗸
 
-- Render To a screen
+- Render To a screen 🗸
 
 - Tab managment
 
-- CSS parser
+- CSS parser 🗸
 
 - Add a CSSDOM tree
 
