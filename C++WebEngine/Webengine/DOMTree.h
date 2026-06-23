@@ -18,7 +18,19 @@
 enum class TokenType { START, TEXT, END, VOID };
 struct Token { TokenType type; std::string value; };
 
+
+struct CSSRule {
+	std::string id; //save the id, like h1
+	std::vector<std::string> properties;
+};
+
+
+
 //pull the tokendata
 int DOM(std::vector<Token> tokens);
+
+
+int CSSDOM(std::vector<CSSRule> tokens);
+
 
 #endif // ! Parser

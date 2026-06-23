@@ -483,13 +483,228 @@ std::string ManageNoScript(const std::string& htmldata)
 
 }
 
+std::string RemoveEverythingButCSS(std::string input)
+{
+	std::string returnhtmldata;
+	returnhtmldata.reserve(input.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
+
+	//we do the same for strip tags, instead of scanning everything, we just find and remove!
+	size_t i = 0;
+	const size_t len = input.size();
+
+	while (i < len) //same as strip tags
+	{
+		size_t startpos = input.find("<style", i); //find the first half, from the i (so we dont check back from the start)
+
+		if (startpos == std::string::npos)
+		{
+			//we need to make sure we save it
+			break;
+		}
+
+		size_t startpos_endtag = input.find('>', startpos); //check if we have a proper closing tag
+		if (startpos_endtag == std::string::npos) //we dont, so break (i should do this with everything else, but im lowkey lazy
+		{
+			break;
+		}
+
+		size_t endpos = input.find("</style>", startpos_endtag); //check if we have a proper closing tag
+		if (endpos == std::string::npos) //we dont, so break (i should do this with everything else, but im lowkey lazy
+		{
+			break;
+		}
+
+
+		//grab the inside part
+		returnhtmldata.append(input, (startpos_endtag + 1), (endpos - startpos - 7)); // to remove the other tags
+		//Currently all we want to do in this is to just remove all the CSS, so lets find the css tags, and remove them.
+	//super simple, look for the style parts, (as they are constant across all websites) and remove everything inbetween.
+	//however some sites may not have a stylesheet, so we should check.
+
+
+		i = endpos + std::string("</style>").length(); //same as the erase but we dont erase anything, and its dynamic now!
+		//if we are good, return this.
+	}
+	std::cout << returnhtmldata << std::endl; //DEBUG
+
+	return returnhtmldata; //return the data
+
+
+}
+
+
+
+//this is diffrent from the ManageCSS, this will parse CSS!
+int StripCSS(std::string input) {
+
+	std::vector<CSSRule> CSS;
+	//Ok, now we have our stuff, the good news is it so much simpler to tokenize than something like our main html
+	//we need to make a dynamic properties list thing, and deal with how we manage that
+	//body{
+	//background: #eee;
+	//width: 60vw;
+	//margin: 15vh auto;
+	//font - family: system - ui, sans - serif
+	//}
+	//	h1{
+	//		font - size: 1.5em
+	//}
+	//	div{
+	//		opacity: 0.8
+	//}
+	//a:link, a : visited{
+	//	color: #348
+	//}
+
+
+	//its stored as [NAME] { Properties }
+	
+	//ok we first build the loop
+	size_t cursor = 0; // we need this to track where we are in the string, rather than erasing it, this is for faster performace.
+
+	while (cursor < input.size())
+	{
+		//find the first thing, we can do that by looking for { as that is the start
+		CSSRule temp; //reset every loop.
+
+
+		//search for open brace, but from START of cursor, not from 0
+		//that lets us move up without removing anything, and is faster
+		size_t start_pos = input.find("{", cursor);
+		if (start_pos == std::string::npos){break;}
+
+		//we find the id now, the get the properties later
+		//first lets get the str from the [h1] {
+		//for example
+		//we can get it by making a temp var
+		std::string get = input.substr(cursor, start_pos - cursor);
+
+		//ok so we erase, we first check if the spot is space ::isspace
+		//if it is, we catolag all the things that are spaces, then we
+		//use erase, and that removes them!, we remove between the start and end of Get
+		get.erase(std::remove_if(get.begin(), get.end(), ::isspace), get.end()); //got this off the internet
+		std::cout << "ID: " << get << std::endl; //DEBUG
+		temp.id = get;
+
+
+		//find the closing brace, but use startpos so we dont grab a } from before
+		size_t end_pos = input.find("}", start_pos); //to make it a bit faster
+		if (end_pos == std::string::npos){break;}
+
+		//std::string parseProperties;
+
+		//parseProperties = input.substr(start_pos + 1, (end_pos - start_pos - 1)); //this is the length we want, from our start pos, to our end pos.
+		//ok now that we found the start, lets go back to the start of the input, and pull this out
+		//std::cout << "PROPERTIES: " << parseProperties << std::endl;
+
+
+		//now lets make the parser, we want to find each ;, keep the text behind it, then add it to our temp properties
+		size_t i = start_pos + 1;
+		while (i < end_pos) //between i and end pos
+		{
+			size_t semi = input.find(";", i);
+			std::string getsemi;
+			//now we need to find the ;, and save and remove the ; and anything before it.
+			size_t prop_start = i;
+
+			size_t prop_end;
+			if (semi == std::string::npos || semi > end_pos) //check if we are done
+			{
+				//get the last one that is missing the semicolen, this means we are at the last one 
+				prop_end = end_pos; //we read the closing then
+				i = end_pos; //make the loop end (if you dont do this, it freezes)
+			}
+			else {
+				//we arnt done, so we first pull it out
+				prop_end = semi;
+				//go to the next one
+				i = semi + 1; //we check for the next property
+			}
+
+			//grab the one property using the start and end we just did
+			//we need to use prop_start instead of i, because i is already moved forward
+			getsemi = input.substr(prop_start, prop_end - prop_start);
+		
+			//We cannot do this, because css needs spaces in some spots.
+			//getsemi.erase(std::remove_if(getsemi.begin(), getsemi.end(), ::isspace), getsemi.end());
+
+	
+
+			//remove all the whitespace, but not the spaces, as we need thoes
+			if (getsemi.find_first_not_of(" \t\n\r") != std::string::npos && getsemi.find_last_not_of(" \t\n\r") != std::string::npos)
+			{
+				getsemi = getsemi.substr(getsemi.find_first_not_of(" \t\n\r"), (getsemi.find_last_not_of(" \t\n\r") - getsemi.find_first_not_of(" \t\n\r") + 1));
+
+				std::cout << "PROPERTIES: " << getsemi << std::endl; //DEBUG
+
+
+				//ok, now that we found stuff, lets now add it ot the temp
+
+				temp.properties.push_back(getsemi);
+
+				//thats all we do!
+			}
+
+			//move us up
+			i = prop_end + 1;
+
+			
+		}
+
+
+
+
+
+
+
+		//after we are done
+		//input.replace(0, (end_pos + 1), ""); //remove all the stuff between h1 and } (for now), for just getting the headers
+		//ok, now lets grab the line
+
+		//we push back everything now.
+		CSS.push_back(temp); //add the temp to it
+
+		//go to the next pos
+		cursor = end_pos + 1;
+	}
+
+
+
+
+
+
+	std::cout << "DONE! " << std::endl;
+
+	//send it to our DOMTREE
+
+	CSSDOM(CSS);
+
+
+	return 0;
+}
+
+
+
+
+
+
 
 int Parser(std::string input)
 {
+
 	//all this is doing, is removing, the json part, then the css part, then all of the tags, just to get the final text for this basic parser.
-	DOM(StripTags(ManageNoScript(ManageCOMMENTS(ManageCSS(ManageJAVASCIRPT(input))))));//not great to nest, will be fixed, but its ok
+	//we want to do this first, as we need to parse it in the DOMTREE
+	StripCSS(
+		RemoveEverythingButCSS(input));
+
+	DOM(StripTags
+		(ManageNoScript(
+			ManageCOMMENTS(
+				ManageCSS(
+					ManageJAVASCIRPT(input))))));//not great to nest, but its ok
 	
 
+	
 
 	//Sending to a DOM class
 

@@ -16,6 +16,7 @@
 //
 //};
 
+//this is super slow, so i dont use it lol, but its a good way to see it
 void PrintDomTree(Node* node, int debth = 0)
 {
 	//check if we have anything, we break;
@@ -54,6 +55,52 @@ void PrintDomTree(Node* node, int debth = 0)
 
 		
 }
+
+
+
+int CSSDOM(std::vector<CSSRule> tokens) {
+
+	//ok we have the CSSDOM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	return 0;
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 int DOM(std::vector<Token> tokens)
