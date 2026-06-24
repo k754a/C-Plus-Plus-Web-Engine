@@ -24,7 +24,7 @@ struct CSSRule {
 	std::vector<std::string> properties;
 };
 
-
+extern std::vector<CSSRule> globalCSS; //turns out i can use  this! and it makes it like a billion times easier that what i was doing before lol 
 
 //pull the tokendata
 int DOM(std::vector<Token> tokens);

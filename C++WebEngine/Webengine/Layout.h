@@ -16,7 +16,6 @@
 //this is saying class tokentype( start (like <p>), text (like "this is a test"), and end (like <p>))
 //i added a VOID tag, and COMMENT, just for the dom tree
 // 
-//make sure we can import the same datatype into our DOM
 //this is moved here, for cleanness
 enum class NODETYPE { START, TEXT, END };
 struct Node {
@@ -38,8 +37,13 @@ struct Layout
 
 	int fontSize; 
 
-	SDL_Texture* textTex; //we are gonna prerender the text, so we dont gotta do it on the fly.
+	SDL_Texture* textTex = nullptr; //we are gonna prerender the text, so we dont gotta do it on the fly.
 };
+
+
+
+
+
 //pull the tokendata
 int LayoutTree(Node* node);
 

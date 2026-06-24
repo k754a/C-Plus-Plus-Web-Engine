@@ -56,17 +56,17 @@ void PrintDomTree(Node* node, int debth = 0)
 		
 }
 
-
+std::vector<CSSRule> globalCSS;
 
 int CSSDOM(std::vector<CSSRule> tokens) {
 
 	//ok we have the CSSDOM
 
+	//we dont need to do anything lol, so ill just pass it off
 
 
 
-
-
+	globalCSS = tokens;
 
 
 
