@@ -11,7 +11,7 @@
 #include "ConnectSocket.h" //pulls our validate string global libary
 #include <fstream>  //for loading local files
 #include <sstream> // for the buffer
-
+#include "Parser.h"
 
 //this is the layout list, and gets filled in by IMPORT
 //the render loop reads from this 
@@ -30,8 +30,8 @@ std::vector<Layout> mainlayout;
 
 
 
-std::vector <std::string> SearchHistory;
-
+std::vector <std::string> SearchHistory = {};
+int currentSearchPos = -1;
 
 //SUDO CODE
 //if(SearchHistory[i] == urlInput && searchHistory.length() > 1){
@@ -95,6 +95,9 @@ int IMPORT(std::vector<Layout> layoutGOTTEN)
 //moved to this, for speed!
 //this uploads the textures to the gpu
 //the idea is that we only do the GPU stuff once a layout, then assign this to a texture, that moves
+
+
+
 void PreRender(SDL_Renderer* render, TTF_Font* font)
 {
 	int xtrack = 20;
@@ -107,17 +110,45 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 		//if the item already has a texture
 		//we skip so we dont rerender it
 
-		if (lasty != -1 && mainlayout[i].y > lasty) {
-			xtrack = 20;
+		//this old one worked, but didnt handle stuf flike line breaks or tabs cells or colums
+		//if (lasty != -1 && mainlayout[i].y > lasty) {
+		//	xtrack = 20;
 
+		//	ytrack += (maxLineHeight + 15);
+		//	maxLineHeight = 0;
+		//}
+
+		//check if we placed not the very first item, but an item, then we check that the y assigned is bigger than the curent, so that means we should be on a new line ish
+		if (lasty != -1 && mainlayout[i].y > lasty) //check if this is a colum or line break
+		{
+			xtrack = 20;
 			ytrack += (maxLineHeight + 15);
 			maxLineHeight = 0;
 		}
 
 		lasty = mainlayout[i].y;
+		//if we dedtect this as a cell with a x offset, do that
 
-	
-		mainlayout[i].x = xtrack;
+
+		//check if this is a table with a colum offset and stuff
+		if (mainlayout[i].x > 20)
+		{
+			//pick whatever is furthest right 
+			int colX = (xtrack > mainlayout[i].x) ? xtrack : mainlayout[i].x; //my max dont work, so i had to use google to fix ts
+			mainlayout[i].x = colX;
+			xtrack = colX; 
+		}
+		else
+		{
+			//if its normal or whatever
+			mainlayout[i].x = xtrack;
+		}
+
+
+
+
+
+
 		mainlayout[i].y = ytrack;
 
 		if (mainlayout[i].textTex == nullptr)
@@ -200,6 +231,82 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 
 }
+
+
+int search(std::string input, bool addToHistory)
+{
+	const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
+	const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
+
+
+	//check if this is a valid url
+	//note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
+	if (std::regex_match(input, httpPattern)) {
+		std::cout << "http url!" << std::endl;
+		ConnectSocketHTTP(input);
+
+
+		//SearchHistory.push_back(input);
+		//now that we understand its a valid url, lets attempt a socket connect.
+		//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
+	}
+
+
+	if (std::regex_match(input, httpsPattern)) {
+		std::cout << "https url!" << std::endl;
+		std::wstring temp(input.begin(), input.end());
+		ConnectSocketHTTPS(temp);
+
+
+		//SearchHistory.push_back(input);
+		//now that we understand its a valid url, lets attempt a socket connect.
+		//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
+	}
+
+	// --- Inside search() in GUI.cpp ---
+	if (!std::regex_match(input, httpPattern) && !std::regex_match(input, httpsPattern)) {
+	//if we dont match https or http, its prob a search, so lets do that
+		std::string query = "";
+		
+
+		//ok if its a space, we repace it with a +
+
+		for (int i = 0; i < input.size(); i++)
+		{
+			//std::cout << "Attempting search " << input << std::endl;
+
+			if (input[i] == ' ')
+			{
+				query += "+";
+			}
+			else {
+				query += input[i];
+			}
+		}
+		
+		input = "lite.duckduckgo.com/lite/?q=" + query;
+		urlInput = input; 
+		//send it to https
+		std::wstring temp(input.begin(), input.end());
+		ConnectSocketHTTPS(temp);
+	}
+
+	if (addToHistory) {
+
+		//if we went back and searched somthing new, deleate that multiverse
+		if (currentSearchPos < (int)SearchHistory.size() - 1) {
+			SearchHistory.resize(currentSearchPos + 1);
+		}
+
+		SearchHistory.push_back(input);
+		currentSearchPos = SearchHistory.size() - 1; // Keep index at the end
+	}
+
+
+
+	return 0;
+}
+
 
 
 int GUIRENDER()
@@ -323,7 +430,7 @@ int GUIRENDER()
 				//if we press enter to search
 				if (event.key.scancode == SDL_SCANCODE_RETURN)
 				{
-					std::cout << "going to: " << urlInput << std::endl; //DEBUG
+					//std::cout << "going to: " << urlInput << std::endl; //DEBUG
 
 
 					//ok lets make this work.
@@ -340,35 +447,10 @@ int GUIRENDER()
 					//these 2 blocks autodetect if its a https or http.
 					//std::thread([input]()
 					//	{
-							const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-							const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-
-							//check if this is a valid url
-							//note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
-							if (std::regex_match(input, httpPattern)) {
-								std::cout << "http url!" << std::endl;
-								ConnectSocketHTTP(input);
-
-
-								SearchHistory.push_back(input);
-								//now that we understand its a valid url, lets attempt a socket connect.
-								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
-							}
-
-
-							if (std::regex_match(input, httpsPattern)) {
-								std::cout << "https url!" << std::endl;
-								std::wstring temp(input.begin(), input.end());
-								ConnectSocketHTTPS(temp);
-
-
-								SearchHistory.push_back(input);
-								//now that we understand its a valid url, lets attempt a socket connect.
-								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
-							}
+							
 						//}).detach();
 
-
+					search(urlInput, true);
 					
 
 
@@ -402,23 +484,128 @@ int GUIRENDER()
 
 					int WinW, WinH;
 
+					SDL_GetWindowSize(window, &WinW, &WinH);
+
+					float barwidth = 1200; //the width of the bar
+					float barx = (WinW - barwidth) / 2; //we use this to align the triggers
+
+					SDL_FRect backbuttontrigger = { barx - 40, 6, 30, 30 }; //pos
+					SDL_FRect forwardbuttontrigger = { barx + barwidth + 10, 6, 30, 30 }; //pos
+					SDL_FRect reloadbuttontrigger = { barx - 80,6,30,30 }; //pos
+
+
+					//test if the backbutton is pressed
+					if (mouseX >= backbuttontrigger.x && mouseX <= (backbuttontrigger.x + backbuttontrigger.w) &&
+						mouseY >= backbuttontrigger.y && mouseY <= (backbuttontrigger.y + backbuttontrigger.h)) {
+
+						
+						//first check, is our index var for the area >= 0? (we need this so we dont have an error
+						if (currentSearchPos > 0) //we do > than 0, as we dont want to have an error
+						{
+							currentSearchPos = currentSearchPos - 1; //remove 1 from the searchpos
+							//std::cout << "BACK " << currentSearchPos << std::endl;
+							//ok, now, get the thing
+
+							urlInput = SearchHistory[currentSearchPos];
+
+							search(urlInput, false);
+
+
+						}
+					}
+
+					if (mouseX >= forwardbuttontrigger.x && mouseX <= (forwardbuttontrigger.x + forwardbuttontrigger.w) &&
+						mouseY >= forwardbuttontrigger.y && mouseY <= (forwardbuttontrigger.y + forwardbuttontrigger.h)) {
+
+						
+						//std::cout << "FORWARD " << currentSearchPos << std::endl;
+						if (!SearchHistory.empty() && currentSearchPos < (int)SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
+						{
+							currentSearchPos = currentSearchPos + 1; //add 1 from the searchpos
+							//std::cout << "FORWARD " << currentSearchPos << std::endl;
+
+							urlInput = SearchHistory[currentSearchPos];
+
+							//load it now!
+							search(urlInput, false);
+							//ok, now, get the thing
+						}
+					}
+
+
+
+
+					if (mouseX >= reloadbuttontrigger.x && mouseX <= (reloadbuttontrigger.x + reloadbuttontrigger.w) &&
+						mouseY >= reloadbuttontrigger.y && mouseY <= (reloadbuttontrigger.y + reloadbuttontrigger.h)) {
+						//reload
+
+						//we need to load a white screen, just so people know it has been reloaded
+						if (urlInput != "")
+						{
+							std::ifstream file("reload.html");
+
+							if (!file.is_open()) {
+								std::cout << "Could not open local file." << std::endl;
+								return -1;
+							}
+							//we dump the file into a buffer
+
+							std::stringstream buffer;
+
+							//load it in 
+							buffer << file.rdbuf();
+
+							//now we load the full file into a temp var
+							//we use the buffer and convert it into a string
+							std::string fileinfo = buffer.str();
+
+							//now we do something diffrent, we just inject it right into the parser to have the same effect
+							Parser(fileinfo);
+
+							//now we force render it
+							PreRender(render, font);
+
+
+							//set the background
+							SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255);
+							SDL_RenderClear(render); //clean the render
+
+							//force draw the new thing
+							for (int i = 0; i < mainlayout.size(); i++)
+							{
+								if (mainlayout[i].textTex == nullptr) continue; //skip if we have somthing thats nullptr, no texture
+
+								//render our text, we make a rectange and assign our text to that!
+								SDL_FRect textrec;
+								textrec.x = mainlayout[i].x;
+								textrec.y = mainlayout[i].y - scrollpos;
+								textrec.w = mainlayout[i].width;
+								textrec.h = mainlayout[i].hight;
+
+								//draw the bg color
+								if (mainlayout[i].hasBg)
+								{
+									SDL_SetRenderDrawColor(render, mainlayout[i].bgColor.r, mainlayout[i].bgColor.g, mainlayout[i].bgColor.b, 255); //255 cause we dont want it transparent
+									//fill the rec
+									SDL_RenderFillRect(render, &textrec);
+								}
 
 
 
 
 
+								SDL_RenderTexture(render, mainlayout[i].textTex, nullptr, &textrec);
+
+							}
+
+							SDL_RenderPresent(render);
 
 
 
-
-
-
-
-
-
-
-
-
+							search(urlInput, false); //now start the search for the other one.
+						}
+				
+					}
 
 
 
@@ -463,14 +650,8 @@ int GUIRENDER()
 							}
 
 							urlInput = finalUrl;
-							std::cout << "URLINPUT: " << urlInput << std::endl;
+							//std::cout << "URLINPUT: " << urlInput << std::endl;
 						
-
-
-
-
-
-
 
 
 
@@ -496,17 +677,17 @@ int GUIRENDER()
 								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
 							}
 
+
+
+							currentSearchPos = SearchHistory.size() - 1;
+
 							break;
 					
 						}
 					}
 				}
 			}
-		
-
-
-
-
+	
 
 
 		}
@@ -618,18 +799,82 @@ int GUIRENDER()
 
 
 		//render the 2 buttons
-		SDL_FRect backBtn = { barX - 40, 6, 30, 30 };
-		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-		SDL_RenderFillRect(render, &backBtn);
-
+		SDL_FRect backBtn;
+		if (currentSearchPos > 0) //we do > than 0, as we dont want to have an error
+		{
+			backBtn = { barX - 40, 6, 30, 30 };
+			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			SDL_RenderFillRect(render, &backBtn);
+		}
+		else {
+			backBtn = { barX - 40, 6, 30, 30 };
+			SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
+			SDL_RenderFillRect(render, &backBtn);
+		}
 	
-		SDL_FRect fwdBtn = { barX + barWidth + 10, 6, 30, 30 };
+
+		SDL_Color textColor = { 0, 0, 0, 255 };
+		SDL_Surface* backSurf = TTF_RenderText_Solid(font, "<", 0, textColor);
+		if (backSurf != nullptr)
+		{
+			SDL_Texture* backTex = SDL_CreateTextureFromSurface(render, backSurf);
+
+			SDL_FRect backTexRect = { backBtn.x + 8, backBtn.y + 4, (float)backSurf->w, (float)backSurf->h };
+			SDL_RenderTexture(render, backTex, nullptr, &backTexRect);
+
+			//prevent mem leaks
+			SDL_DestroyTexture(backTex);
+			SDL_DestroySurface(backSurf);
+		}
+
+		SDL_FRect fwdBtn;
+		if (!SearchHistory.empty() && currentSearchPos < (int)SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
+		{
+			fwdBtn = { barX + barWidth + 10, 6, 30, 30 };
+			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			SDL_RenderFillRect(render, &fwdBtn);
+		}
+		else {
+			//not enabled
+			fwdBtn = { barX + barWidth + 10, 6, 30, 30 };
+			SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
+			SDL_RenderFillRect(render, &fwdBtn);
+		}
+		
+
+
+		SDL_Surface* forwardSurf = TTF_RenderText_Solid(font, ">", 0, textColor);
+		if (forwardSurf != nullptr)
+		{
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, forwardSurf);
+
+			SDL_FRect fwdTexRect = { fwdBtn.x + 8, fwdBtn.y + 4, (float)forwardSurf->w, (float)forwardSurf->h };
+			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect);
+
+			//prevent mem leaks
+			SDL_DestroyTexture(forwardTex);
+			SDL_DestroySurface(forwardSurf);
+		}
+
+		SDL_FRect reloadButton;
+
+		//reload button
+		reloadButton = { barX - 80, 6, 30, 30 };
 		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-		SDL_RenderFillRect(render, &fwdBtn);
+		SDL_RenderFillRect(render, &reloadButton);
 
+		SDL_Surface* reloadSurf = TTF_RenderText_Solid(font, "R", 0, textColor);
+		if (reloadSurf != nullptr)
+		{
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, reloadSurf);
 
+			SDL_FRect reloadTexRect = { reloadButton.x + 9, reloadButton.y + 2, (float)reloadSurf->w, (float)reloadSurf->h };
+			SDL_RenderTexture(render, forwardTex, nullptr, &reloadTexRect);
 
-
+			//prevent mem leaks
+			SDL_DestroyTexture(forwardTex);
+			SDL_DestroySurface(reloadSurf);
+		}
 
 
 
@@ -639,12 +884,6 @@ int GUIRENDER()
 		SDL_RenderPresent(render);
 
 	}
-	
-	//while (true)
-	//{
-	//	std::cout << "TEST" << std::endl;
-	//}
-	
 
 
 	//we need to quit to clean up all the subsystems

@@ -256,7 +256,7 @@ int DOM(std::vector<Token> tokens)
 			{
 				//move back one level
 				Save = Save->Parent;
-				std::cout << "End of Tag, Back one!" << std::endl;
+				//td::cout << "End of Tag, Back one!" << std::endl;
 			}
 		}
 

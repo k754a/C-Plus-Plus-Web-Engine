@@ -38,7 +38,70 @@ bool iswhitespace(std::string& input)
 	return true;
 }
 
+std::string DecodeEntities(const std::string& input)
+{
+	std::string out; //the thing we are gonna return out
+	//save some size in meme for it, using our input size
+	out.reserve(input.size());
+	//do somthin like how we do our main tag stripping
+	size_t i = 0;
 
+	while (i < input.size())
+	{
+		if (input[i] == '&') //check if it starts for our unknown entitites.
+		{
+			size_t semi = input.find(';', i);
+			//check if its not null, or its not bigger than 12 char
+			if (semi != std::string::npos && semi - i < 20)
+			{
+				//get the thing
+				std::string entity = input.substr(i, semi - i + 1);
+
+				//if it = to any of these, we convert them
+				if (entity == "&nbsp;") { out += ' '; }
+				else if (entity == "&amp;") { out += '&'; }
+				else if (entity == "&lt;") { out += '<'; }
+				else if (entity == "&gt;") { out += '>'; }
+				else if (entity == "&quot;") { out += '"'; }
+				else if (entity == "&apos;") { out += '\''; }
+				else if (entity == "&mdash;") { out += '-'; out += '-'; }
+				else if (entity == "&ndash;") { out += '-'; }
+				else if (entity == "&laquo;") { out += '<'; out += '<'; }
+				else if (entity == "&raquo;") { out += '>'; out += '>'; }
+				else if (entity == "&#160;") { out += ' '; }
+				else if (entity.size() > 3 && entity[1] == '#' && entity[2] == 'x'){i = semi + 1;continue;}
+				else if (entity.size() > 2 && entity[1] == '#'){i = semi + 1;continue;}
+				else
+				{
+					//unkown, just let it through
+					out += input[i];
+					i++;
+					continue;
+				}
+				i = semi + 1;
+				continue;
+			}
+		}
+		//now lets remove werid things (thoes boxes)
+
+
+
+
+		unsigned char c = input[i++];
+		if(c < 128) 	out += c;
+	}
+
+
+	
+
+
+
+
+
+
+	return out;
+
+}
 
 //Full striptags code, does not handle things like <a href="link">
 std::vector<Token> StripTags(std::string htmldata)
@@ -131,7 +194,7 @@ std::vector<Token> StripTags(std::string htmldata)
 					Token textT;
 
 					//we just made a temp token, now we need to do 
-					textT.value = text;
+					textT.value = DecodeEntities(text);
 					textT.type = TokenType::TEXT;
 					tokenList.push_back(textT);
 

@@ -21,7 +21,7 @@ bool USELOCALFILE = FALSE; //use internet, set this to false.
 
 
 //hide the cmd on relase config
-#pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
+//#pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 
 
 
@@ -48,10 +48,9 @@ int main()
 
     //ConnectSocketHTTPS();
 
-    if (USELOCALFILE)
-    {
+    //THIS IS NOW CHANGED, THIS IS THE HOMEPAGE
         //load the file using fsstream
-        std::ifstream file("TestDoc.html");
+        std::ifstream file("main.html");
 
         if (!file.is_open()) {
             std::cout << "Could not open local file." << std::endl;
@@ -71,7 +70,7 @@ int main()
         //now we do something diffrent, we just inject it right into the parser to have the same effect
         Parser(fileinfo);
 
-    }
+    
 
     //THERE IS NOW A SETTING SO THAT YOU CAN TEST IT WITH JUST HTML FILES DIRECTLY!
     //this will be off in build versions tho.

@@ -143,7 +143,7 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 		//if we have one
 		if (!node->href.empty())
 		{
-			std::cout << "LINK HREF FOUND" << std::endl;
+			//std::cout << "LINK HREF FOUND" << std::endl;
 			currentHref = node->href;
 
 
@@ -164,7 +164,7 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 					fs.erase(fs.begin());
 				}
 
-				std::cout << "Getting char size" << std::endl;
+				//std::cout << "Getting char size" << std::endl;
 				//ok now we set our font size
 				//fonts are marked like 16px, so we need to get the numbers before the nums
 				if (std::isdigit(fs[0])) //check to avoid a crash
@@ -269,13 +269,22 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 
 		//this will let more stuff on one line, and will make the formating better
 		//first we check if its a structure block tag (div), (p), (h1)
-		if (node->tagValue == "div" || node->tagValue == "p" || node->tagValue == "h1")
+		// Block elements: push down to a new line
+		// added way more elemnets adns tuff
+		if (node->tagValue == "div" || node->tagValue == "p" ||
+			node->tagValue == "h1" || node->tagValue == "h2" ||
+			node->tagValue == "h3" || node->tagValue == "tr" ||
+			node->tagValue == "li" || node->tagValue == "br")
 		{
-			//if (currentXpos > 20) {
-			currentYpos += 10;
-			//currentYpos += (fontsize + 10);
-		//}
-			currentXpos = 20; //padding
+			currentYpos += fontsize + 6;
+			currentXpos = 20;
+		}
+
+		// table cells
+		if (node->tagValue == "td" || node->tagValue == "th")
+		{
+			//gives collums and stuff
+			currentXpos = ((currentXpos / 200) + 1) * 200;
 		}
 
 
@@ -291,6 +300,11 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 		layouttree.x = currentXpos; 
 		layouttree.y = currentYpos;
 
+		if (node->tagValue == "tr")
+		{
+			currentYpos += fontsize + 6;
+			currentXpos = 20; // reset columns for this new row
+		}
 
 		layouttree.node = node;
 
@@ -314,9 +328,19 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 
 		//send back the node to our layout list, to save
 		layoutList.push_back(layouttree);
-		std::cout << layouttree.fontSize << std::endl;
+		//std::cout << layouttree.fontSize << std::endl;
 
-		
+		//estamate x size to prevent overlap, using our font size ig
+		currentXpos += (int)(node->tagValue.size() * fontsize * 0.6);
+
+		// If we've gone too wide, wrap to next line
+		currentXpos += (int)(node->tagValue.size() * (fontsize / 2)) + 8;
+
+		if (currentXpos > 1400)
+		{
+			currentXpos = 20;
+			currentYpos += fontsize + 4;
+		}
 
 	}
 	

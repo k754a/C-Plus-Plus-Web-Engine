@@ -56,48 +56,30 @@ int EndWinSock()
 std::string URLPath;
 std::string Cleanup(std::string linkinput)
 {
-
+	URLPath = "/"; //reset the path
 	//this function santizes the input, its super janky but it works lol
-	std::string santizedlinkinput = linkinput;
+	
+	std::string host = linkinput;
+	//better way to strip the https
+	size_t slashpos = host.find("://");
 
-	int s_count = 0; //count how many / we find, if we find 3, figure out how long weve been running, and destory everything past the / 
-	for (int i = 0; i < santizedlinkinput.length(); i++)
-	{
-		
-		//if we detect a repeat add it to the score
-		if (santizedlinkinput[i] == '/')
-		{
-			s_count++;
-		}
-		if (s_count == 1)
-		{
-			//we do i + 1, because it will miss one of the /
-			santizedlinkinput.erase(0, i + 2);
-			std::cout << "Removed the start: " + santizedlinkinput << std::endl;
-			//we do this to  avoid making this run again
-			s_count++;
-			
-		}
-		if (s_count >= 3)
-		{
-			//if we have seen 3 / (or two, as we add an extra one, just to keep one of the / alive)
-			//we save this part, as we will need it
-			URLPath = santizedlinkinput.substr(i, santizedlinkinput.length());
-
-			//we then remove the extra part
-			santizedlinkinput.erase(i, santizedlinkinput.length());
-			//print its completed, and what we got.
-			std::cout << "Removed the end: " + santizedlinkinput << std::endl;
-			
-		}
-		
-		
+	//remove everything from the https:// (or http://)
+	if (slashpos != std::string::npos) {
+		host.erase(0, slashpos + 3);
 	}
-	//bit of debug
-	std::cout << "sanitized path: " << URLPath << std::endl;
-	std::cout << "sanitized link: " << santizedlinkinput << std::endl;
 
-	return santizedlinkinput;
+	//now we find the area we need the single /
+	size_t pathPos = host.find("/");
+	if (pathPos != std::string::npos)
+	{
+		URLPath = host.substr(pathPos);
+
+		host = host.substr(0, pathPos);
+	}
+
+
+
+	return host;
 }
 
 
@@ -119,7 +101,8 @@ int ConnectSocketHTTPS(std::wstring input)
 	std::string cleaned = Cleanup(temp);
 	std::wstring host_name(cleaned.begin(), cleaned.end());
 	//arguments (What type of browser), (type of accsess), (info abrout your proxy), (proxy bypass), (flags). we will set the last 3 to NULL NULL 0.
-	HINTERNET hInternet = InternetOpen(L"Browse++", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+	//we spoof a few of our proprties lol, just cause its easier
+	HINTERNET hInternet = InternetOpen(L"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
 
 
 	//then lets check, to make sure we got this part working
@@ -130,6 +113,13 @@ int ConnectSocketHTTPS(std::wstring input)
 		//the INTERNET_DEFAULT_HTTPS_PORT is port 443
 		//then it asks for username and password (we dont need)
 		//the next one i dont understand, but the last 2 are flags and context
+
+		//get winInet to handle redirects and stuff better! (i got this snipit online)
+		DWORD optionValue = WININET_API_FLAG_ASYNC;
+		InternetSetOption(hInternet, INTERNET_OPTION_CONNECT_TIMEOUT, new DWORD(10000), sizeof(DWORD));
+		InternetSetOption(hInternet, INTERNET_OPTION_RECEIVE_TIMEOUT, new DWORD(10000), sizeof(DWORD));
+
+
 		HINTERNET hconnect = InternetConnect(hInternet, host_name.c_str(), INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
 
 		if (hconnect != NULL)
@@ -139,14 +129,40 @@ int ConnectSocketHTTPS(std::wstring input)
 			//we send like our std::string request = std::string("GET ") + URLPath + std::string(" HTTP/1.1\r\n") + "Host: " + host_name + "\r\n" + "Connection: close\r\n\r\n"; 
 			//connection handle, http method, url path (convert to wstring), version, referrer, and acount types (we dont care), how we get https, is we use INTERNET FLAG SECURE
 			std::wstring temp1(URLPath.begin(), URLPath.end());
-			HINTERNET hRequest = HttpOpenRequest(hconnect, L"GET", temp1.c_str(), NULL, NULL, NULL, INTERNET_FLAG_SECURE, 0);
+
+			//got this through a google search too, apparently it will help with avoiding bot detections.
+			//list of flags
+			DWORD requestFlags =
+				INTERNET_FLAG_SECURE |  // HTTPS
+				INTERNET_FLAG_RELOAD |  // Don't use cached version
+				INTERNET_FLAG_NO_CACHE_WRITE |  // Don't cache our request
+				INTERNET_FLAG_KEEP_CONNECTION; // Persist the connection (helps with cookies)
+
+
+			HINTERNET hRequest = HttpOpenRequest(hconnect, L"GET", temp1.c_str(), L"HTTP/1.1", NULL, NULL, requestFlags, 0);
 
 			//we check to make sure
 			if (hRequest != NULL)
 			{
+
+
+				//common things browsers use for headers
+				std::wstring headers =
+					L"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n"
+					L"Accept-Language: en-US,en;q=0.9\r\n"
+					L"Accept-Encoding: identity\r\n"  
+					L"Connection: keep-alive\r\n"
+					L"Upgrade-Insecure-Requests: 1\r\n"
+					L"Sec-Fetch-Dest: document\r\n"
+					L"Sec-Fetch-Mode: navigate\r\n"
+					L"Sec-Fetch-Site: none\r\n"
+					L"Sec-Fetch-User: ?1\r\n"
+					L"Cache-Control: max-age=0\r\n";
+
+
 				//we send our packet of info, and just set everything else to 0 or NULL
 				//we make an if and when it runs the if it sees if it returns true, and it works
-				if (HttpSendRequest(hRequest, NULL, 0, NULL, 0))
+				if (HttpSendRequest(hRequest, headers.c_str(), (DWORD)headers.size(), NULL, 0))
 				{
 					//like how we do it in http.
 					char buffer[4096];
@@ -178,6 +194,7 @@ int ConnectSocketHTTPS(std::wstring input)
 		}
 
 		else {
+			InternetCloseHandle(hInternet);
 			std::cout << "ERROR - hconnect is Null, thats all we know :(" << std::endl;
 			return -1;
 		}
