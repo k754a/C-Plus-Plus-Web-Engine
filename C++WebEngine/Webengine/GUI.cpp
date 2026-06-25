@@ -19,14 +19,55 @@ std::vector<Layout> mainlayout;
 
 
 
+//wanted to devlop a way to have a back and forward arrow.
+//the way we can do this is have a list with the websites, and 2 buttons besides the input box, if they are pressed, we change the index, going back or forth
+//this is my thoughs
+
+//SEARCH -> ADD TO LIST -> SAVED
+
+//WHEN BUTTON PRESSED (either or) -> LOOK FORWARD OR BACKWARD IN THE LIST -> COMPARE TILL WE FIND THE INDEX -> MOVE BACK ONE.
+
+
+
+
+std::vector <std::string> SearchHistory;
+
+
+//SUDO CODE
+//if(SearchHistory[i] == urlInput && searchHistory.length() > 1){
+//
+//	urlInput = SearchHistory[i - 1];
+// 
+// 
+// 
+// 
+//}
+
+//we we search, we add one to the top, if we search, and our current pos is back one from our search history, we will overwrite that history.
+
+
+
+
+
+
+
+
+
+
+//the pos and how far weve scrolled down for the page
+//starts at the top of the page 0, and increases as the user scrolls down.
+//its subtracted from each elements y, so it gives the illiusion of scrolling.
+int scrollpos = 0;
+
 std::string urlInput = "";    // holds the url we type
 bool urlBarFocused = true;    // currently we have no other inputs, so we can always have this focused!
-
+SDL_Color backgroundColor = { 245, 245, 245, 255 }; //white bg, gets changed btw
 
 
 //this is called in layout, and repaces whatever was on the screen with the new layout
 int IMPORT(std::vector<Layout> layoutGOTTEN)
 {
+	scrollpos = 0; //reset the scroll pos, for new web sites
 	//we need to destroy all the old textures, as these are loaded in gpu mem
 	for (int i = 0; i < mainlayout.size(); i++)
 	{
@@ -56,49 +97,103 @@ int IMPORT(std::vector<Layout> layoutGOTTEN)
 //the idea is that we only do the GPU stuff once a layout, then assign this to a texture, that moves
 void PreRender(SDL_Renderer* render, TTF_Font* font)
 {
+	int xtrack = 20;
+	int ytrack = 40;
+	int lasty = -1; //set to -1 for first run so we allways small first run
+	int maxLineHeight = 0; //fix clipping
 
 	for (int i = 0; i < mainlayout.size(); i++) {
 
 		//if the item already has a texture
 		//we skip so we dont rerender it
-		if (mainlayout[i].textTex != nullptr) continue; 
 
-		//grab the text string from our current mainlayout node
-		//the value holds the text.
-		std::string text = mainlayout[i].node->tagValue;// Make sure this holds the text payload!
+		if (lasty != -1 && mainlayout[i].y > lasty) {
+			xtrack = 20;
 
-		//we pull the layout i (loop through everything)
-		//Layout currentLayout = mainlayout[i];
-		if (text.empty()) continue;
-
-		//we set the fonts to diffrent sizes, that our layout dom tree already does!
-		TTF_SetFontSize(font, mainlayout[i].fontSize);
-
-		//Create the surface (using black text)
-		SDL_Surface* nodeSurf = TTF_RenderText_Solid(font, text.c_str(), 0, SDL_Color{ 0, 0, 0, 255 });
-
-		//Make sure the surface was created successfully
-		if (nodeSurf != nullptr) {
-
-			////make a texture and update it
-			//SDL_Texture* nodeTex = SDL_CreateTextureFromSurface(render, nodeSurf);
-
-			//SDL_FRect textRec;
-			//textRec.x = currentLayout.x;
-			//textRec.y = currentLayout.y - scrollpos;
-
-
-			//save the dimetions of the block of text
-			mainlayout[i].width = nodeSurf->w;
-			mainlayout[i].hight = nodeSurf->h;
-
-			//upload the surface from ram to gpu as a texture!
-			// Draw and destroy to prevent mem leaks
-			mainlayout[i].textTex = SDL_CreateTextureFromSurface(render, nodeSurf); //send it to the gpu
-			
-			//free the cpu to avoid ram leaks!
-			SDL_DestroySurface(nodeSurf);
+			ytrack += (maxLineHeight + 15);
+			maxLineHeight = 0;
 		}
+
+		lasty = mainlayout[i].y;
+
+	
+		mainlayout[i].x = xtrack;
+		mainlayout[i].y = ytrack;
+
+		if (mainlayout[i].textTex == nullptr)
+		{
+			//grab the text string from our current mainlayout node
+			//the value holds the text.
+			std::string text = mainlayout[i].node->tagValue;// Make sure this holds the text payload!
+
+			//we pull the layout i (loop through everything)
+			//Layout currentLayout = mainlayout[i];
+			if (!text.empty())
+			{
+
+				//we set the fonts to diffrent sizes, that our layout dom tree already does!
+				TTF_SetFontSize(font, mainlayout[i].fontSize);
+
+				if (!mainlayout[i].href.empty()) {
+					TTF_SetFontStyle(font, TTF_STYLE_UNDERLINE);
+				}
+				else {
+					TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
+				}
+
+
+				//Create the surface (using black text)
+				SDL_Surface* nodeSurf = TTF_RenderText_Solid(font, text.c_str(), 0, mainlayout[i].textColor);
+
+				//Make sure the surface was created successfully
+				if (nodeSurf != nullptr) {
+
+					////make a texture and update it
+					//SDL_Texture* nodeTex = SDL_CreateTextureFromSurface(render, nodeSurf);
+
+					//SDL_FRect textRec;
+					//textRec.x = currentLayout.x;
+					//textRec.y = currentLayout.y - scrollpos;
+
+
+					//save the dimetions of the block of text
+					mainlayout[i].width = nodeSurf->w;
+					mainlayout[i].hight = nodeSurf->h;
+
+					//upload the surface from ram to gpu as a texture!
+					// Draw and destroy to prevent mem leaks
+					mainlayout[i].textTex = SDL_CreateTextureFromSurface(render, nodeSurf); //send it to the gpu
+
+					//free the cpu to avoid ram leaks!
+					SDL_DestroySurface(nodeSurf);
+				}
+
+			}
+		
+		
+		
+		
+		}
+
+
+		TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
+
+		if (mainlayout[i].hight > maxLineHeight)
+		{
+			maxLineHeight = mainlayout[i].hight;
+		}
+	
+
+
+		xtrack += (mainlayout[i].width + 12);
+
+
+
+
+
+
+
+
 	}
 
 
@@ -174,14 +269,14 @@ int GUIRENDER()
 	//clear and remove it
 	SDL_DestroySurface(textserf); //done wiht the text serface
 	
-	//the pos and how far weve scrolled down for the page
-	//starts at the top of the page 0, and increases as the user scrolls down.
-	//its subtracted from each elements y, so it gives the illiusion of scrolling.
-	int scrollpos = 0;
+
 
 	//shows events like window changes and stuff
 	SDL_Event event; //we make an SDL event handler
 
+
+
+	
 	//main loop
 	while (running)
 	{
@@ -243,8 +338,8 @@ int GUIRENDER()
 
 
 					//these 2 blocks autodetect if its a https or http.
-					std::thread([input]()
-						{
+					//std::thread([input]()
+					//	{
 							const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 							const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 
@@ -253,6 +348,9 @@ int GUIRENDER()
 							if (std::regex_match(input, httpPattern)) {
 								std::cout << "http url!" << std::endl;
 								ConnectSocketHTTP(input);
+
+
+								SearchHistory.push_back(input);
 								//now that we understand its a valid url, lets attempt a socket connect.
 								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
 							}
@@ -262,10 +360,13 @@ int GUIRENDER()
 								std::cout << "https url!" << std::endl;
 								std::wstring temp(input.begin(), input.end());
 								ConnectSocketHTTPS(temp);
+
+
+								SearchHistory.push_back(input);
 								//now that we understand its a valid url, lets attempt a socket connect.
 								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
 							}
-						}).detach();
+						//}).detach();
 
 
 					
@@ -289,15 +390,119 @@ int GUIRENDER()
 				}
 			}
 
+			if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+			{
+				//check if our left mouse pressed
+				if (event.button.button == SDL_BUTTON_LEFT) {
 
+					float mouseX = event.button.x;
+					float mouseY = event.button.y;
+
+					//check the main 2 buttons
+
+					int WinW, WinH;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+					for (int i = 0; i < mainlayout.size(); i++)
+					{
+						//skip ones that arnt links
+						if (mainlayout[i].textTex == nullptr) continue;
+						if (mainlayout[i].href.empty()) continue;
+
+						//ok we have a link, now lets adjust the activator block
+						float screeny = mainlayout[i].y - scrollpos;
+
+						//calculate if we are over it
+						if (mouseX >= mainlayout[i].x && mouseX <= (mainlayout[i].x + mainlayout[i].width) &&
+							mouseY >= screeny && mouseY <= (screeny + mainlayout[i].hight))
+						{
+
+
+
+							std::cout << "link pressed" << std::endl;
+
+						
+
+
+							std::string finalUrl = mainlayout[i].href;
+
+							//connect to it
+							const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
+							const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
+
+							//if our links are kinda weird, and arnt the full thing (wikipedia does this a lot lol
+							if (!std::regex_search(finalUrl, httpPattern) && !std::regex_search(finalUrl, httpsPattern))
+							{
+								size_t endstr = urlInput.find("/", urlInput.find("://") + 3);
+								std::string basedomain = urlInput.substr(0, endstr);
+
+								//add them together
+								// We also add a "/" in the middle just in case the link doesnt have one
+								finalUrl = basedomain + (finalUrl.empty() || finalUrl[0] != '/' ? "/" : "") + finalUrl;
+							}
+
+							urlInput = finalUrl;
+							std::cout << "URLINPUT: " << urlInput << std::endl;
+						
+
+
+
+
+
+
+
+
+
+							//check if this is a valid url
+							//note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
+							if (std::regex_match(urlInput, httpPattern)) {
+								std::cout << "http url!" << std::endl;
+								ConnectSocketHTTP(urlInput);
+								//now that we understand its a valid url, lets attempt a socket connect.
+								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.q
+								SearchHistory.push_back(urlInput);
+							}
+
+
+							if (std::regex_match(urlInput, httpsPattern)) {
+								std::cout << "https url!" << std::endl;
+								std::wstring temp(urlInput.begin(), urlInput.end());
+								ConnectSocketHTTPS(temp);
+
+
+								SearchHistory.push_back(urlInput);
+								//now that we understand its a valid url, lets attempt a socket connect.
+								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
+							}
+
+							break;
+					
+						}
+					}
+				}
+			}
 		
-
-
-
-
-
-
-
 
 
 
@@ -311,7 +516,7 @@ int GUIRENDER()
 		PreRender(render, font);
 
 		//Clear the screen
-		SDL_SetRenderDrawColor(render, 255, 255, 255, 255); // White background
+		SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255); // auto choses based on the site!
 		SDL_RenderClear(render);
 
 		//Loop through the layout list
@@ -331,6 +536,18 @@ int GUIRENDER()
 			textrec.y = mainlayout[i].y - scrollpos;
 			textrec.w = mainlayout[i].width;
 			textrec.h = mainlayout[i].hight;
+
+			//draw the bg color
+			if (mainlayout[i].hasBg)
+			{
+				SDL_SetRenderDrawColor(render, mainlayout[i].bgColor.r, mainlayout[i].bgColor.g, mainlayout[i].bgColor.b, 255); //255 cause we dont want it transparent
+				//fill the rec
+				SDL_RenderFillRect(render, &textrec);
+			}
+
+		
+
+
 
 			SDL_RenderTexture(render, mainlayout[i].textTex, nullptr, &textrec);
 
@@ -400,6 +617,16 @@ int GUIRENDER()
 		}
 
 
+		//render the 2 buttons
+		SDL_FRect backBtn = { barX - 40, 6, 30, 30 };
+		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		SDL_RenderFillRect(render, &backBtn);
+
+	
+		SDL_FRect fwdBtn = { barX + barWidth + 10, 6, 30, 30 };
+		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		SDL_RenderFillRect(render, &fwdBtn);
+
 
 
 
@@ -431,3 +658,4 @@ int GUIRENDER()
 	
 	return 0;
 }
+

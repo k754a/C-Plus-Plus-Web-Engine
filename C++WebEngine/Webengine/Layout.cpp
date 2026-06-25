@@ -59,7 +59,73 @@ std::string FindProperty(CSSRule* rule, std::string propertyName)
 
 
 
+//for bg and text colors!
+struct RGB { int r, g, b;  };
 
+//got this online! 
+RGB hexToRgb(unsigned int hexValue)
+{
+	RGB color;
+	color.r = (hexValue >> 16) & 0xFF; // Extract the first 2 hex digits
+	color.g = (hexValue >> 8) & 0xFF;  // Extract the middle 2 hex digits
+	color.b = hexValue & 0xFF;         // Extract the last 2 hex digits
+	return color;
+}
+
+RGB ParseHexColor(std::string hex)
+{
+	//css can somtimes have a lot of spaces
+	// #bbbbbb
+	//the problem is, this would cause a huge crash, as the code didnt know what to do.
+	//now, the code will work!
+	//this removes the front spaces
+	while (!hex.empty() && std::isspace((unsigned char)hex.front()))
+		hex.erase(hex.begin());
+
+	//this removes the back.
+	while (!hex.empty() && std::isspace((unsigned char)hex.back()))
+		hex.pop_back();
+
+	//remove spaces or #
+	if (!hex.empty() && hex[0] == '#')
+	{
+		hex = hex.substr(1);
+	}
+
+	//expand shortand (#eee) to #eeeeee
+
+	if (hex.size() == 3)
+	{
+		hex = std::string() + hex[0] + hex[0]
+			+ hex[1] + hex[1]
+			+ hex[2] + hex[2];
+	}
+
+	//handle errors
+	if (hex.empty() || hex.size() != 6)
+	{
+		std::cout << "Found a invalid hex size, going back to black." << std::endl;
+		RGB error = { 0,0,0, };
+		return error;
+	}
+
+	//prevent a crash
+	try {
+		unsigned int hexValue = std::stoul(hex, nullptr, 16);
+		return hexToRgb(hexValue);
+	}
+	catch (...) //any error
+	{
+		//just return our error thing
+		RGB error = { 0,0,0, };
+		return error;
+	}
+
+
+
+	//convert to our rgb vals!
+	
+}
 
 
 
@@ -69,11 +135,21 @@ std::string FindProperty(CSSRule* rule, std::string propertyName)
 
 std::vector<Layout> layoutList; //list to store the layout
 
-void GenerateLayoutTree(Node* node, int& currentYpos, int fontsize)
+void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int fontsize, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref)
 {
 	
 	if (node->tag == NODETYPE::START)
 	{
+		//if we have one
+		if (!node->href.empty())
+		{
+			std::cout << "LINK HREF FOUND" << std::endl;
+			currentHref = node->href;
+
+
+
+		}
+		
 		CSSRule* id = FindID(node->tagValue);
 
 		//check if its not null
@@ -83,11 +159,92 @@ void GenerateLayoutTree(Node* node, int& currentYpos, int fontsize)
 
 			if (!fs.empty())
 			{
+				//rm the spaces
+				while (!fs.empty() && std::isspace((unsigned char)fs.front())) {
+					fs.erase(fs.begin());
+				}
+
+				std::cout << "Getting char size" << std::endl;
+				//ok now we set our font size
+				//fonts are marked like 16px, so we need to get the numbers before the nums
+				if (std::isdigit(fs[0])) //check to avoid a crash
+				{
+					fontsize = std::stoi(fs) * 2; //we * by 2, cause it would be super small
+				}
+				//fontsize = std::stoi(fs) * 2; 
+			}
+
+
+
+			std::string bg = FindProperty(id, "background-color"); //check each one for font size
+			if (bg.empty())
+			{
+				bg = FindProperty(id, "background"); //if it fails the first time, check for this
+			}
+			if (!bg.empty()) //if we get either.
+			{
+				std::cout << "Getting hex code" << std::endl;
+
+				if (bg.find("var(") != std::string::npos)
+				{
+					//we found somthing like
+					std::cout << "ERROR, CSS Defined with Var, Auto Skipping page color!" << std::endl;
+					std::cout << "This is not a problem :)" << std::endl;
+
+					return;
+				}
 				//ok now we set our font size
 				//fonts are marked like 16px, so we need to get the numbers before the nums
 
-				fontsize = std::stoi(fs) * 2; //we * by 2, cause it would be super small
+				std::cout << "BG RAW: [" << bg << "]" << std::endl;
+
+				RGB parsed = ParseHexColor(bg);
+				//we do this, as there is other bg definitions in things like the <divs>, we only want the bg (currently) for the body.
+				if (node->tagValue == "body")
+				{
+
+					
+					backgroundColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we * by 2, cause it would be super small
+				}
+				else {
+					bgColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 };
+					hasBg = true;
+				}
+
 			}
+
+
+			//now support text color
+			std::string tc = FindProperty(id, "color");
+			if (!tc.empty())
+			{
+				RGB parsed = ParseHexColor(tc);
+				textColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we * by 2, cause it would be super small
+			}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		}
 		else {
 			//give it that predefined
@@ -104,11 +261,25 @@ void GenerateLayoutTree(Node* node, int& currentYpos, int fontsize)
 			else if (node->tagValue == "span") {
 				fontsize = 36;
 			}
-			else if (node->tagValue == "div") {
-
-				currentYpos += 5;
+			else {
+				//defualt size
+				fontsize = 24;
 			}
 		}
+
+		//this will let more stuff on one line, and will make the formating better
+		//first we check if its a structure block tag (div), (p), (h1)
+		if (node->tagValue == "div" || node->tagValue == "p" || node->tagValue == "h1")
+		{
+			//if (currentXpos > 20) {
+			currentYpos += 10;
+			//currentYpos += (fontsize + 10);
+		//}
+			currentXpos = 20; //padding
+		}
+
+
+
 		
 	}
 	
@@ -117,7 +288,7 @@ void GenerateLayoutTree(Node* node, int& currentYpos, int fontsize)
 	{
 		//make a var that resets every run
 		Layout layouttree;
-		layouttree.x = 10; 
+		layouttree.x = currentXpos; 
 		layouttree.y = currentYpos;
 
 
@@ -126,24 +297,33 @@ void GenerateLayoutTree(Node* node, int& currentYpos, int fontsize)
 		//when i code css, this will get replaced merging the data.
 
 
+		layouttree.textColor = textColor;
 
-
+		if (!currentHref.empty())
+		{
+			layouttree.textColor = { 0, 50, 255, 255 }; //blue
+		}
 		layouttree.fontSize = fontsize;
 
-	
+		layouttree.bgColor = bgColor;
+
+		layouttree.hasBg = hasBg;
+
+
+		layouttree.href = currentHref;
 
 		//send back the node to our layout list, to save
 		layoutList.push_back(layouttree);
 		std::cout << layouttree.fontSize << std::endl;
 
-		currentYpos += (fontsize + 10);
+		
 
 	}
 	
 
 	for (Node* child : node->children)
 	{
-		GenerateLayoutTree(child, currentYpos, fontsize);
+		GenerateLayoutTree(child, currentXpos, currentYpos, fontsize, textColor, bgColor, hasBg, currentHref);
 	}
 	
 }
@@ -153,10 +333,16 @@ int LayoutTree(Node* node)
 	layoutList.clear(); //we need to do this, or we will have errors
 
 	int currentY = 40;
+	int currentX = 10;
 	int startingfontsize = 14;
 	//ok first we assing the node val to our new layout list
 	//now we set it to add the node
-	GenerateLayoutTree(node, currentY, startingfontsize);
+	SDL_Color startingTextColor = { 0, 0, 0, 255 };
+
+	SDL_Color startingBgColor = { 0, 0, 0, 0 };
+	bool startingHasBg = false;
+																													//current Href starts empty
+	GenerateLayoutTree(node, currentX, currentY, startingfontsize, startingTextColor, startingBgColor, startingHasBg, "");
 
 	std::cout << "Layout Compleate." << std::endl;
 	

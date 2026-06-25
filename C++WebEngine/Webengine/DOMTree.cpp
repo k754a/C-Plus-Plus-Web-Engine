@@ -132,13 +132,47 @@ int DOM(std::vector<Token> tokens)
 		//lets do the START first.
 		if (currentToken.type == TokenType::START) //check if its a start token
 		{
+
+
 			//ok now this is what we need to do.
 			Node* TempNode = new Node(); //first lets make a temp node.
 			//then we need to filter our stuff, currently we have a lot of junk we dont want, like <> and some other stuff the tokenizer didnt catch
 
 
-
 			std::string rawToken = currentToken.value;
+
+
+			size_t hrefPos = rawToken.find("href=\"");
+			if (hrefPos != std::string::npos) //if we do
+			{
+				size_t startpos = hrefPos + 6; //skip the href= part
+				size_t endpos = rawToken.find("\"", startpos); //find the end
+				if (endpos != std::string::npos)
+				{
+					
+
+					TempNode->href = rawToken.substr(startpos, endpos - startpos); //grab between start and len of start - end
+
+					//save the url
+					std::cout << "[DEBUG] Parser found link: " << TempNode->href << std::endl;
+				}
+			}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 			size_t space = rawToken.find(' '); //find if we have a " "
@@ -210,8 +244,6 @@ int DOM(std::vector<Token> tokens)
 			//we dont do the Save = TempNode, cause we dont wanna move the dir forward on the end of values.
 
 			//DEBUG
-			std::cout << currentToken.value << std::endl;
-
 		}
 
 		//handle end tokens

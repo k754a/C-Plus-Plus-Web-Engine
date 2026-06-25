@@ -232,7 +232,7 @@ std::vector<Token> StripTags(std::string htmldata)
 					//currently we do nothing with this, but thats ok, we have a VOID tag, so we will in the future!
 					//std::cout << "Void Tag Found! " << Savevar << std::endl;
 					currenttoken.type = TokenType::START;
-					currenttoken.value = "<" + tagName + ">";
+					currenttoken.value = Savevar;
 					tokenList.push_back(currenttoken);
 
 					// close the tag right after, i didnt do this before and it just wreaked everything.
@@ -247,7 +247,7 @@ std::vector<Token> StripTags(std::string htmldata)
 				else {
 
 					currenttoken.type = TokenType::START;
-					currenttoken.value = "<" + tagName + ">";
+					currenttoken.value = Savevar;
 					tokenList.push_back(currenttoken);
 
 					TokenStack.push_back(tagName);

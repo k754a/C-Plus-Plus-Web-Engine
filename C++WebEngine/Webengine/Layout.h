@@ -24,6 +24,8 @@ struct Node {
 	std::vector<Node*> children; //make this node so that we can have depth, like stuff inside the tag
 	Node* Parent = nullptr; // so we can track the parent
 
+	std::string href = ""; //we have non links "" clickable ones are filled in!
+
 };
 
 
@@ -38,6 +40,16 @@ struct Layout
 	int fontSize; 
 
 	SDL_Texture* textTex = nullptr; //we are gonna prerender the text, so we dont gotta do it on the fly.
+
+	SDL_Color textColor; // txt colors
+
+	//we set the 0,0,0,0 to keep it transparent
+
+	SDL_Color bgColor = { 0, 0, 0, 0 }; //bg color
+
+	bool hasBg = false; //start off false
+
+	std::string href = ""; //we have non links "" clickable ones are filled in!
 };
 
 
