@@ -25,6 +25,7 @@ struct Node {
 	Node* Parent = nullptr; // so we can track the parent
 
 	std::string href = ""; //we have non links "" clickable ones are filled in!
+	std::string src = ""; //tell if we have images (cause links and images ids are kinda the same)
 
 };
 
@@ -50,8 +51,74 @@ struct Layout
 	bool hasBg = false; //start off false
 
 	std::string href = ""; //we have non links "" clickable ones are filled in!
-};
 
+
+
+	//images
+	SDL_Texture* imageTex = nullptr; 
+
+	//this will speed up stuff
+	bool isImage = false;
+
+
+	//because we attempt to pull multiple times, we gotta make sure we dont get stuck in a loop
+	bool imageAttempted = false;
+
+
+	//we add our loaded surfaces to this, to save time
+    std::atomic<SDL_Surface*> pendingSurface{ nullptr };
+
+    //we make copies so that SDL_Surface can use this lol
+    Layout() = default;
+
+    // 2. Custom Copy Constructor
+    Layout(const Layout& other)
+    {
+        node = other.node;
+        x = other.x;
+        y = other.y;
+        width = other.width;
+        hight = other.hight;
+        fontSize = other.fontSize;
+        textTex = other.textTex;
+        textColor = other.textColor;
+        bgColor = other.bgColor;
+    
+         href = other.href; 
+         hasBg = other.hasBg;
+        isImage = other.isImage;
+        imageTex = other.imageTex;
+        imageAttempted = other.imageAttempted;
+
+        pendingSurface.store(other.pendingSurface.load());
+    }
+
+    // 3. Custom Copy Assignment Operator
+    Layout& operator=(const Layout& other)
+    {
+        if (this != &other)
+        {
+            node = other.node;
+            x = other.x;
+            y = other.y;
+            width = other.width;
+            hight = other.hight;
+            fontSize = other.fontSize;
+            textTex = other.textTex;
+            textColor = other.textColor;
+            bgColor = other.bgColor;
+             href = other.href;
+             hasBg = other.hasBg;
+            isImage = other.isImage;
+            imageTex = other.imageTex;
+            imageAttempted = other.imageAttempted;
+
+          
+            pendingSurface.store(other.pendingSurface.load());
+        }
+        return *this;
+    }
+};
 
 
 

@@ -8,10 +8,12 @@
 #include <iostream>
 #include <winsock2.h>
 #include <ws2tcpip.h> //for pton
+#include <vector>
 
 //pull the validate string
 int ConnectSocketHTTP(std::string input);
 int ConnectSocketHTTPS(std::wstring input);
+std::vector<unsigned char> DownloadBytes(std::string url);
 int EndWinSock();
 int StartWinSock();
 

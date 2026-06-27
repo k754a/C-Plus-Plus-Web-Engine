@@ -158,7 +158,24 @@ int DOM(std::vector<Token> tokens)
 				}
 			}
 
+			size_t srcPos = rawToken.find("src=\"");
+			if (srcPos != std::string::npos) //if we do
+			{
+				size_t startpos = srcPos + 5; //skip the src= part
+				size_t endpos = rawToken.find("\"", startpos); //find the end
+				if (endpos != std::string::npos)
+				{
 
+
+					TempNode->src = rawToken.substr(startpos, endpos - startpos); //grab between start and len of start - end
+
+					//save the url
+					std::cout << "[DEBUG] Image link found: " << TempNode->src << std::endl;
+				}
+			}
+
+
+		
 
 
 

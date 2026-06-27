@@ -4,8 +4,8 @@
 #include <vector>
 #include <list>
 #include <unordered_set> //for the check to make it faster
-
-
+#include "GUI.h"
+#include <algorithm>    
 
 
 //THIS IS ADDED/DEFINED IN THE DOM
@@ -278,6 +278,11 @@ std::vector<Token> StripTags(std::string htmldata)
 				//first we need just the tag name
 				std::string tagName = Savevar.substr(1, Savevar.length() - 2);
 				 
+			
+				if (!tagName.empty() && tagName.back() == '/') { //lets us handle things like <img/>
+					tagName.pop_back();
+				}
+
 				//this checks to see if we have any other properties like <a href="google.com">
 				size_t spacePos = tagName.find(' ');
 				if (spacePos != std::string::npos) //make sure thats not null lol
@@ -287,6 +292,7 @@ std::vector<Token> StripTags(std::string htmldata)
 					tagName = tagName.substr(0, spacePos);
 				}
 
+				std::transform(tagName.begin(), tagName.end(), tagName.begin(), ::tolower); //force everything to be lowercase
 
 				//before we throw in the towel, lets check to see if its one of our void tags
 				//we check if its not = to voidtags.end() because if we get to the end of a vector and cant find nothing, we are ok with that!
@@ -369,7 +375,30 @@ std::vector<Token> StripTags(std::string htmldata)
 //removed old stuff
 
 //now all functions can parse much faster than before.
+std::string pullTITLE(std::string htmldata)
+{
+	std::string titlepos;
+	//there should only be one title btw, so just grab that ig
+	size_t startpos = htmldata.find("<title");
+	if (startpos == std::string::npos)
+	{
+		return "unk tab name";
+	}
 
+
+
+	size_t endpos = htmldata.find("</title>");
+	if (endpos == std::string::npos)
+	{
+		return "unk tab name";
+	}
+
+	titlepos = htmldata.substr(startpos + 7, endpos - (startpos + 7));
+	//grab between 
+
+	return titlepos;
+
+}
 
 //these classes will be populate eventualy, to actully tokenize, and render css, but not today.
 //this was updated to a loop, because https sites can have more than one stylesheet.
@@ -768,7 +797,12 @@ int Parser(std::string input)
 	
 
 	
-
+	//grab the title
+	std::string title = pullTITLE(input);
+	if (!title.empty())
+	{
+		SetTabTitle(title);
+	}
 	//Sending to a DOM class
 
 

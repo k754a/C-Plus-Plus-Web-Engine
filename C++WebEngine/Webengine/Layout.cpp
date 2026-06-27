@@ -223,28 +223,6 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 			}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 		}
 		else {
 			//give it that predefined
@@ -289,6 +267,51 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 
 
 
+
+		//check if its an image
+		//check if its a img and its not empty
+		if (node->tagValue == "img" && !node->src.empty())
+		{
+			//create a image 
+			Layout imgLayout;
+			imgLayout.node = node;
+			imgLayout.x = currentXpos;
+			imgLayout.y = currentYpos;
+			imgLayout.isImage = true;    //set the img to true
+
+			imgLayout.imageAttempted = false;
+			imgLayout.imageTex = nullptr;   //we dont know the texture yet
+			imgLayout.fontSize = 0; //no font
+			imgLayout.textColor = { 0,0,0,255 }; //dont matter
+			imgLayout.href = currentHref;
+			layoutList.push_back(imgLayout);
+
+
+			//give it a alocated size
+			int allocatedWidth = 200;
+			int allocatedHeight = 150;
+			imgLayout.width = allocatedWidth;
+			imgLayout.hight = allocatedHeight; 
+
+			layoutList.push_back(imgLayout);
+
+			//move the cursor to not run into it
+			currentXpos += allocatedWidth + 15;
+			if (currentXpos > 1200) {
+				currentXpos = 20;
+				currentYpos += allocatedHeight + 15;
+			}
+
+
+		}
+
+
+
+
+
+
+
+
 		
 	}
 	
@@ -326,12 +349,22 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 
 		layouttree.href = currentHref;
 
-		//send back the node to our layout list, to save
-		layoutList.push_back(layouttree);
+		
+		
 		//std::cout << layouttree.fontSize << std::endl;
 
-		//estamate x size to prevent overlap, using our font size ig
-		currentXpos += (int)(node->tagValue.size() * fontsize * 0.6);
+		int estimatedTextWidth = (int)(node->tagValue.size() * (fontsize * 0.45));
+		int estimatedTextHeight = fontsize + 4;
+
+		//estimate the size or whateveer and for img
+		layouttree.width = estimatedTextWidth;
+		layouttree.hight = estimatedTextHeight;
+
+		//send back the node to our layout list, to save
+		layoutList.push_back(layouttree);
+
+		// Advance layout typing alignment cursor safely without overlapping
+		currentXpos += estimatedTextWidth + 8;
 
 		// If we've gone too wide, wrap to next line
 		currentXpos += (int)(node->tagValue.size() * (fontsize / 2)) + 8;
@@ -341,6 +374,17 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 			currentXpos = 20;
 			currentYpos += fontsize + 4;
 		}
+
+
+
+
+
+
+
+
+
+
+
 
 	}
 	
@@ -356,7 +400,7 @@ int LayoutTree(Node* node)
 {
 	layoutList.clear(); //we need to do this, or we will have errors
 
-	int currentY = 40;
+	int currentY = 50;
 	int currentX = 10;
 	int startingfontsize = 14;
 	//ok first we assing the node val to our new layout list

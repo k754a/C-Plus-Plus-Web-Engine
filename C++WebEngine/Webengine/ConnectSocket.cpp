@@ -84,6 +84,132 @@ std::string Cleanup(std::string linkinput)
 
 
 
+
+
+//basiclly the https funct, but we pull bytes instead
+std::vector<unsigned char> DownloadBytes(std::string url)
+{
+
+	std::vector<unsigned char> result; //we make this, as we want to store the bites and idk if there gonna be string or whatever
+
+
+	std::string cleaned = Cleanup(url);
+	std::wstring host_name(cleaned.begin(), cleaned.end());
+	//arguments (What type of browser), (type of accsess), (info abrout your proxy), (proxy bypass), (flags). we will set the last 3 to NULL NULL 0.
+	//we spoof a few of our proprties lol, just cause its easier
+	HINTERNET hInternet = InternetOpen(L"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+
+
+	//check if hInt is null
+
+	if (hInternet == NULL) return result;
+
+	//do our hconnect
+	HINTERNET hconnect = InternetConnect(hInternet, host_name.c_str(), INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+
+	//check if hCon is null
+
+	if (hconnect == NULL) { InternetCloseHandle(hconnect); return result; } //we need to close it up, or else we get errors 
+
+
+	std::wstring path(URLPath.begin(), URLPath.end());
+
+	//got this through a google search too, apparently it will help with avoiding bot detections.
+	//list of flags
+	DWORD flags =
+		INTERNET_FLAG_SECURE |  // HTTPS
+		INTERNET_FLAG_RELOAD |  // Don't use cached version
+		INTERNET_FLAG_NO_CACHE_WRITE |   // Don't cache our request
+		INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS; 
+
+
+	HINTERNET hRequest = HttpOpenRequest(hconnect, L"GET", path.c_str(), L"HTTP/1.1", NULL, NULL, flags, 0);
+
+
+	//if the h request is null
+
+	if (hRequest == NULL)
+	{
+		InternetCloseHandle(hconnect);
+		InternetCloseHandle(hRequest);
+
+		return result;
+	}
+
+
+	//change it to grab the images
+	std::wstring headers =
+		L"Accept: image/webp,image/png,image/jpeg,image/*,*/*\r\n"
+		L"Accept-Encoding: identity\r\n"
+		L"Connection: keep-alive\r\n";
+
+
+
+	if (HttpSendRequest(hRequest, headers.c_str(), (DWORD)headers.size(), NULL, 0))
+	{
+		//like how we do it in http.
+		char buffer[4096];
+		DWORD bytesRead = 0;//how many bytes read
+
+
+
+		//now lets read!
+
+		while (InternetReadFile(hRequest, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0)
+		{
+			//keep adding onto our gotten
+			result.insert(result.end(), buffer, buffer + bytesRead);
+		}
+
+	}
+	
+
+
+
+	//ok now that we have everything, apparently these network nodes will leak resorces untill we close them
+
+
+	InternetCloseHandle(hconnect);
+	InternetCloseHandle(hRequest);
+	InternetCloseHandle(hInternet);
+
+
+
+	return result; //i forgot this, so nothing worked lol
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //Connect for https.
 int ConnectSocketHTTPS(std::wstring input)
 {
@@ -217,15 +343,6 @@ int ConnectSocketHTTPS(std::wstring input)
 	return 0;
 
 }
-
-
-
-
-
-
-
-
-
 
 
 
