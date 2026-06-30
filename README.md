@@ -8,9 +8,9 @@
 
 
 
-
-# Browse++: A C++ Browser Engine from Scratch.
-
+<div align="center">
+  <h1>Browse++: A C++ Browser Engine from Scratch.</h1>
+</div>
 
 
 <p align="center">
