@@ -22,6 +22,12 @@ struct Tab //tab struct
 	std::vector<std::string> history = {}; //give each tab its own history (currently we have it for the main one)
 	int historypos = -1; //the pos for history/
 
+	//hold the tabs search history!
+	std::vector <std::string> SearchHistory = {};
+
+	//and current pos, we look at the current selected tab before adjusting these
+	int currentSearchPos = -1;
+
 };
 
 

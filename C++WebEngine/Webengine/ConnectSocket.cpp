@@ -54,6 +54,10 @@ int EndWinSock()
 
 //save the URLPath to the page we want to load, we have to have a var out of this as we want to accsess this in our main scirpt.
 std::string URLPath;
+
+
+//a current problem with this, if i force load 2 urls at the same time, it will crash :(
+//however, because of the loading screen, it allows me to ignore this! so idr
 std::string Cleanup(std::string linkinput)
 {
 	URLPath = "/"; //reset the path

@@ -43,10 +43,8 @@ std::vector<Layout> mainlayout;
 //C++ global structs always run first, so we can make it instantly
 
 
+//MOVED CURRENT SEARCH HISTORY, AS WE NEED SEPRATE ONES FOR TABS!
 
-
-std::vector <std::string> SearchHistory = {};
-int currentSearchPos = -1;
 //
 ////SUDO CODE
 ////if(SearchHistory[i] == urlInput && searchHistory.length() > 1){
@@ -87,6 +85,8 @@ struct TabInit {
 		t.title = "New Tab";
 		tabs.push_back(t);
 		activeTab = 0;
+
+		
 	}
 } _tabInit;
 
@@ -126,12 +126,6 @@ int IMPORT(std::vector<Layout> layoutGOTTEN)
 
 
 
-
-
-
-
-
-
 	tabs[activeTab].layout = layoutGOTTEN;
 	tabs[activeTab].url = urlInput;
 	std::cout << "Updated" << std::endl;
@@ -153,6 +147,10 @@ std::string PercentDecode(const std::string& src)
 			out += decoded;
 			i += 2;
 		}
+		else if (src[i] == '+') //handle things like +'s in urls
+		{
+			out += ' ';
+		}
 		else
 		{
 			out += src[i];
@@ -161,7 +159,7 @@ std::string PercentDecode(const std::string& src)
 	return out;
 }
 
-// add this above PreRender
+// added this above PreRender
 std::string ResolveURL(std::string src, std::string currentUrl)
 {
 	std::string decoded = ""; //thing to hold decoded
@@ -327,6 +325,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 				}
 
 
+			
 				//Create the surface (using black text)
 				SDL_Surface* nodeSurf = TTF_RenderText_Solid(font, text.c_str(), 0, tabs[activeTab].layout[i].textColor);
 
@@ -403,6 +402,8 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 						}
 						else {
 							std::cout << "ERROR - Trying To Download IMG" << std::endl;
+
+							std::cout << "FROM THIS - " << urlInput << std::endl;
 						}
 					}
 				}
@@ -564,7 +565,7 @@ void SetTabTitle(std::string title)
 
 
 
-int search(std::string input, bool addToHistory, SDL_Renderer* render, TTF_Font* font)
+int search(std::string input, bool addToHistory, SDL_Renderer* render, TTF_Font* font, int CurrentTab)
 {
 	const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 	const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
@@ -634,19 +635,55 @@ int search(std::string input, bool addToHistory, SDL_Renderer* render, TTF_Font*
 
 	if (addToHistory) {
 
+		
 		//if we went back and searched somthing new, deleate that multiverse
-		if (currentSearchPos < (int)SearchHistory.size() - 1) {
-			SearchHistory.resize(currentSearchPos + 1);
+		if (tabs[activeTab].currentSearchPos < (int)tabs[activeTab].SearchHistory.size() - 1) {
+			tabs[activeTab].SearchHistory.resize(tabs[activeTab].currentSearchPos + 1);
 		}
 
-		SearchHistory.push_back(input);
-		currentSearchPos = SearchHistory.size() - 1; // Keep index at the end
+		tabs[activeTab].SearchHistory.push_back(input);
+		tabs[activeTab].currentSearchPos = tabs[activeTab].SearchHistory.size() - 1; // Keep index at the end
 	}
 
 
 
 	return 0;
 }
+
+
+
+
+//ok, this fixes duck duck go redirect strings!
+std::string FixURLREDIRECT(const std::string& href)
+{
+	//first find our uddg=, we want to remove that
+	size_t uddgPos = href.find("uddg=");
+	//if we cant find that, stop
+	if (uddgPos == std::string::npos) return "";
+
+	size_t start = uddgPos + 5; // skip "uddg="
+
+
+	//hold our fixed value
+	std::string encoded = "";
+
+	//ok, starting at the start pos, we go till the end
+	for (int i = start; i < href.size(); i++)
+	{
+		//ok, we hit a new parram, we dont want to put that into our main loop, so we stop!
+		if (href[i] == '&')
+		{
+			break;
+		}
+
+		//else, just keep going
+		encoded += href[i];
+	}
+
+	return PercentDecode(encoded);
+}
+
+
 
 
 
@@ -789,7 +826,7 @@ int GUIRENDER()
 
 						//}).detach();
 
-					search(urlInput, true, render, font);
+					search(urlInput, true, render, font, activeTab);
 
 
 
@@ -837,17 +874,20 @@ int GUIRENDER()
 					if (mouseX >= backbuttontrigger.x && mouseX <= (backbuttontrigger.x + backbuttontrigger.w) &&
 						mouseY >= backbuttontrigger.y && mouseY <= (backbuttontrigger.y + backbuttontrigger.h)) {
 
+						
 
+						
 						//first check, is our index var for the area >= 0? (we need this so we dont have an error
-						if (currentSearchPos > 0) //we do > than 0, as we dont want to have an error
+						if (tabs[activeTab].currentSearchPos > 0) //we do > than 0, as we dont want to have an error
 						{
-							currentSearchPos = currentSearchPos - 1; //remove 1 from the searchpos
+							tabs[activeTab].currentSearchPos = tabs[activeTab].currentSearchPos - 1; //remove 1 from the searchpos
 							//std::cout << "BACK " << currentSearchPos << std::endl;
 							//ok, now, get the thing
 
-							urlInput = SearchHistory[currentSearchPos];
+							urlInput = tabs[activeTab].SearchHistory[tabs[activeTab].currentSearchPos];
 
-							search(urlInput, false, render, font);
+
+							search(urlInput, false, render, font, activeTab);
 
 
 						}
@@ -858,15 +898,15 @@ int GUIRENDER()
 
 
 						//std::cout << "FORWARD " << currentSearchPos << std::endl;
-						if (!SearchHistory.empty() && currentSearchPos < (int)SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
+						if (!tabs[activeTab].SearchHistory.empty() && tabs[activeTab].currentSearchPos < (int)tabs[activeTab].SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
 						{
-							currentSearchPos = currentSearchPos + 1; //add 1 from the searchpos
+							tabs[activeTab].currentSearchPos = tabs[activeTab].currentSearchPos + 1; //add 1 from the searchpos
 							//std::cout << "FORWARD " << currentSearchPos << std::endl;
 
-							urlInput = SearchHistory[currentSearchPos];
+							urlInput = tabs[activeTab].SearchHistory[tabs[activeTab].currentSearchPos];
 
 							//load it now!
-							search(urlInput, false, render, font);
+							search(urlInput, false, render, font, activeTab);
 							//ok, now, get the thing
 						}
 					}
@@ -885,7 +925,7 @@ int GUIRENDER()
 							//we load the anim, render it and stuff!
 							//LoadAnimation(render, font);
 
-							search(urlInput, false, render, font); //now start the search for the other one.
+							search(urlInput, false, render, font, activeTab); //now start the search for the other one.
 						}
 
 					}
@@ -917,6 +957,24 @@ int GUIRENDER()
 
 							std::string finalUrl = tabs[activeTab].layout[i].href;
 
+
+							std::string realDest = FixURLREDIRECT(finalUrl);
+							if (!realDest.empty())
+							{
+								finalUrl = realDest;
+							}
+
+							//we got a few issues with the url links, as they break lol, so to fix, we add a https for it!
+							if (finalUrl.size() >= 2 && finalUrl[0] == '/' && finalUrl[1] == '/')
+							{
+								//fix it
+								finalUrl = "https:" + finalUrl;
+							}
+
+
+
+
+
 							//connect to it
 							const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 							const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
@@ -947,7 +1005,8 @@ int GUIRENDER()
 								ConnectSocketHTTP(urlInput);
 								//now that we understand its a valid url, lets attempt a socket connect.
 								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.q
-								SearchHistory.push_back(urlInput);
+
+								tabs[activeTab].SearchHistory.push_back(urlInput);
 							}
 
 
@@ -957,14 +1016,14 @@ int GUIRENDER()
 								ConnectSocketHTTPS(temp);
 
 
-								SearchHistory.push_back(urlInput);
+								tabs[activeTab].SearchHistory.push_back(urlInput);
 								//now that we understand its a valid url, lets attempt a socket connect.
 								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
 							}
 
 
 
-							currentSearchPos = SearchHistory.size() - 1;
+							tabs[activeTab].currentSearchPos = tabs[activeTab].SearchHistory.size() - 1;
 
 							break;
 
@@ -1157,12 +1216,12 @@ int GUIRENDER()
 			if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex != nullptr)
 			{
 				//for now, we are gonna clamp images
-				if (textrec.w > 300)
-				{
-					float scale = 300 / textrec.w; //make a scale thing, so we adjust right
-					textrec.w = 300; //se the width to 300
-					textrec.h = (int)(textrec.h * scale); //so that the scale is accurate
-				}
+				//if (textrec.w > 300)
+				//{
+				//	float scale = 300 / textrec.w; //make a scale thing, so we adjust right
+				//	textrec.w = 300; //se the width to 300
+				//	textrec.h = (int)(textrec.h * scale); //so that the scale is accurate
+				//}
 
 				SDL_RenderTexture(render, tabs[activeTab].layout[i].imageTex, nullptr, &textrec);
 			}
@@ -1263,7 +1322,8 @@ int GUIRENDER()
 
 		//render the 2 buttons
 		SDL_FRect backBtn;
-		if (currentSearchPos > 0) //we do > than 0, as we dont want to have an error
+
+		if (tabs[activeTab].currentSearchPos > 0) //we do > than 0, as we dont want to have an error
 		{
 			backBtn = { barX - 40, 35, 30, 30 };
 			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
@@ -1291,7 +1351,7 @@ int GUIRENDER()
 		}
 
 		SDL_FRect fwdBtn;
-		if (!SearchHistory.empty() && currentSearchPos < (int)SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
+		if (!tabs[activeTab].SearchHistory.empty() && tabs[activeTab].currentSearchPos < (int)tabs[activeTab].SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
 		{
 			fwdBtn = { barX + barWidth + 10, 35, 30, 30 };
 			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);

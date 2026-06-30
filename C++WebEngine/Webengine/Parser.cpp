@@ -69,8 +69,9 @@ std::string DecodeEntities(const std::string& input)
 				else if (entity == "&laquo;") { out += '<'; out += '<'; }
 				else if (entity == "&raquo;") { out += '>'; out += '>'; }
 				else if (entity == "&#160;") { out += ' '; }
-				else if (entity.size() > 3 && entity[1] == '#' && entity[2] == 'x'){i = semi + 1;continue;}
-				else if (entity.size() > 2 && entity[1] == '#'){i = semi + 1;continue;}
+				else if (entity == "□") { out += ' '; }
+				else if (entity.size() > 3 && entity[1] == '#' && entity[2] == 'x') { i = semi + 1; continue; }
+				else if (entity.size() > 2 && entity[1] == '#') { i = semi + 1; continue; }
 				else
 				{
 					//unkown, just let it through
@@ -86,9 +87,8 @@ std::string DecodeEntities(const std::string& input)
 
 
 
-
-		unsigned char c = input[i++];
-		if(c < 128) 	out += c;
+		//changed this to not filter non ascii one at a time
+		out += input[i++];
 	}
 
 

@@ -92,7 +92,43 @@ int CSSDOM(std::vector<CSSRule> tokens) {
 
 
 
+#include <string>
 
+
+//ok, i figured out its something to do like \t \n or \r, its because our font tries to render them, but cannot!
+std::string CollapseWhitespace(const std::string& input)
+{
+	//result string
+	std::string result = "";
+
+	//check if its whitespace
+	bool inWhitespace = false;
+
+	for (char c : input)
+	{
+		// Treat newlines, carriage returns, tabs, and spaces all as whitespace
+		if (c == '\n' || c == '\r' || c == '\t' || c == ' ')
+		{
+			if (!inWhitespace)
+			{
+				result += ' '; // Replace the whole block of whitespace with one space
+				inWhitespace = true; //say that we have whitespace!
+			}
+		}
+		else
+		{
+			//if we dont have a \n \r or \t, we can flip it to false, prepearing for the next new line!
+			result += c;
+			inWhitespace = false;
+		}
+	}
+
+	//lets trim the extras, to keep it clean, check if the result is basicly just whitespace, and remove it
+	if (!result.empty() && result.front() == ' ') result.erase(0, 1);
+	if (!result.empty() && result.back() == ' ') result.pop_back();
+
+	return result;
+}
 
 
 
@@ -248,7 +284,7 @@ int DOM(std::vector<Token> tokens)
 
 			Node* TempNode = new Node(); //make the new node.
 			TempNode->tag = NODETYPE::TEXT;
-			TempNode->tagValue = currentToken.value; //set it to our current token, this does not need any refinement.
+			TempNode->tagValue = CollapseWhitespace(currentToken.value); //set it to our current token, this does not need any refinement.
 			TempNode->Parent = Save;
 
 

@@ -284,7 +284,7 @@ void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int font
 			imgLayout.fontSize = 0; //no font
 			imgLayout.textColor = { 0,0,0,255 }; //dont matter
 			imgLayout.href = currentHref;
-			layoutList.push_back(imgLayout);
+			//layoutList.push_back(imgLayout); //put 2 in, oops!
 
 
 			//give it a alocated size
