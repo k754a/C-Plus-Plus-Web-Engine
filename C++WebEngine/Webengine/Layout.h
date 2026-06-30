@@ -27,6 +27,14 @@ struct Node {
 	std::string href = ""; //we have non links "" clickable ones are filled in!
 	std::string src = ""; //tell if we have images (cause links and images ids are kinda the same)
 
+
+    //ok, updates to the node, adding things like w & h, so we can put in flexboxes!
+
+    int measuredWidth = 0;
+    int measuredHeight = 0;
+    bool measured = false;  //so we dont measure more than once!
+
+
 };
 
 
