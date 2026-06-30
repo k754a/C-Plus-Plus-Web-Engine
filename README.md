@@ -1,7 +1,12 @@
+<h2 align="center">Screenshots</h2>
+
 <p align="center">
+  <img src="generalimg.png" width="48%">
+  <img src="searchimg.jpg" width="48%">
+</p>
 
-  <img src="https://github.com/k754a/C-Plus-Plus-Web-Engine/blob/main/image%20(2).png?raw=true" alt="Browse++ Logo" width="100">
-
+<p align="center">
+  <img src="websiteexample.jpg" width="70%">
 </p>
 
 # Browse++ A C++ Browser Engine from Scratch.
@@ -30,11 +35,11 @@ https://k754a.hackclub.app/
 
 - Render to a screen 🗸
 
-- Tab management
+- Tab management 🗸
 
 - CSS parser 🗸
 
-- Add a CSS DOM tree
+- Add a CSS DOM tree 🗸
 
 ## AI notice
 
@@ -45,4 +50,19 @@ AI has been used in some aspects of this project.
 - The native Windows code to Linux for the server. Any code changes are clearly marked with (`// CHANGED WITH AI: ...`) if they have been changed with AI.
 
 - The main windows project has NOT been coded with AI whatsoever.
+
+
+# Contributing
+
+Feel free to make your own forks of this project, add things, and find issues!
+
+---
+
+# ⭐ Support the Project
+
+If you find Browse++ interesting, please consider giving it a ⭐!
+
+It helps more people discover the project!
+
+---
 
