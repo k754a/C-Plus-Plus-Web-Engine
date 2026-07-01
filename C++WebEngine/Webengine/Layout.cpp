@@ -56,6 +56,115 @@ std::string FindProperty(CSSRule* rule, std::string propertyName)
 }
 
 
+//see if a node has absolute in the css
+//if it does we return true!
+//we need the x and y
+bool IsAbsolute(Node* node, int& outX, int& outY)
+{
+	//i first want to look through the nodes tag, to see if it has it
+	//we check that it has css values, if not, we return false
+
+	CSSRule* id = FindID(node->tagValue);
+	if (id == nullptr)
+	{
+		return false;
+	}
+
+	//now letes get the display part, if the element dont have this, we skip
+
+	std::string position = FindProperty(id, "position");
+	if (position.empty())
+	{
+		return false;
+	}
+
+	//rm the spaces, (same code ive been using in a bunch of other areas lol
+
+	while (!position.empty() && std::isspace((unsigned char)position.front()))
+		position.erase(position.begin());
+
+	//if its flex, we return true
+	if (position.find("absolute") != std::string::npos)
+	{
+		//grab the left and top
+		std::string leftStr = FindProperty(id, "left");
+		std::string topStr = FindProperty(id, "top");
+
+		while (!leftStr.empty() && std::isspace((unsigned char)leftStr.front()))
+			leftStr.erase(leftStr.begin());
+		if (!leftStr.empty() && std::isdigit(leftStr[0])) {
+			outX = std::stoi(leftStr);
+		}
+
+		while (!topStr.empty() && std::isspace((unsigned char)topStr.front()))
+			topStr.erase(topStr.begin());
+		if (!topStr.empty() && std::isdigit(topStr[0])) {
+			outY = std::stoi(topStr);
+		}
+
+
+
+
+
+		return true;
+
+	}
+
+	return false;
+}
+
+//see if a node has flex in the css
+//if it does we return true!
+bool IsFlex(Node* node)
+{
+	//i first want to look through the nodes tag, to see if it has it
+	//we check that it has css values, if not, we return false
+
+	CSSRule* id = FindID(node->tagValue);
+	if (id == nullptr)
+	{
+		return false;
+	}
+
+	//now letes get the display part, if the element dont have this, we skip
+
+	std::string display = FindProperty(id, "display");
+	if (display.empty())
+	{
+		return false;
+	}
+
+	//rm the spaces, (same code ive been using in a bunch of other areas lol
+
+	while (!display.empty() && std::isspace((unsigned char)display.front()))
+		display.erase(display.begin());
+
+	//if its flex, we return true
+	return display.find("flex") != std::string::npos;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -238,12 +347,14 @@ void MeasureNodes(Node* node, int fontsize)
 
 //this is the poistion part, i split them into functs, just to be a bit cleaner
 //we are gonna adjust our pos, based on a bunch of things :)
-void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref)
+void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref, bool inFlex = false)
 {
 
 	//first we gotta make sure its an open tag, rather than something like text
 	if (node->tag == NODETYPE::START)
 	{
+		
+
 		//if we have one
 		if (!node->href.empty())
 		{
@@ -349,19 +460,123 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			}
 		}
 
+
+
+		//we are gonna handle our flex stuff here.
+		//first check if its a flex node
+		if (IsFlex(node))
+		{
+			std::cout << "Found FLEX tag! " << node->tagValue << std::endl; //DEBUG
+
+			currentYpos += fontsize + 6;
+
+			//this will kinda be a template for other things like flex, span, ect
+			int flexX = currentXpos;
+			int flexY = currentYpos;
+			int tallestChild = 0; //we handle the loop again, for each child as we need to handle it
+
+			//go through each child, as the flex affects them!
+
+			for (Node* child : node->children)
+			{
+				//this helps prevent y drift!
+				int childX = flexX;
+				int childY = flexY;
+
+				//change the pos of each child at the flex pos
+				PositionNodes(child, childX, childY, fontsize, textColor, bgColor, hasBg, currentHref, true);
+
+
+				//forgot to update this! it wont work wihout
+				tallestChild = std::max(tallestChild, child->measuredHeight);
+
+
+				//we should move the cursor a bit
+				flexX += child->measuredWidth + 8;
+
+				//handle if it gets too big
+				if (flexX > 2600)
+				{
+					flexX = currentXpos; //reset x 
+					flexY += tallestChild + 8; //we move the y down
+					tallestChild = 0; //reset for the new row
+				}
+
+			}
+
+			//after we place the children, lets update the cursor to avoid overlapping
+
+			currentYpos = flexY + tallestChild + 8; //move it down!
+
+			//reset the x
+			currentYpos += tallestChild + 20;
+			currentXpos = 20;
+
+
+			return;
+
+		}
+
+		//handle absolute pos
+		int absX = 0;
+		int absY = 0;
+
+		//ok, if we get true from this
+		if (IsAbsolute(node, absX, absY))
+		{
+			std::cout << "Found ABSOLUTE tag! " << node->tagValue << std::endl; //DEBUG
+
+			//save where the normal flow of the page was, like the pos beforehand
+			int savedX = currentXpos;
+			int savedY = currentYpos;
+
+			//update the cursor to the pos of the css
+			currentXpos = absX;
+			currentYpos = absY;
+
+			//render 
+			for (Node* child : node->children)
+			{
+				PositionNodes(child, currentXpos, currentYpos, fontsize, textColor, bgColor, hasBg, currentHref, false);
+			}
+
+			//update the current x and y pos back, as we need them
+
+			currentXpos = savedX;
+			currentYpos = savedY;
+
+			return;
+		}
+
+
+
+
+
+
+
+
+
+
+
+
+
 		//this will let more stuff on one line, and will make the formating better
 		//first we check if its a structure block tag (div), (p), (h1)
 		// Block elements: push down to a new line
 		// added way more elemnets adns tuff
-		if (node->tagValue == "div" || node->tagValue == "p" ||
-			node->tagValue == "h1" || node->tagValue == "h2" ||
-			node->tagValue == "h3" || node->tagValue == "tr" ||
-			node->tagValue == "li" || node->tagValue == "br")
-		{
-			currentYpos += fontsize + 6;
-			currentXpos = 20;
-		}
 
+		if (!inFlex)
+		{
+
+			if (node->tagValue == "div" || node->tagValue == "p" ||
+				node->tagValue == "h1" || node->tagValue == "h2" ||
+				node->tagValue == "h3" || node->tagValue == "tr" ||
+				node->tagValue == "li" || node->tagValue == "br")
+			{
+				currentYpos += fontsize + 6;
+				currentXpos = 20;
+			}
+		}
 		// table cells
 		if (node->tagValue == "td" || node->tagValue == "th")
 		{
@@ -492,7 +707,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 	for (Node* child : node->children)
 	{
-		PositionNodes(child, currentXpos, currentYpos, fontsize, textColor, bgColor, hasBg, currentHref);
+		PositionNodes(child, currentXpos, currentYpos, fontsize, textColor, bgColor, hasBg, currentHref, false);
 	}
 
 
@@ -769,7 +984,7 @@ int LayoutTree(Node* node)
 {
 	layoutList.clear(); //we need to do this, or we will have errors
 
-	int currentY = 50;
+	int currentY = 120; //update this, to fix text clipping
 	int currentX = 10;
 	int startingfontsize = 14;
 

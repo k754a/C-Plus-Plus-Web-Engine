@@ -247,7 +247,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size()) return; //if we have no active tabs, ignore
 
 	int xtrack = 20;
-	int ytrack = 40;
+	int ytrack = 120; //issues with the y track, now fixed!
 	int lasty = -1; //set to -1 for first run so we allways small first run
 	int maxLineHeight = 0; //fix clipping
 
@@ -737,7 +737,8 @@ int GUIRENDER()
 	//Now that we got it init, lets render that font
 	//open the font file from disk.
 	//16 is the defalt size (we change this in PreRender)
-	font = TTF_OpenFont("./fonts/PixelifySans-Regular.ttf", 16);
+	font = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", 16);
+	TTF_Font* iconFont = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", 28); // For icons
 	//make sure it worked
 	if (font == nullptr)
 	{
@@ -759,12 +760,17 @@ int GUIRENDER()
 	//shows events like window changes and stuff
 	SDL_Event event; //we make an SDL event handler
 
-
+	//i added this, because my padding and stuff kept moving and it was super annoying!
+	const float btnSize = 30.0f;   // Keep button size constant
+	const float padding = 15.0f;   // alwasy 10px of space
+	const float topMargin = 37.0f; // dist from the top of the window
 
 
 	//main loop
 	while (running)
 	{
+
+
 
 
 
@@ -862,17 +868,16 @@ int GUIRENDER()
 
 					SDL_GetWindowSize(window, &WinW, &WinH);
 
-					float barwidth = 1200; //the width of the bar
-					float barx = (WinW - barwidth) / 2; //we use this to align the triggers
+					
 
-					SDL_FRect backbuttontrigger = { barx - 40, 35 , 30, 30 }; //pos
-					SDL_FRect forwardbuttontrigger = { barx + barwidth + 10, 35, 30, 30 }; //pos
-					SDL_FRect reloadbuttontrigger = { barx - 80,35,30,30 }; //pos
-
+					SDL_FRect backBtnRect = { padding, topMargin, btnSize, btnSize };
+					SDL_FRect fwdBtnRect = { backBtnRect.x + backBtnRect.w + padding, topMargin, btnSize, btnSize };
+					SDL_FRect reloadBtnRect = { fwdBtnRect.x + fwdBtnRect.w + padding, topMargin, btnSize, btnSize };
+					SDL_FRect homeBtnRect = { reloadBtnRect.x + reloadBtnRect.w + padding, topMargin, btnSize, btnSize };
 
 					//test if the backbutton is pressed
-					if (mouseX >= backbuttontrigger.x && mouseX <= (backbuttontrigger.x + backbuttontrigger.w) &&
-						mouseY >= backbuttontrigger.y && mouseY <= (backbuttontrigger.y + backbuttontrigger.h)) {
+					if (mouseX >= backBtnRect.x && mouseX <= (backBtnRect.x + backBtnRect.w) &&
+						mouseY >= backBtnRect.y && mouseY <= (backBtnRect.y + backBtnRect.h)) {
 
 						
 
@@ -893,8 +898,8 @@ int GUIRENDER()
 						}
 					}
 
-					if (mouseX >= forwardbuttontrigger.x && mouseX <= (forwardbuttontrigger.x + forwardbuttontrigger.w) &&
-						mouseY >= forwardbuttontrigger.y && mouseY <= (forwardbuttontrigger.y + forwardbuttontrigger.h)) {
+					if (mouseX >= fwdBtnRect.x && mouseX <= (fwdBtnRect.x + fwdBtnRect.w) &&
+						mouseY >= fwdBtnRect.y && mouseY <= (fwdBtnRect.y + fwdBtnRect.h)) {
 
 
 						//std::cout << "FORWARD " << currentSearchPos << std::endl;
@@ -914,8 +919,8 @@ int GUIRENDER()
 
 
 
-					if (mouseX >= reloadbuttontrigger.x && mouseX <= (reloadbuttontrigger.x + reloadbuttontrigger.w) &&
-						mouseY >= reloadbuttontrigger.y && mouseY <= (reloadbuttontrigger.y + reloadbuttontrigger.h)) {
+					if (mouseX >= reloadBtnRect.x && mouseX <= (reloadBtnRect.x + reloadBtnRect.w) &&
+						mouseY >= reloadBtnRect.y && mouseY <= (reloadBtnRect.y + reloadBtnRect.h)) {
 						//reload
 
 						//we need to load a white screen, just so people know it has been reloaded
@@ -930,6 +935,34 @@ int GUIRENDER()
 
 					}
 
+
+					//handle the new home buttn
+					else if (mouseX >= homeBtnRect.x && mouseX <= (homeBtnRect.x + homeBtnRect.w) &&
+						mouseY >= homeBtnRect.y && mouseY <= (homeBtnRect.y + homeBtnRect.h)) {
+
+						std::ifstream file("main.html");
+
+						if (!file.is_open()) {
+							std::cout << "Could not open local file." << std::endl;
+							return -1;
+						}
+						//we dump the file into a buffer
+
+						std::stringstream buffer;
+
+						//load it in 
+						buffer << file.rdbuf();
+
+						//now we load the full file into a temp var
+						//we use the buffer and convert it into a string
+						std::string fileinfo = buffer.str();
+
+						//now we do something diffrent, we just inject it right into the parser to have the same effect
+						Parser(fileinfo);
+
+						//lets clear the url input too
+						urlInput = "";
+					}
 
 
 
@@ -1242,29 +1275,198 @@ int GUIRENDER()
 		}
 
 
-
-
+		//icons! Home, Reload, Back+Forth arrows, search, star, printer
+		//љ њ ђ ы ж ξ
 
 		int WinW, WinH;
 		SDL_GetWindowSize(window, &WinW, &WinH);
 
+		SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH);
+	
+
+		float scaleX = 1.0f, scaleY = 1.0f;
+		SDL_GetRenderScale(render, &scaleX, &scaleY);
 
 		SDL_SetRenderDrawColor(render, 245, 245, 245, 255);
 		SDL_FRect searchBarBg = { 0, 30, (float)WinW, 39 };
 		SDL_RenderFillRect(render, &searchBarBg);
 
+		//render the 2 buttons
+		SDL_FRect backBtn;
+
+		if (tabs[activeTab].currentSearchPos > 0) //we do > than 0, as we dont want to have an error
+		{
+			backBtn.x = SDL_floorf(padding * scaleX) / scaleX;
+			backBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
+			backBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
+			backBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
+			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			SDL_RenderFillRect(render, &backBtn);
+		}
+		else {
+			backBtn.x = SDL_floorf(padding * scaleX) / scaleX;
+			backBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
+			backBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
+			backBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
+			SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
+			SDL_RenderFillRect(render, &backBtn);
+		}
+
+
+		SDL_Color textColor = { 0, 0, 0, 255 };
+
+		//handle my monitor
+	
+
+		//BACK ARROW
+		SDL_Surface* backSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);
+		if (backSurf != nullptr)
+		{
+			SDL_Texture* backTex = SDL_CreateTextureFromSurface(render, backSurf);
+
+
+			SDL_SetTextureScaleMode(backTex, SDL_SCALEMODE_NEAREST);
+
+			//before i had them hardcoded, not anymore!
+			//we snap to the screen
+			float backX = SDL_floorf((backBtn.x + (backBtn.w - (float)backSurf->w) / 2.0f) * scaleX) / scaleX;
+			float backY = SDL_floorf((backBtn.y + (backBtn.h - (float)backSurf->h) / 2.0f) * scaleY) / scaleY;
+
+			
+			SDL_FRect backTexRect = { backX, backY, (float)backSurf->w, (float)backSurf->h };
+			SDL_RenderTexture(render, backTex, nullptr, &backTexRect);
+
+			//prevent mem leaks
+			SDL_DestroyTexture(backTex);
+			SDL_DestroySurface(backSurf);
+		}
+
+		SDL_FRect fwdBtn;
+		if (!tabs[activeTab].SearchHistory.empty() && tabs[activeTab].currentSearchPos < (int)tabs[activeTab].SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
+		{
+			//changed to snap the <> correctly!
+			fwdBtn.x = SDL_floorf((backBtn.x + backBtn.w + padding) * scaleX) / scaleX;
+			fwdBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
+			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
+			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
+
+			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			SDL_RenderFillRect(render, &fwdBtn);
+		}
+		else {
+			//not enabled
+			//changed to snap the <> correctly!
+			fwdBtn.x = SDL_floorf((backBtn.x + backBtn.w + padding) * scaleX) / scaleX;
+			fwdBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
+			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
+			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
+
+			SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
+			SDL_RenderFillRect(render, &fwdBtn);
+		}
+
+
+		//FORWARD ARROW
+		SDL_Surface* forwardSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);
+		if (forwardSurf != nullptr)
+		{
+			//flip the sprite, as currently its ugly lol
+			SDL_FlipSurface(forwardSurf, SDL_FLIP_HORIZONTAL);
+
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, forwardSurf);
+
+			//force it to fix the pixel art! (found this with a bit of searching!)
+			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST);
+
+			float fwdX = SDL_floorf((fwdBtn.x + (fwdBtn.w - (float)forwardSurf->w) / 2.0f) * scaleX) / scaleX;
+			float fwdY = SDL_floorf((fwdBtn.y + (fwdBtn.h - (float)forwardSurf->h) / 2.0f) * scaleY) / scaleY;
+
+			SDL_FRect fwdTexRect = { fwdX, fwdY, (float)forwardSurf->w, (float)forwardSurf->h };
+
+			//flip the sprite, as currently its ugly lol
+			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect);
+
+			//prevent mem leaks
+			SDL_DestroyTexture(forwardTex);
+			SDL_DestroySurface(forwardSurf);
+		}
+
+
+
+		SDL_FRect reloadButton;
+
+		//reload button
+		reloadButton.x = fwdBtn.x + fwdBtn.w + padding;
+		reloadButton.y = topMargin;
+		reloadButton.w = btnSize;
+		reloadButton.h = btnSize;
+		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		SDL_RenderFillRect(render, &reloadButton);
+
+		SDL_Surface* reloadSurf = TTF_RenderText_Solid(iconFont, "њ", 0, textColor);
+		if (reloadSurf != nullptr)
+		{
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, reloadSurf);
+
+			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST);
+
+			SDL_FRect reloadTexRect = { reloadButton.x + 3, reloadButton.y - 4, (float)reloadSurf->w, (float)reloadSurf->h };
+			SDL_RenderTexture(render, forwardTex, nullptr, &reloadTexRect);
+
+			//prevent mem leaks
+			SDL_DestroyTexture(forwardTex);
+			SDL_DestroySurface(reloadSurf);
+		}
 
 
 
 
-		//get the current win dimentions
+
+
+		SDL_FRect homeBtn;
+		
+			homeBtn.x = reloadButton.x + reloadButton.w + padding;
+			homeBtn.y = topMargin;
+			homeBtn.w = btnSize;
+			homeBtn.h = btnSize;
+			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			SDL_RenderFillRect(render, &homeBtn);
 		
 
-		//little equation to place the url bar in the center
-		float barWidth = 1200;
-		float barX = (WinW - barWidth) / 2; //center it by taking half the window
-		//draw the bar
-		SDL_FRect bar = { barX, 35, barWidth, 30 };
+		
+		
+		SDL_Surface* homeSurf = TTF_RenderText_Blended(iconFont, "љ", 0, textColor);
+		if (homeSurf != nullptr)
+		{
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, homeSurf);
+
+			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST);
+
+			SDL_FRect fwdTexRect = { homeBtn.x + 2, homeBtn.y - 2, (float)homeSurf->w, (float)homeSurf->h };
+			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect);
+
+			//prevent mem leaks
+			SDL_DestroyTexture(forwardTex);
+			SDL_DestroySurface(homeSurf);
+		}
+
+
+
+
+		
+		//INPUT BOX
+		float searchX = homeBtn.x + homeBtn.w + padding;
+		float searchW = (float)WinW - btnSize - padding - padding - searchX - ((btnSize) * 2); //for 2 buttons
+
+		
+
+		SDL_FRect bar = {
+			SDL_floorf(searchX * scaleX) / scaleX,
+			SDL_floorf(topMargin * scaleY) / scaleY,
+			SDL_floorf(searchW * scaleX) / scaleX,
+			SDL_floorf(btnSize * scaleY) / scaleY
+		};
+
 		SDL_SetRenderDrawColor(render, 240, 240, 240, 255); //draw a grayish color
 		//fill the rec with this
 		SDL_RenderFillRect(render, &bar);
@@ -1278,17 +1480,20 @@ int GUIRENDER()
 
 		if (urlInput.empty()) //check if its empty
 		{
-			displayText = "Enter a url...";
+			displayText = "ы Enter a url...";
 			color = { 180, 180, 180, 255 }; //just a dark gray
 		}
 
 		//render it!
 		SDL_Surface* urlSurf = TTF_RenderText_Solid(font, displayText.c_str(), 0, color);
 
+	
 		if (urlSurf != nullptr) //check to make sure we arnt trying to render somthing that is null
 		{
 			//upload it to the gpu for drawing
 			SDL_Texture* urlTexture = SDL_CreateTextureFromSurface(render, urlSurf);
+
+			SDL_SetTextureScaleMode(urlTexture, SDL_SCALEMODE_NEAREST);
 			//make a rectangle that is going to render our text
 			//give the text a bit of padding and stuff
 			SDL_FRect urlTextureRect = { bar.x + 8, bar.y + 6, (float)urlSurf->w, (float)urlSurf->h };
@@ -1319,85 +1524,89 @@ int GUIRENDER()
 
 		}
 
+		
+		//new button, star
+		SDL_FRect starBtn;
+		starBtn.x = SDL_floorf((bar.x + bar.w + padding) * scaleX) / scaleX;
+		starBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
+		starBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
+		starBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
 
-		//render the 2 buttons
-		SDL_FRect backBtn;
-
-		if (tabs[activeTab].currentSearchPos > 0) //we do > than 0, as we dont want to have an error
-		{
-			backBtn = { barX - 40, 35, 30, 30 };
-			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-			SDL_RenderFillRect(render, &backBtn);
-		}
-		else {
-			backBtn = { barX - 40, 35, 30, 30 };
-			SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
-			SDL_RenderFillRect(render, &backBtn);
-		}
-
-
-		SDL_Color textColor = { 0, 0, 0, 255 };
-		SDL_Surface* backSurf = TTF_RenderText_Solid(font, "<", 0, textColor);
-		if (backSurf != nullptr)
-		{
-			SDL_Texture* backTex = SDL_CreateTextureFromSurface(render, backSurf);
-
-			SDL_FRect backTexRect = { backBtn.x + 8, backBtn.y + 4, (float)backSurf->w, (float)backSurf->h };
-			SDL_RenderTexture(render, backTex, nullptr, &backTexRect);
-
-			//prevent mem leaks
-			SDL_DestroyTexture(backTex);
-			SDL_DestroySurface(backSurf);
-		}
-
-		SDL_FRect fwdBtn;
-		if (!tabs[activeTab].SearchHistory.empty() && tabs[activeTab].currentSearchPos < (int)tabs[activeTab].SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
-		{
-			fwdBtn = { barX + barWidth + 10, 35, 30, 30 };
-			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-			SDL_RenderFillRect(render, &fwdBtn);
-		}
-		else {
-			//not enabled
-			fwdBtn = { barX + barWidth + 10, 35, 30, 30 };
-			SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
-			SDL_RenderFillRect(render, &fwdBtn);
-		}
-
-
-
-		SDL_Surface* forwardSurf = TTF_RenderText_Solid(font, ">", 0, textColor);
-		if (forwardSurf != nullptr)
-		{
-			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, forwardSurf);
-
-			SDL_FRect fwdTexRect = { fwdBtn.x + 8, fwdBtn.y + 4, (float)forwardSurf->w, (float)forwardSurf->h };
-			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect);
-
-			//prevent mem leaks
-			SDL_DestroyTexture(forwardTex);
-			SDL_DestroySurface(forwardSurf);
-		}
-
-		SDL_FRect reloadButton;
-
-		//reload button
-		reloadButton = { barX - 80, 35, 30, 30 };
 		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-		SDL_RenderFillRect(render, &reloadButton);
+		SDL_RenderFillRect(render, &starBtn);
 
-		SDL_Surface* reloadSurf = TTF_RenderText_Solid(font, "R", 0, textColor);
-		if (reloadSurf != nullptr)
+		//RENDER STAR
+		SDL_Surface* starSurf = TTF_RenderText_Solid(iconFont, "ж", 0, textColor);
+		if (starSurf != nullptr)
 		{
-			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, reloadSurf);
+			SDL_Texture* starTex = SDL_CreateTextureFromSurface(render, starSurf);
 
-			SDL_FRect reloadTexRect = { reloadButton.x + 9, reloadButton.y + 2, (float)reloadSurf->w, (float)reloadSurf->h };
-			SDL_RenderTexture(render, forwardTex, nullptr, &reloadTexRect);
+
+			SDL_SetTextureScaleMode(starTex, SDL_SCALEMODE_NEAREST);
+
+			//before i had them hardcoded, not anymore!
+			//we snap to the screen
+			float starX = SDL_floorf((starBtn.x + (starBtn.w - (float)starSurf->w) / 2.0f) * scaleX) / scaleX;
+			float starY = SDL_floorf((starBtn.y + (starBtn.h - (float)starSurf->h) / 2.0f) * scaleY) / scaleY;
+
+
+			SDL_FRect backTexRect = { starX, starY, (float)starSurf->w, (float)starSurf->h };
+			SDL_RenderTexture(render, starTex, nullptr, &backTexRect);
 
 			//prevent mem leaks
-			SDL_DestroyTexture(forwardTex);
-			SDL_DestroySurface(reloadSurf);
+			SDL_DestroyTexture(starTex);
+			SDL_DestroySurface(starSurf);
 		}
+
+
+		//new button, printer
+		SDL_FRect printerBtn;
+		printerBtn.x = SDL_floorf((bar.x + bar.w + padding + btnSize + padding) * scaleX) / scaleX;
+		printerBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
+		printerBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
+		printerBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
+
+		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		SDL_RenderFillRect(render, &printerBtn);
+
+		//RENDER PRINTER
+		SDL_Surface* printerSurf = TTF_RenderText_Solid(iconFont, "ξ", 0, textColor);
+		if (printerSurf != nullptr)
+		{
+			SDL_Texture* printerTex = SDL_CreateTextureFromSurface(render, printerSurf);
+
+
+			SDL_SetTextureScaleMode(printerTex, SDL_SCALEMODE_NEAREST);
+
+			//before i had them hardcoded, not anymore!
+			//we snap to the screen
+			float printerX = SDL_floorf((printerBtn.x + (printerBtn.w - (float)printerSurf->w) / 2.0f) * scaleX) / scaleX;
+			float printerY = SDL_floorf((printerBtn.y + (printerBtn.h - (float)printerSurf->h) / 2.0f) * scaleY) / scaleY;
+
+
+			SDL_FRect backTexRect = { printerX, printerY, (float)printerSurf->w, (float)printerSurf->h };
+			SDL_RenderTexture(render, printerTex, nullptr, &backTexRect);
+
+			//prevent mem leaks
+			SDL_DestroyTexture(printerTex);
+			SDL_DestroySurface(printerSurf);
+		}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
