@@ -7,4 +7,7 @@
 //pull the data we downloaded
 int Parser(std::string input);
 
+// CHANGED WITH AI: Ported from the Windows engine — pulls the <title> tag.
+std::string pullTITLE(std::string htmldata);
+
 #endif // ! Parser

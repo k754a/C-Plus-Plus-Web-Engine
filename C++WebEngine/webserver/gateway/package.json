@@ -1,0 +1,12 @@
+{
+  "name": "cppbrowse-gateway",
+  "version": "1.0.0",
+  "description": "Reverse-proxy gateway for C++Browse (routes to frontend + engine service)",
+  "main": "gateway.js",
+  "scripts": {
+    "start": "node gateway.js"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  }
+}

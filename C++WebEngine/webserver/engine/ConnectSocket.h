@@ -22,10 +22,15 @@ typedef unsigned long u_long;
 
 #include <string> // for stoi
 #include <iostream>
+#include <vector>
 
 //pull the validate string
 int ConnectSocketHTTP(std::string input);
+// CHANGED WITH AI: Windows used std::wstring for HTTPS; web port uses std::string (curl).
 int ConnectSocketHTTPS(std::string input);
+// CHANGED WITH AI: Ported DownloadBytes from the Windows engine (uses curl on Linux)
+// so the web engine can fetch image bytes for the layout.
+std::vector<unsigned char> DownloadBytes(std::string url);
 int EndWinSock();
 int StartWinSock();
 
