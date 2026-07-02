@@ -13,6 +13,9 @@
 #include "ConnectSocket.h" //pulls our validate string global libary
 #include <fstream>  //for loading local files
 #include <sstream> // for the buffer
+
+#include <SDL3/SDL_main.h> //set this to main
+
 //this checks if a url is valid or not.
 const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
@@ -30,7 +33,9 @@ bool USELOCALFILE = FALSE; //use internet, set this to false.
 
 
 std::atomic<bool> running = true; //we connect to change the bool in GUI.h
-int main()
+
+//update to work with sdlmain
+int main(int argc, char* argv[])
 {
     //this is used for a higher performace gain, it removes some of the checks for std::cout
     std::ios_base::sync_with_stdio(false);
@@ -44,8 +49,8 @@ int main()
     //before we do anything, we need to load our screen.
     
     StartWinSock();
-
-
+    LoadStarredPages(); //load the bookmarks!
+    UpdateHTML(); //update!
     //ConnectSocketHTTPS();
 
     //THIS IS NOW CHANGED, THIS IS THE HOMEPAGE

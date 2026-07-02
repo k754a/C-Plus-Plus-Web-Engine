@@ -13,8 +13,8 @@
 #include <sstream> // for the buffer
 #include "Parser.h"
 #include <SDL3_image/SDL_image.h>
-
-
+#include <windows.h> //for the print
+#include <filesystem> //for the folder handling on the bmp
 
 //MOVED TO TAB MODE.
 
@@ -73,7 +73,7 @@ std::vector<Layout> mainlayout;
 int scrollpos = 40;
 
 std::string urlInput = "";    // holds the url we type
-
+std::string currentURL = ""; //hold the url, but does not change till someone presses search!
 
 std::vector<Tab> tabs;        // all open tabs
 int activeTab = 0;            // active tab open
@@ -89,6 +89,135 @@ struct TabInit {
 		
 	}
 } _tabInit;
+
+
+
+
+
+std::vector<std::string> starredPages; //hold our starred, saved pages!
+int LoadStarredPages()
+{
+	//fist clean our vector, just in case
+	starredPages.clear();
+
+	//then open the file
+	std::ifstream bookmarks("starred_pages.STAR");
+
+	//before we do anything, make sure that its open, (cause we will 100% crash lol)
+	if (bookmarks.is_open())
+	{
+		std::string line;
+
+		//read the file line by line, and then add it to the starredPages
+		//when we have no more lines, we can return false
+		while (std::getline(bookmarks, line))
+		{
+			//ignore blank lines
+			if (!line.empty())
+			{
+				//add it
+				starredPages.push_back(line);
+			}
+		}
+		bookmarks.close();
+	}
+
+	return 0;
+}
+
+
+//now we update the html!
+
+int UpdateHTML()
+{
+	std::ofstream htmlFile("main.html", std::ios::trunc); //make sure to overwrite it on open
+
+	//checks to make sure that its good!
+	if (htmlFile.is_open())
+	{
+				//first add the stuff to it: 
+				htmlFile << R"(<!DOCTYPE html><html lang="en"><head>
+			<link rel="icon" href="data:,">
+			<meta name="viewport" content="width=device-width, initial-scale=1">
+			<title>New Tab</title>
+
+			<style>
+				h1 {
+					color: #000000;
+					font-size: 36px;
+				}
+				p {
+					color: #111111;
+					font-size: 24px;
+				}
+				a {
+					color: #4A90E2; /* Visible blue link */
+					font-size: 22px;
+				}
+				/* Style to make the logo look nice and neat */
+				.browser-image {
+					max-width: 200px; /* Limits the size of the logo */
+					height: auto;
+					display: block;
+					margin-top: 20px;
+					margin-bottom: 20px;
+					border-radius: 8px;
+				}
+			</style></head><body>
+			<div>
+				<h1>C++Browse</h1>
+				<p>This is my C++ web browser project.</p>
+       
+
+				<h1>To start, search anything. ы </h1>
+				<h1>‎ </h1>
+		)";
+
+			//now we loop through each starred page, and print them!
+		if (!starredPages.empty()) //we display somthin else if they are empty!
+		{
+			htmlFile << "        <br>Starred Pages:\n"; //display the star pages
+			for (const std::string& site : starredPages) { //go through each one, and add it to the file
+				
+				htmlFile << "        <p>ж -<a href=\"" << site << "\">" << site << "</a></p>\n";
+			}
+		}
+		else {
+			htmlFile << "<br>No Starred Pages\n";
+		}
+
+		htmlFile << R"(    </div></body></html>)"; 
+
+
+		//close the file
+		htmlFile.close();
+
+
+	}
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -128,6 +257,7 @@ int IMPORT(std::vector<Layout> layoutGOTTEN)
 
 	tabs[activeTab].layout = layoutGOTTEN;
 	tabs[activeTab].url = urlInput;
+	currentURL = urlInput;
 	std::cout << "Updated" << std::endl;
 	return 0;
 }
@@ -745,7 +875,7 @@ int GUIRENDER()
 		std::cout << "Failed to open TTF" << std::endl;
 		return -1;
 	}
-
+ 
 
 	//lets make the text, we set the font, the info we want to render, length, and finaly color
 
@@ -791,6 +921,10 @@ int GUIRENDER()
 				if (tabs[activeTab].scrollpos < 40)
 				{
 					tabs[activeTab].scrollpos = 40;
+				}
+				if (tabs[activeTab].scrollpos > tabs[activeTab].maxscroll)
+				{
+					tabs[activeTab].scrollpos = tabs[activeTab].maxscroll;
 				}
 			}
 
@@ -874,6 +1008,15 @@ int GUIRENDER()
 					SDL_FRect fwdBtnRect = { backBtnRect.x + backBtnRect.w + padding, topMargin, btnSize, btnSize };
 					SDL_FRect reloadBtnRect = { fwdBtnRect.x + fwdBtnRect.w + padding, topMargin, btnSize, btnSize };
 					SDL_FRect homeBtnRect = { reloadBtnRect.x + reloadBtnRect.w + padding, topMargin, btnSize, btnSize };
+					
+					//we need to do this, or else our button dont work!
+					float searchX = homeBtnRect.x + homeBtnRect.w + padding;
+					float searchW = (float)WinW - btnSize - padding - padding - searchX - (btnSize * 2);
+					SDL_FRect searchBarRect = { searchX, topMargin, searchW, btnSize };
+
+				
+					SDL_FRect starBtnRect = { searchBarRect.x + searchBarRect.w + padding, topMargin, btnSize, btnSize };
+					SDL_FRect printerBtnRect = { starBtnRect.x + starBtnRect.w + padding, topMargin, btnSize, btnSize };
 
 					//test if the backbutton is pressed
 					if (mouseX >= backBtnRect.x && mouseX <= (backBtnRect.x + backBtnRect.w) &&
@@ -937,7 +1080,7 @@ int GUIRENDER()
 
 
 					//handle the new home buttn
-					else if (mouseX >= homeBtnRect.x && mouseX <= (homeBtnRect.x + homeBtnRect.w) &&
+					if (mouseX >= homeBtnRect.x && mouseX <= (homeBtnRect.x + homeBtnRect.w) &&
 						mouseY >= homeBtnRect.y && mouseY <= (homeBtnRect.y + homeBtnRect.h)) {
 
 						std::ifstream file("main.html");
@@ -963,6 +1106,111 @@ int GUIRENDER()
 						//lets clear the url input too
 						urlInput = "";
 					}
+
+
+					//handle the print button
+					if (mouseX >= printerBtnRect.x && mouseX <= (printerBtnRect.x + printerBtnRect.w) &&
+						mouseY >= printerBtnRect.y && mouseY <= (printerBtnRect.y + printerBtnRect.h)) {
+
+						//first we capture the entire render!
+						//then we crop it, as we dont want everything yk
+
+						int uiHeight = 80;
+
+						SDL_Rect contentArea; //create the contetent area
+
+						//x,w, h we leave, but, y we adjust
+						contentArea.x = 0;
+						contentArea.y = uiHeight;
+						contentArea.w = WinW;
+						contentArea.h = WinH - uiHeight;
+
+
+
+
+
+						SDL_Surface* screenshot = SDL_RenderReadPixels(render, &contentArea);
+
+					
+
+						//we need to make sure that this hasnt failed
+						if (screenshot != nullptr)
+						{
+							std::cout << "Printing..." << std::endl;
+
+							std::string saveFolder = "Printed_Pages";
+							std::filesystem::create_directories(saveFolder);
+
+							//make a char
+							//we need a string first
+							//we use + std::to_string(SDL_GetTicks()), because it wont want to print more than once in a loop with the same name
+							//i used to have the name of the site, but sites with / and stuff dont work, so i just make it Tab
+							std::string filenameStr = saveFolder + "\\Tab_print_" + std::to_string(SDL_GetTicks()) + ".bmp";
+
+							//then into the char
+							const char* filename = filenameStr.c_str();
+
+							SDL_SaveBMP(screenshot, filename);
+							//now we run the print command
+							std::string paintParams = "\"" + filenameStr + "\"";
+							// Ask Windows to handle the printing, but SHOW the menu normally
+							ShellExecuteA(NULL, "print", filename, NULL, NULL, SW_SHOWNORMAL);
+
+
+							//we are done here, destory the screenshot
+							SDL_DestroySurface(screenshot);
+						}
+
+					}
+
+					//handle the star button!
+
+					//ok this is my plan for the star button, we save the stars, to a txt file, its a toggle, so it saves between loads of the browser, through a custom file (idk what yet tho)
+					//we update the saved links in the https main thing, so its easy to get back to them, and a uncheck removes them, udpates the main.html, and continues!
+					if (mouseX >= starBtnRect.x && mouseX <= (starBtnRect.x + starBtnRect.w) &&
+						mouseY >= starBtnRect.y && mouseY <= (starBtnRect.y + starBtnRect.h)) {
+
+						//first we get the current url
+						std::string currentSite = currentURL;
+
+						//first, we should check our database to see if its alr starred
+
+						auto it = std::find(starredPages.begin(), starredPages.end(), currentSite); //find it!
+
+
+						if (it != starredPages.end())
+						{
+
+							//we found it, so we toggle it off
+							starredPages.erase(it);
+							std::cout << currentSite << " Removed from stars!" << std::endl;
+
+						}
+						else {
+							//it was not found, so that means we are toggling in on
+							starredPages.push_back(currentSite);
+							std::cout << currentSite << " Added to stars!" << std::endl;
+						}
+
+
+						//then lets handle text file that holds it
+						//we should just wipe it for cleanness
+						std::ofstream bookmark("starred_pages.STAR", std::ios::trunc);
+						if (bookmark.is_open())
+						{
+							//go through each site and add the star pages
+							for (const std::string& site : starredPages)
+							{
+								bookmark << site << "\n";
+							}
+							//close clean
+							bookmark.close();
+						}
+
+						UpdateHTML();
+
+					}
+
 
 
 
@@ -1291,6 +1539,89 @@ int GUIRENDER()
 		SDL_FRect searchBarBg = { 0, 30, (float)WinW, 39 };
 		SDL_RenderFillRect(render, &searchBarBg);
 
+
+
+		//fist draw the scroll bar!
+		//my plan is to draw the track, and then the bar, the bar shoudl adjust size based on len of the document
+		//the track is easy, it never moves
+
+		//fist lets make the max scroll, as we should limit it with a bar (however, we should prob get this working from the layout in the future) (its stored in the gui tab folder)
+		float scrollBarWidth = 20.0f;
+		float uiTopBarHeight = 70.0f; 
+		float trackHeight = WinH - uiTopBarHeight;
+
+		//draw the bar
+		SDL_SetRenderDrawColor(render, 224, 224, 224, 255);
+		SDL_FRect scrollTrack = { WinW - scrollBarWidth, uiTopBarHeight, scrollBarWidth, trackHeight };
+		SDL_RenderFillRect(render, &scrollTrack);
+
+		//now we handle the size of the bar
+		float barHeight = (trackHeight / (float)(tabs[activeTab].maxscroll + WinH)) * trackHeight; //the height of the bar, we take teh winH, the trackHight, and the max scroll!
+		if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might dissapear!
+
+		//we calculate its pos out of 100, with the size and stuff, so that we get an accurate bar!
+		float scrollPercentage = (float)tabs[activeTab].scrollpos / (float)tabs[activeTab].maxscroll;
+		float barY = uiTopBarHeight + (scrollPercentage * (trackHeight - barHeight));
+
+		//draw it
+		SDL_SetRenderDrawColor(render, 192, 192, 192, 255);
+		SDL_FRect scrollbar = { WinW - scrollBarWidth, barY, scrollBarWidth, barHeight };
+		SDL_RenderFillRect(render, &scrollbar);
+
+
+		SDL_SetRenderDrawColor(render, 255, 255, 255, 180); // White top/left highlight
+		SDL_RenderLine(render, scrollbar.x, scrollbar.y, scrollbar.x + scrollbar.w, scrollbar.y);
+		SDL_RenderLine(render, scrollbar.x, scrollbar.y, scrollbar.x, scrollbar.y + scrollbar.h);
+
+		SDL_SetRenderDrawColor(render, 100, 100, 100, 255); 
+		SDL_RenderLine(render, scrollbar.x, scrollbar.y + scrollbar.h, scrollbar.x + scrollbar.w, scrollbar.y + scrollbar.h);
+		SDL_RenderLine(render, scrollbar.x + scrollbar.w, scrollbar.y, scrollbar.x + scrollbar.w, scrollbar.y + scrollbar.h);
+
+
+
+		//find the lowest point
+		int totalPageHeight = 0;
+
+		//go through each node, and find its pos
+		for (int i = 0; i < tabs[activeTab].layout.size(); i++) {
+		
+			int nodeBottom = tabs[activeTab].layout[i].y + tabs[activeTab].layout[i].hight;
+
+			//if this node is > than the last, update it!
+			if (nodeBottom > totalPageHeight) {
+				totalPageHeight = nodeBottom;
+			}
+		}
+
+	
+		tabs[activeTab].maxscroll = totalPageHeight - (WinH - uiTopBarHeight) + 100;
+
+		
+		if (tabs[activeTab].maxscroll < 0) {
+			tabs[activeTab].maxscroll = 0;
+		}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		//render the 2 buttons
 		SDL_FRect backBtn;
 
@@ -1524,6 +1855,8 @@ int GUIRENDER()
 
 		}
 
+
+
 		
 		//new button, star
 		SDL_FRect starBtn;
@@ -1532,7 +1865,20 @@ int GUIRENDER()
 		starBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
 		starBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
 
-		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		bool isStarred = (std::find(starredPages.begin(), starredPages.end(), currentURL) != starredPages.end());
+		
+		if (isStarred)
+		{
+			SDL_SetRenderDrawColor(render, 255, 255, 0, 255);
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		}
+
+
+
+
+	
 		SDL_RenderFillRect(render, &starBtn);
 
 		//RENDER STAR
@@ -1591,7 +1937,6 @@ int GUIRENDER()
 			SDL_DestroyTexture(printerTex);
 			SDL_DestroySurface(printerSurf);
 		}
-
 
 
 
@@ -1700,6 +2045,7 @@ int GUIRENDER()
 
 
 
+
 		//draw the + for the tabs
 		SDL_SetRenderDrawColor(render, 180, 180, 180, 255);
 		//make the button for it
@@ -1725,15 +2071,6 @@ int GUIRENDER()
 			SDL_DestroyTexture(plusTex);
 			SDL_DestroySurface(plusSurf);
 		}
-
-
-
-
-
-
-
-
-
 
 
 

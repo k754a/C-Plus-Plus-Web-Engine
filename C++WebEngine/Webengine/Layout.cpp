@@ -441,21 +441,42 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 		}
 		else {
 			//give it that predefined
-			if (node->tagValue == "h1")
-			{
+			if (node->tagValue == "h1") {
 				fontsize = 96;
 			}
-			else if (node->tagValue == "p") {
+			else if (node->tagValue == "h2") {
+				fontsize = 72;
+			}
+			else if (node->tagValue == "h3") {
+				fontsize = 60;
+			}
+			else if (node->tagValue == "h4" || node->tagValue == "p" || node->tagValue == "li" || node->tagValue == "blockquote") {
+				
 				fontsize = 48;
 			}
-			else if (node->tagValue == "a") {
+			else if (node->tagValue == "h5") {
 				fontsize = 36;
 			}
-			else if (node->tagValue == "span") {
+			else if (node->tagValue == "h6") {
+				fontsize = 28;
+			}
+			else if (node->tagValue == "a" || node->tagValue == "span") {
+				// Links and spans
+				fontsize = 36;
+			}
+			else if (node->tagValue == "big") {
+				fontsize = 64;
+			}
+			else if (node->tagValue == "small" || node->tagValue == "sub" || node->tagValue == "sup") {
+				
+				fontsize = 24;
+			}
+			else if (node->tagValue == "code" || node->tagValue == "pre") {
+				
 				fontsize = 36;
 			}
 			else {
-				//defualt size
+				// Default size for unrecognized tags or raw text nodes
 				fontsize = 24;
 			}
 		}
