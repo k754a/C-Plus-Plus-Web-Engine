@@ -1,97 +1,66 @@
-// ConsoleApplication1.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+#include <SDL3/SDL_main.h> //NEEDED FOR RELEASE BUILD
+
+
+#include "GUI.h" //FOR THE GUIRENDER
+#include "ConnectSocket.h" //FOR THE START WIN SOCK
+#include "Parser.h" //FOR THE PARSER
+
+
+#include <iostream> //FOR STD::
+#include <fstream>  //FOR THE MAIN.HTML READING
+#include <sstream> //NEED SSTREAM FOR THE BUFFER
 
 
 
-//we include the parser for the using a file
-#include "Parser.h"
-#include <thread>
-#include "GUI.h"
-
-#include <regex>
-#include <iostream>
-#include "ConnectSocket.h" //pulls our validate string global libary
-#include <fstream>  //for loading local files
-#include <sstream> // for the buffer
-
-#include <SDL3/SDL_main.h> //set this to main
-
-//this checks if a url is valid or not.
-const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-bool USELOCALFILE = FALSE; //use internet, set this to false.
-
-
-
-//hide the cmd on relase config
-//#pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
-
-
-
-
-
-
-
-std::atomic<bool> running = true; //we connect to change the bool in GUI.h
-
-//update to work with sdlmain
-int main(int argc, char* argv[])
+int main(int argc, char* argv[]) //we give the start of main, a starting int and char 
 {
-    //this is used for a higher performace gain, it removes some of the checks for std::cout
-    std::ios_base::sync_with_stdio(false);
-    //this stops automatic flushing.
-    std::cin.tie(NULL);
-
-    SetConsoleOutputCP(CP_UTF8); //we do this for ╨á╤â
-
-
-
-    //before we do anything, we need to load our screen.
     
-    StartWinSock();
-    LoadStarredPages(); //load the bookmarks!
-    UpdateHTML(); //update!
-    //ConnectSocketHTTPS();
+    std::ios_base::sync_with_stdio(false);  std::cin.tie(NULL); //these lines allow the terminal to run a bit faster in debug, saves some time
+ 
+    SetConsoleOutputCP(CP_UTF8); //we do this for ╨á╤â and other weird chars, to render right
 
-    //THIS IS NOW CHANGED, THIS IS THE HOMEPAGE 
-        //load the file using fsstream
-        std::ifstream file("main.html");
-
-        if (!file.is_open()) {
-            std::cout << "Could not open local file." << std::endl;
-            return -1;
-        }
-        //we dump the file into a buffer
-
-        std::stringstream buffer;
-
-        //load it in 
-        buffer << file.rdbuf();
-
-        //now we load the full file into a temp var
-        //we use the buffer and convert it into a string
-        std::string fileinfo = buffer.str();
-
-        //now we do something diffrent, we just inject it right into the parser to have the same effect
-        Parser(fileinfo);
-
-    
-
-    //THERE IS NOW A SETTING SO THAT YOU CAN TEST IT WITH JUST HTML FILES DIRECTLY!
-    //this will be off in build versions tho.
    
 
-    GUIRENDER();
+    //=======STARTUP=======\\
+
+    StartWinSock(); //init the winsock, this will be used for our connections and stuff (like connecting to https and http)
+    LoadStarredPages(); //load our pages from starred_pages.STAR, and load them into the list
+    UpdateHTML();  //we update the main.html, and add our STAR pages.
 
 
+    //======LOAD-MAIN-MENU======\\
 
-    //kill the thread
-    running = false;
-   // GUITHREAD.join(); //join the main thread up with this, to end it nicely
-   //if we dont do this, we get errors lol
+    std::ifstream file("main.html"); //open on start, in read mode
 
-    EndWinSock();
+    if (!file.is_open()) { //if we cannot open the file
+        std::cout << "Could not open main file." << std::endl; //send an error, as we need this for new tab
+
+        EndWinSock(); //make sure we cleanup
+        return -1; //return an error code
+    }
     
-    return(0); 
-}
+
+   
+    std::stringstream buffer;  buffer << file.rdbuf(); //create the buffer, and write the main.html file data to it
+
+    std::string fileinfo = buffer.str(); //convert that buffer, into a string for the parser
+
+    Parser(fileinfo); //send the new tab to the parser for rendering
+        
+
+     
+
+
+   
+    //======RENDER-GUI======\\
+
+    GUIRENDER(); //Run the GUI loop, this again, is a loops, so we wont continue until we close it
+
+ 
+
+    EndWinSock(); //close the winsock cleanly
+    
+    return(0); //end
+
+} //END OF MAIN
 

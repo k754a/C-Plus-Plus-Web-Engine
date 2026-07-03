@@ -514,7 +514,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 			std::thread([src, currentItem]() {
 
 				//download the bytes
-				std::vector<unsigned char> bytes = DownloadBytes(src);
+				std::vector<unsigned char> bytes = DownloadImages(src);
 				if (!bytes.empty())
 				{
 
@@ -691,40 +691,22 @@ void SetTabTitle(std::string title)
 
 
 
+const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
+const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 
 
 
 
 int search(std::string input, bool addToHistory, SDL_Renderer* render, TTF_Font* font, int CurrentTab)
 {
-	const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-	const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-
+	
 	LoadAnimation(render, font);
 
 
 
 
 
-
-
-
-
-
-	//check if this is a valid url
-	//note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
-	if (std::regex_match(input, httpPattern)) {
-		std::cout << "http url!" << std::endl;
-		ConnectSocketHTTP(input);
-
-
-		//SearchHistory.push_back(input);
-		//now that we understand its a valid url, lets attempt a socket connect.
-		//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
-	}
-
-
-	if (std::regex_match(input, httpsPattern)) {
+	if (std::regex_match(input, httpsPattern) || std::regex_match(input, httpPattern)) {
 		std::cout << "https url!" << std::endl;
 		std::wstring temp(input.begin(), input.end());
 		ConnectSocketHTTPS(temp);
@@ -895,6 +877,7 @@ int GUIRENDER()
 	const float padding = 15.0f;   // alwasy 10px of space
 	const float topMargin = 37.0f; // dist from the top of the window
 
+	bool running = true;
 
 	//main loop
 	while (running)
@@ -1256,10 +1239,7 @@ int GUIRENDER()
 
 
 
-							//connect to it
-							const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-							const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-
+						
 
 							//if our links are kinda weird, and arnt the full thing (wikipedia does this a lot lol
 							if (!std::regex_search(finalUrl, httpPattern) && !std::regex_search(finalUrl, httpsPattern))
@@ -1281,17 +1261,9 @@ int GUIRENDER()
 
 							//check if this is a valid url
 							//note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
-							if (std::regex_match(urlInput, httpPattern)) {
-								std::cout << "http url!" << std::endl;
-								ConnectSocketHTTP(urlInput);
-								//now that we understand its a valid url, lets attempt a socket connect.
-								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.q
+							
 
-								tabs[activeTab].SearchHistory.push_back(urlInput);
-							}
-
-
-							if (std::regex_match(urlInput, httpsPattern)) {
+							if (std::regex_match(urlInput, httpsPattern) || std::regex_match(urlInput, httpPattern)) {
 								std::cout << "https url!" << std::endl;
 								std::wstring temp(urlInput.begin(), urlInput.end());
 								ConnectSocketHTTPS(temp);
@@ -1309,7 +1281,7 @@ int GUIRENDER()
 							break;
 
 						}
-					}
+					} 
 
 
 					//now we settup button detection for the tabs
