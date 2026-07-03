@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
     UpdateHTML(); //update!
     //ConnectSocketHTTPS();
 
-    //THIS IS NOW CHANGED, THIS IS THE HOMEPAGE
+    //THIS IS NOW CHANGED, THIS IS THE HOMEPAGE 
         //load the file using fsstream
         std::ifstream file("main.html");
 

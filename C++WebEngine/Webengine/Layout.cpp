@@ -250,7 +250,7 @@ std::vector<Layout> layoutList; //list to store the layout
 void MeasureNodes(Node* node, int fontsize)
 {
 	//first check, if the node has been measured, dont do it again
-	if (node->measured) return;
+	if (node->measureded) return;
 
 
 	//same thing in the old generate layout tree.
@@ -295,7 +295,7 @@ void MeasureNodes(Node* node, int fontsize)
 		//same as before
 		node->measuredWidth = 200;
 		node->measuredHeight = 150;
-		node->measured = true;
+		node->measureded = true;
 		return;
 	}
 
@@ -310,7 +310,7 @@ void MeasureNodes(Node* node, int fontsize)
 		//we set the width to the len of the text, * the fontsize, with a bit of adjusting!
 		node->measuredWidth = (int)(node->tagValue.size() * (fontsize * 0.45));
 		node->measuredHeight = fontsize + 4;
-		node->measured = true;
+		node->measureded = true;
 		return;
 	}
 
@@ -339,7 +339,7 @@ void MeasureNodes(Node* node, int fontsize)
 	node->measuredHeight = totalH;
 
 	//make sure we mark its done
-	node->measured = true;
+	node->measureded = true;
 
 
 }

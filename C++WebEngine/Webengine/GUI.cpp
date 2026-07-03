@@ -1329,7 +1329,7 @@ int GUIRENDER()
 							//check for intersects
 							if (mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= 2 && mouseY <= 28 && tabs.size() > 1)
 							{
-								
+							
 								//ok close the tab
 								tabs.erase(tabs.begin() + t); //remove the tab
 
@@ -1346,6 +1346,15 @@ int GUIRENDER()
 									tabs.push_back(Tab());
 									activeTab = 0;
 								}
+
+
+
+								//update the urls to the tab, this saves time and s
+								currentURL = tabs[activeTab].url;
+								urlInput = tabs[activeTab].url;
+
+
+
 								break; //we are done (saves performace)
 							}
 
@@ -2016,7 +2025,15 @@ int GUIRENDER()
 			//we also want the ability to close the tabs with an x, like a normal browser.
 
 			//make the serf for it
-			SDL_Surface* xSurf = TTF_RenderText_Solid(font, "x", 0, tabTextColor);
+			SDL_Surface* xSurf;
+			if (tabs.size() > 1)
+			{
+				xSurf = TTF_RenderText_Solid(font, "x", 0, tabTextColor);
+			}
+			else {
+				xSurf = TTF_RenderText_Solid(font, "", 0, tabTextColor);
+			}
+			
 
 			//make sure we have made it
 			if (xSurf != nullptr)

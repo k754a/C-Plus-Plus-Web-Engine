@@ -32,8 +32,8 @@ struct Node {
 
     int measuredWidth = 0;
     int measuredHeight = 0;
-    bool measured = false;  //so we dont measure more than once!
-
+    bool measureded = false;  //so we dont measure more than once!
+    bool isFlexContainer = false; //handle <divs> 
 
 };
 
