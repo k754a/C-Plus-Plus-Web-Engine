@@ -1,266 +1,223 @@
 //THIS IS THE DOM TREE.
 
-//ok this is my plan, currently we just have a list of tokens, they are assigned with things like END tags, START tags, and TEXT, if we see an new <> we bump out a space on the tree
-//then if we see a </> we bump in a space, because we already sort when we parse we all set for that.
-#include <iostream>
-#include "DOMTree.h"
-#include <string>
-#include "Layout.h"
+#include "DOMTree.h" //allow the classes to be global, and import the globalCSS class.
+#include "Layout.h" //pull the Layout for libs, and "node"
+#include "Profiler.h" //DEBUG
 
-
-std::vector<CSSToken> globalCSS;
-
-int CSSDOM(std::vector<CSSToken> tokens) { //this returns an int, and takes in our special CSSToken class.
-	//ok we have the CSSDOM
-	//we don't need to do anything lol, so ill just pass it off
-	globalCSS = tokens;
-
-	return 0;
+std::vector<CSSToken> globalCSS; //pull our global css class, and assign it (so that any other instances in layout.cpp, works.)
 
 
 
-}
+//======COLLAPSE WHITESPACE======\\
 
-
-
-
-
-
-
-
-
-
-
-#include <string>
-
-
-//ok, i figured out its something to do like \t \n or \r, its because our font tries to render them, but cannot!
-std::string CollapseWhitespace(const std::string& input)
+std::string RemoveNewLineChars(const std::string& input) //this takes a const std::string, and returns a string.
 {
-	//result string
-	std::string result = "";
+	std::string result = ""; result.reserve(input.size()); //string to hold our final result, reserve data to be faster
 
-	//check if its whitespace
-	bool inWhitespace = false;
+	bool inWhitespace = false;  //create a bool, to check if we are currently in a whitespace.
 
-	for (char c : input)
+	for (unsigned char c : input) //loop through each char in our 'input'
 	{
-		// Treat newlines, carriage returns, tabs, and spaces all as whitespace
+		//treat newlines, carriage returns, tabs, and spaces all as whitespace
 		if (c == '\n' || c == '\r' || c == '\t' || c == ' ')
 		{
+			//if we are not inside whitespace currently, and that means we prob have a ' '
 			if (!inWhitespace)
 			{
-				result += ' '; // Replace the whole block of whitespace with one space
-				inWhitespace = true; //say that we have whitespace!
+				//dont do anything if the result is blank
+				if (!result.empty())
+					result.push_back(' '); //if its not blank, we add a new space, like "EXAMPLE" -> "EXAMPLE "
 			}
+
+			inWhitespace = true; //we are in whitespace, so now we start to skip chars, for example "EXAM    PLE" -> "EXAM  PLE" -> "EXAM PLE" -> "EXAMPLE"
 		}
 		else
 		{
-			//if we dont have a \n \r or \t, we can flip it to false, prepearing for the next new line!
-			result += c;
-			inWhitespace = false;
+
+			result.push_back(c); //we dont have whitespace, so we can add to our result so we go "E"  -> "X" ...
+			inWhitespace = false; //we found a normal char, we are not in whitespace
 		}
 	}
 
-	//lets trim the extras, to keep it clean, check if the result is basicly just whitespace, and remove it
-	if (!result.empty() && result.front() == ' ') result.erase(0, 1);
-	if (!result.empty() && result.back() == ' ') result.pop_back();
+	//check if the final char is a space, if it is, we remove it.
+	if (!result.empty() && result.back() == ' ')
+		result.pop_back(); //remove it.
 
-	return result;
+	return result; //return our final cleaned string
+} //END OF REMOVE NEW LINE CHARS
+
+
+
+
+
+
+//======CSSDOM======\\
+
+int CSSDOM(std::vector<CSSToken> tokens) { //this takes in our custom CSSToken class ({ std::string id; std::vector<std::string> properties; }), and returns an int
+	globalCSS = tokens; //assign the globalCSS to the current token list, in parser.cpp.
+
+	return 0; //done, return 0;
 }
 
 
 
+//======DOM======\\
 
-
-
-
-
-
-
-int DOM(std::vector<HTMLToken> tokens)
+int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vector ({ TokenType type; std::string value; }), and returns a 'int' 
 {
+	PROFILE("DOM"); //PROFILE THE DOM
+
 	
-
-	std::cout << "-------------------" << std::endl;
-
-	//now lets make a node that helps out with the loading.
-	//we create a new starting tag, and this will be the tag that updates, and adds to our save node
-	Node* Root = new Node(); //this is the main node, because we set SAVE to fill the same area in ram as root, letting us save data.
-	Root->tagValue = "ROOT";
-	Root->tag = NODETYPE::START; 
-	//we set the parent to 0, because this is the base.
-	Root->Parent = nullptr;
+	Node* Root = new Node(); //Create our starting node, this holds a lot of data, and we will add to it, as we index.
+	Root->tagValue = "ROOT"; //For the starting node, we set the starting one's id to "ROOT"
+	Root->tag = NODETYPE::START; //Set the NODETYPE to start, as this is the start of the tree.
+	
+	Root->Parent = nullptr; //we set the parent too null, as its the base, and does not contain a parent
 
 
-	//ok, lets make our main tag that will save everything we do
-	Node* Save = Root; //we set it to our root, as thats our first point.
+	
+	Node* Temp = Root; //this "Temp" Node, will get the current window, and send it back the ROOT.
 
-	//now lets make the loop
-	//this loops for each token item in our Vector!
-	for (int i = 0; i < tokens.size(); i++)
+	
+	for (size_t i = 0; i < tokens.size(); i++) //go through the size of the tokenList
 	{
-		//lets set a val at the top, so we dont need to check so many times
-		HTMLToken currentToken = tokens[i];
+		
+		const HTMLToken& currentToken = tokens[i]; //index the current token at the start, for performance.
 
 
-		//lets do the START first.
+		//check if its a "START" tag.
 		if (currentToken.type == TokenType::START) //check if its a start token
 		{
 
 
-			//ok now this is what we need to do.
-			Node* TempNode = new Node(); //first lets make a temp node.
-			//then we need to filter our stuff, currently we have a lot of junk we dont want, like <> and some other stuff the tokenizer didnt catch
+			
+			Node* TempNode = new Node(); //Temp node, to temporally assign values.
+			
+
+			std::string_view rawToken = currentToken.value;  //get the current token value, and assign it to a string
 
 
-			std::string rawToken = currentToken.value;
+			size_t hrefPos = rawToken.find("href=\""); //attempt to find 'href=\'
 
-
-			size_t hrefPos = rawToken.find("href=\"");
-			if (hrefPos != std::string::npos) //if we do
+			if (hrefPos != std::string::npos) //if the herfPos condition is met (it returns a value)
 			{
-				size_t startpos = hrefPos + 6; //skip the href= part
-				size_t endpos = rawToken.find("\"", startpos); //find the end
-				if (endpos != std::string::npos)
+				size_t StartPos = hrefPos + 6; //set the startpos to start PAST, the herf.
+				size_t EndPos = rawToken.find("\"", StartPos); //find the end part of our raw token. so our href= 'https://google.com'/
+				if (EndPos != std::string::npos)
 				{
 					
 
-					TempNode->href = rawToken.substr(startpos, endpos - startpos); //grab between start and len of start - end
+					TempNode->href = rawToken.substr(StartPos, EndPos - StartPos); //grab the 'https://google.com' inside part
 
 				}
 			}
 
-			size_t srcPos = rawToken.find("src=\"");
-			if (srcPos != std::string::npos) //if we do
+
+			size_t srcPos = rawToken.find("src=\""); //attempt to find 'src=\'
+			if (srcPos != std::string::npos) //if the srcPos condition is met (it returns a value)
 			{
-				size_t startpos = srcPos + 5; //skip the src= part
-				size_t endpos = rawToken.find("\"", startpos); //find the end
-				if (endpos != std::string::npos)
+				size_t StartPos = srcPos + 5; //set the StartPos to start PAST, the src.
+				size_t EndPos = rawToken.find("\"", StartPos); //find the end part
+				if (EndPos != std::string::npos)
 				{
 
 
-					TempNode->src = rawToken.substr(startpos, endpos - startpos); //grab between start and len of start - end
+					TempNode->src = rawToken.substr(StartPos, EndPos - StartPos); //grab only the inside part, like image.png.
 
 			
 				}
 			}
 
-
-		
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-			size_t space = rawToken.find(' '); //find if we have a " "
-			if (space != std::string::npos) //if we do
+			size_t space = rawToken.find(' '); //find if we have a space
+			if (space != std::string::npos) //if the condition is met
 			{
-				rawToken = rawToken.substr(0, space);
+				rawToken = rawToken.substr(0, space); //we remove the space.
 			}
-
-			//find the '>'
-			space = rawToken.find('>');
-			if (space != std::string::npos) //if we do
+			space = rawToken.find('>'); //find if we have a '>'
+			if (space != std::string::npos) //if the condition is met
 			{
 				rawToken = rawToken.substr(0, space); //remove it
 			}
-			//find the '<'
-			space = rawToken.find('<');
-			if (space != std::string::npos) //if we do
+			space = rawToken.find('<'); //find if we have a '>'
+			if (space != std::string::npos) //if the condition is met
 			{
 				rawToken = rawToken.substr(space + 1, rawToken.length()); //remove it
 			}
 
-			std::string MToken = rawToken;
+			
+			std::string_view MToken = rawToken; //temp var to hold our modified (cleaned) token.
+
+
+
+
+
+
+
+
+
+		
 
 			//-------------------------------------------------------------------------------------
 
 
-			//now that we have simplifyed this token, we need to acctualy assign it and stuff.
+			//now that we have simplified this token, we need to actually assign the values towards it
 
-			//these 2 assign the HTMLToken value (our Modifyed token) And the type (NODETYPE::START)
+			//these 2 assign the HTMLToken value (our Modified token) And the type (NODETYPE::START)
 			TempNode->tagValue = MToken;
 			TempNode->tag = NODETYPE::START;
 
 			//ok, now we need to set our parent
 			//this lets us link back to the save, creating a tree.
-			TempNode->Parent = Save;
+			TempNode->Parent = Temp;
 
 			//ok now with all our values assigned, lets send it to the save node.
-			Save->children.push_back(TempNode);
+			Temp->children.push_back(TempNode);
 
 
 
-			//finaly lets update our Current with our temp
+			//finally lets update our Current with our temp
 			//this says, move the main dir forward, like how we did it for the Root.
-			Save = TempNode;
+			Temp = TempNode;
 		}
 
 
-		//Lets do our next check, for Text
-		if(currentToken.type == TokenType::TEXT)
+		
+		if(currentToken.type == TokenType::TEXT) //check if its TEXT or not.
 		{
-			//ok, basicly the same, however we dont move up our main dir, because this is text, not a dir
+			//ok, basically the same, however we don't move up our main dir, because this is text, not a dir
 
-			Node* TempNode = new Node(); //make the new node.
-			TempNode->tag = NODETYPE::TEXT;
-			TempNode->tagValue = CollapseWhitespace(currentToken.value); //set it to our current token, this does not need any refinement.
-			TempNode->Parent = Save;
+			Node* TempNode = new Node(); //make a temp node to store our values
+			TempNode->tag = NODETYPE::TEXT; //set the type to NODETYPE::TEXT;
+			TempNode->tagValue = RemoveNewLineChars(currentToken.value); //set the tag value to our currentToken.value, but remove things like /n
+			TempNode->Parent = Temp; //Set our parent to the Temp node
 
-
-			//set our parent to the current dir
-			
 
 			//make sure to write it
-			Save->children.push_back(TempNode);
+			Temp->children.push_back(TempNode);
 
-			//we don't do the Save = TempNode, cause we don't wanna move the dir forward on the end of values.
+			//we don't do the Temp = TempNode, cause we don't wanna move the dir forward on the end of values.
 
-			//DEBUG
 		}
 
 		//handle end tokens
 		if (currentToken.type == TokenType::END)
 		{
 			//ok, we want to handle these tokens, by if we get them, we go back a directory.
-			//first we make sure we dont have an issue rq
-			//prevents an error, making sure the back dir arnt nullptr
-			if (Save != nullptr && Save->Parent != nullptr)
+			
+			
+			if (Temp != nullptr && Temp->Parent != nullptr) //check that our Temp dir is not null, and our parent for the tag is not null
 			{
-				//move back one level
-				Save = Save->Parent;
-				//td::cout << "End of Tag, Back one!" << std::endl;
+				//if we pass
+				Temp = Temp->Parent; //we have passed, lets move our cursor up one.
+				
 			}
 		}
 
-
-
-
-
-
-
-
 	}
 
-	std::cout << std::endl << "DOM TREE" << std::endl;
-	//PrintDomTree(Root, 0); //to improve performace
 
+	LayoutTree(Root); //ok send it to the layout
 
-	//ok send it to the layout
-	LayoutTree(Root);
-	
 	return 0;
 }
 

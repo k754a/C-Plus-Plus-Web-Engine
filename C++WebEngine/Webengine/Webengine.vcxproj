@@ -158,6 +158,7 @@
     <ClInclude Include="GUI.h" />
     <ClInclude Include="Layout.h" />
     <ClInclude Include="Parser.h" />
+    <ClInclude Include="Profiler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

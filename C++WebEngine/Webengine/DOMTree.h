@@ -3,7 +3,6 @@
 #define GET_DOMTREE
 
 #include <string> //For std::string
-#include <iostream> //For STD:: functs
 #include <vector> //For std::vector
 
 

@@ -1,5 +1,6 @@
 //THIS SCRIPT WILL PARSE THE DATA GOTTEN FROM THE NETWORK SOCKET.
 
+#include "Profiler.h"
 
 #include "Parser.h" 
 
@@ -606,6 +607,7 @@ std::string PullTITLE(const std::string HtmlData) //PullTITLE returns an std::st
 
 int Parser(std::string input) //this is the global class, and will manage the data we get from the network parser. It returns an int, and takes in a single string as input
 {
+	PROFILE("PARSER"); //PROFILE THE PARSER
 
 	//strip the CSS.
 	StripCSS(

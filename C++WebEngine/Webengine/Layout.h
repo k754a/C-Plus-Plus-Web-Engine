@@ -9,31 +9,24 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 
-
-//ok, lets first define our strucutre
-//currently we want to have a start tag, a text, and a end tag
-//we say enum just to tell the complier that we wont be changing this
-//this is saying class tokentype( start (like <p>), text (like "this is a test"), and end (like <p>))
-//i added a VOID tag, and COMMENT, just for the dom tree
-// 
-//this is moved here, for cleanness
-enum class NODETYPE { START, TEXT, END };
+enum class NODETYPE { START, TEXT, END }; //NODETYPE holds 1 value out of 3 types (a fancy bool)
 struct Node {
 	NODETYPE tag; //our tag (START, TEXT, END)
-	std::string tagValue; //the cleaned value, like "a" 
-	std::vector<Node*> children; //make this node so that we can have depth, like stuff inside the tag
-	Node* Parent = nullptr; // so we can track the parent
+	std::string tagValue; //the value of the tag, like <'a'>
+	std::vector<Node*> children; //Node contains our children, and there properties, recalling this function
 
-	std::string href = ""; //we have non links "" clickable ones are filled in!
-	std::string src = ""; //tell if we have images (cause links and images ids are kinda the same)
+	Node* Parent = nullptr; //our parent (starts unassigned)
+
+	std::string href = ""; //If we contain a link
+	std::string src = ""; //If we contain an image
 
 
-    //ok, updates to the node, adding things like w & h, so we can put in flexboxes!
+   
 
-    int measuredWidth = 0;
-    int measuredHeight = 0;
-    bool measureded = false;  //so we dont measure more than once!
-    bool isFlexContainer = false; //handle <divs> 
+    int measuredWidth = 0; //hold the measured Width
+    int measuredHeight = 0; //hold the measured Height
+    bool measured = false;  //so we don't measure more than once!
+    bool isFlexContainer = false; //determin if we are in a div
 
 };
 
@@ -44,7 +37,7 @@ struct Layout
 
 	int x; int y; //the x and y pos
 
-	int width; int hight; //handle the width and hight of the text
+	int width; int height; //handle the width and height of the text
 
 	int fontSize; 
 
@@ -89,7 +82,7 @@ struct Layout
         x = other.x;
         y = other.y;
         width = other.width;
-        hight = other.hight;
+        height = other.height;
         fontSize = other.fontSize;
         textTex = other.textTex;
         textColor = other.textColor;
@@ -113,7 +106,7 @@ struct Layout
             x = other.x;
             y = other.y;
             width = other.width;
-            hight = other.hight;
+            height = other.height;
             fontSize = other.fontSize;
             textTex = other.textTex;
             textColor = other.textColor;

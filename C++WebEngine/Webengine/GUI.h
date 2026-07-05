@@ -29,6 +29,8 @@ struct Tab //tab struct
 	//and current pos, we look at the current selected tab before adjusting these
 	int currentSearchPos = -1;
 
+	Node* domRoot = nullptr;
+
 };
 
 
@@ -50,7 +52,7 @@ struct Tab //tab struct
 
 void SetTabTitle(std::string title);
 int GUIRENDER();
-int IMPORT(std::vector<Layout> layoutList);
+int IMPORT(std::vector<Layout> layoutList, Node* node);
 int LoadStarredPages();
 int UpdateHTML();
 #endif // ! GUI

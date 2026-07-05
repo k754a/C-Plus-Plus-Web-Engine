@@ -1,40 +1,39 @@
 //THIS WILL HANDLE THE LAYOUT OF THE ENGINE
 //it will assign things like the positions of elements, and assign things like x and y
 
-//currently because we have no css stuff, lets just increase the y (0 is starting the higher the y, lower it is)
-#include <string>
-#include <vector>
+
+
 #include "Layout.h"
 #include "GUI.h"
 #include "DOMTree.h"
-//lets bild a basic loop and stuff.
-
-//first we assign the node from the dom tree
-
-
+#include "Profiler.h"
 
 
 
 
 //looks through all our CSS rules to find the one that matches our tag in our tree
-//basicy we look through everything, and we pass in "H1" we match it and return the proprites
-CSSToken* FindID(std::string input)
+
+
+//=======Find ID======\\
+
+CSSToken* FindID(const static std::string input) //FIND-ID returns in our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), and takes in a std::string
 {
-	//loop and check through each element
+	//loop and check through each element, for the size of globalCSS
 	for (int i = 0; i < globalCSS.size(); i++)
 	{
-		if (globalCSS[i].id == input) //if the id we looping through is = to it
+		if (globalCSS[i].id == input) //if the current id = to the input
 		{
-			return &globalCSS[i]; //we need the & or we get an error
+			return &globalCSS[i]; //we return the id, and the vector string, holding the proprties
 		}
 	}
 
-	return nullptr; //i forgot this lol, and it just crashed
-}
+	return nullptr; //if we cannot find it
+} //END OF FIND-ID
 
-//now we want to get proprites
-//we will loop throught the properties, and match
-std::string FindProperty(CSSToken* rule, std::string propertyName)
+
+//=======Find Property======\\
+
+std::string FindProperty(const static CSSToken* rule, const static std::string propertyName) //FindProperty returns a std::string, and takes in our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), and a string
 {
 	for (int i = 0; i < rule->properties.size(); i++)
 	{
@@ -51,15 +50,15 @@ std::string FindProperty(CSSToken* rule, std::string propertyName)
 			}
 		}
 	}
-	//we didnt find it :(
+	//we did'nt find it :(
 	return "";
-}
+}//END OF FIND PROPERTY
 
 
 //see if a node has absolute in the css
 //if it does we return true!
 //we need the x and y
-bool IsAbsolute(Node* node, int& outX, int& outY)
+bool IsAbsolute(const static Node* node, int& outX, int& outY)
 {
 	//i first want to look through the nodes tag, to see if it has it
 	//we check that it has css values, if not, we return false
@@ -115,7 +114,7 @@ bool IsAbsolute(Node* node, int& outX, int& outY)
 
 //see if a node has flex in the css
 //if it does we return true!
-bool IsFlex(Node* node)
+bool IsFlex(const static Node* node)
 {
 	//i first want to look through the nodes tag, to see if it has it
 	//we check that it has css values, if not, we return false
@@ -172,7 +171,7 @@ bool IsFlex(Node* node)
 struct RGB { int r, g, b;  };
 
 //got this online! 
-RGB hexToRgb(unsigned int hexValue)
+RGB hexToRgb(const static unsigned int hexValue)
 {
 	RGB color;
 	color.r = (hexValue >> 16) & 0xFF; // Extract the first 2 hex digits
@@ -250,7 +249,7 @@ std::vector<Layout> layoutList; //list to store the layout
 void MeasureNodes(Node* node, int fontsize)
 {
 	//first check, if the node has been measured, dont do it again
-	if (node->measureded) return;
+	if (node->measured) return;
 
 
 	//same thing in the old generate layout tree.
@@ -295,7 +294,7 @@ void MeasureNodes(Node* node, int fontsize)
 		//same as before
 		node->measuredWidth = 200;
 		node->measuredHeight = 150;
-		node->measureded = true;
+		node->measured = true;
 		return;
 	}
 
@@ -310,7 +309,7 @@ void MeasureNodes(Node* node, int fontsize)
 		//we set the width to the len of the text, * the fontsize, with a bit of adjusting!
 		node->measuredWidth = (int)(node->tagValue.size() * (fontsize * 0.45));
 		node->measuredHeight = fontsize + 4;
-		node->measureded = true;
+		node->measured = true;
 		return;
 	}
 
@@ -318,7 +317,7 @@ void MeasureNodes(Node* node, int fontsize)
 	//ok, now we do what we came to do:
 	//we understand that this node has children (like a div, body, a, ect)
 	//we cant know our own size, till we know there sizes
-	int totalH = 0; //holds our total hight size OVERALL
+	int totalH = 0; //holds our total height size OVERALL
 	int maxW = 0; //holds the widest child we've seen
 
 	//for each child in our children
@@ -339,7 +338,7 @@ void MeasureNodes(Node* node, int fontsize)
 	node->measuredHeight = totalH;
 
 	//make sure we mark its done
-	node->measureded = true;
+	node->measured = true;
 
 
 }
@@ -629,7 +628,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			imgLayout.href = currentHref;
 			
 			imgLayout.width = node->measuredWidth;
-			imgLayout.hight = node->measuredHeight;
+			imgLayout.height = node->measuredHeight;
 
 			layoutList.push_back(imgLayout);
 
@@ -695,7 +694,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 		//std::cout << layouttree.fontSize << std::endl;
 
 		layouttree.width = node->measuredWidth;
-		layouttree.hight = node->measuredHeight;
+		layouttree.height = node->measuredHeight;
 
 		//send back the node to our layout list, to save
 		layoutList.push_back(layouttree);
@@ -739,6 +738,8 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 int LayoutTree(Node* node)
 {
+	PROFILE("LAYOUTTREE"); //PROFILE THE LAYOUTTREE
+
 	layoutList.clear(); //we need to do this, or we will have errors
 
 	int currentY = 120; //update this, to fix text clipping
@@ -760,7 +761,8 @@ int LayoutTree(Node* node)
 
 	std::cout << "Layout Complete." << std::endl;
 	
-	IMPORT(layoutList);
+	IMPORT(layoutList, node);
+	
 	return 0;
 }
 

@@ -15,7 +15,7 @@
 #include <SDL3_image/SDL_image.h>
 #include <windows.h> //for the print
 #include <filesystem> //for the folder handling on the bmp
-
+#include "Profiler.h" //DEBUG
 //MOVED TO TAB MODE.
 
 //this is the layout list, and gets filled in by IMPORT
@@ -91,6 +91,22 @@ struct TabInit {
 } _tabInit;
 
 
+
+//======DELETE TREE======\\
+
+void DeleteTree(Node* node) //this takes in our custom node tree, and returns nothing.
+{
+	//insure that our node is not null
+	if (node == nullptr) return; //error case, just return
+
+	for (Node* child : node->children) //loop through every child in this node
+	{
+		DeleteTree(child); //for each child we call this, to destroy its child's.
+	}
+	node->children.clear();
+
+	delete node; //we have made it to the bottom, destroy ourselves.
+}
 
 
 
@@ -231,8 +247,10 @@ SDL_Color backgroundColor = { 245, 245, 245, 255 }; //white bg, gets changed btw
 
 
 //this is called in layout, and repaces whatever was on the screen with the new layout
-int IMPORT(std::vector<Layout> layoutGOTTEN)
+int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot)
 {
+	PROFILE("IMPORT"); //PROFILE THE IMPORT
+
 	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size())
 	{
 		std::cout << "IMPORT called before tabs ready." << std::endl;
@@ -251,9 +269,13 @@ int IMPORT(std::vector<Layout> layoutGOTTEN)
 		}
 	}
 
+	//rm the old tree
+	if (tabs[activeTab].domRoot != nullptr)
+	{
+		DeleteTree(tabs[activeTab].domRoot);
+	}
 
-
-
+	tabs[activeTab].domRoot = newRoot;
 
 	tabs[activeTab].layout = layoutGOTTEN;
 	tabs[activeTab].url = urlInput;
@@ -374,7 +396,9 @@ std::string ResolveURL(std::string src, std::string currentUrl)
 
 void PreRender(SDL_Renderer* render, TTF_Font* font)
 {
-	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size()) return; //if we have no active tabs, ignore
+	
+
+	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size())  return; //if we have no active tabs, ignore
 
 	int xtrack = 20;
 	int ytrack = 120; //issues with the y track, now fixed!
@@ -472,7 +496,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 					//save the dimetions of the block of text
 					tabs[activeTab].layout[i].width = nodeSurf->w;
-					tabs[activeTab].layout[i].hight = nodeSurf->h;
+					tabs[activeTab].layout[i].height = nodeSurf->h;
 
 					//upload the surface from ram to gpu as a texture!
 					// Draw and destroy to prevent mem leaks
@@ -562,7 +586,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 				//save the sizes of it now
 				tabs[activeTab].layout[i].width = surf->w;
-				tabs[activeTab].layout[i].hight = surf->h;
+				tabs[activeTab].layout[i].height = surf->h;
 
 				//clear the surf for performace
 				SDL_DestroySurface(surf);
@@ -576,9 +600,9 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 		TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
 
-		if (tabs[activeTab].layout[i].hight > maxLineHeight)
+		if (tabs[activeTab].layout[i].height > maxLineHeight)
 		{
-			maxLineHeight = tabs[activeTab].layout[i].hight;
+			maxLineHeight = tabs[activeTab].layout[i].height;
 		}
 
 
@@ -650,7 +674,7 @@ int LoadAnimation(SDL_Renderer* render, TTF_Font* font)
 			textrec.x = tabs[activeTab].layout[i].x;
 			textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;
 			textrec.w = tabs[activeTab].layout[i].width;
-			textrec.h = tabs[activeTab].layout[i].hight;
+			textrec.h = tabs[activeTab].layout[i].height;
 
 			//draw the bg color
 			if (tabs[activeTab].layout[i].hasBg)
@@ -823,7 +847,7 @@ int GUIRENDER()
 	//added a pointer to it, so that we can accses it later
 	SDL_Window* window;
 	//create window, some parrams are 
-	//title, width, hight, and flags
+	//title, width, height, and flags
 	//make it 1080p sizewise
 	//for flags, its in this format -> UINT64_C(0X0000000000000020), we also can add more tags through |
 	window = SDL_CreateWindow("Browse++", 1920, 1080, SDL_WINDOW_RESIZABLE);
@@ -1209,7 +1233,7 @@ int GUIRENDER()
 
 						//calculate if we are over it
 						if (mouseX >= tabs[activeTab].layout[i].x && mouseX <= (tabs[activeTab].layout[i].x + tabs[activeTab].layout[i].width) &&
-							mouseY >= screeny && mouseY <= (screeny + tabs[activeTab].layout[i].hight))
+							mouseY >= screeny && mouseY <= (screeny + tabs[activeTab].layout[i].height))
 						{
 
 
@@ -1301,6 +1325,10 @@ int GUIRENDER()
 							//check for intersects
 							if (mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= 2 && mouseY <= 28 && tabs.size() > 1)
 							{
+								if (tabs[t].domRoot != nullptr)
+								{
+									DeleteTree(tabs[t].domRoot);
+								}
 							
 								//ok close the tab
 								tabs.erase(tabs.begin() + t); //remove the tab
@@ -1463,7 +1491,7 @@ int GUIRENDER()
 			textrec.x = tabs[activeTab].layout[i].x;
 			textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;
 			textrec.w = tabs[activeTab].layout[i].width;
-			textrec.h = tabs[activeTab].layout[i].hight;
+			textrec.h = tabs[activeTab].layout[i].height;
 
 			//draw the bg color
 			if (tabs[activeTab].layout[i].hasBg)
@@ -1566,7 +1594,7 @@ int GUIRENDER()
 		//go through each node, and find its pos
 		for (int i = 0; i < tabs[activeTab].layout.size(); i++) {
 		
-			int nodeBottom = tabs[activeTab].layout[i].y + tabs[activeTab].layout[i].hight;
+			int nodeBottom = tabs[activeTab].layout[i].y + tabs[activeTab].layout[i].height;
 
 			//if this node is > than the last, update it!
 			if (nodeBottom > totalPageHeight) {
@@ -1958,7 +1986,7 @@ int GUIRENDER()
 				SDL_SetRenderDrawColor(render, 190, 190, 190, 255);
 
 			//make our tab rec, putting in our tab width and pos
-			SDL_FRect tabrect = { (float)tabX, 0, (float)tabW, 30 }; //with a hight of 30
+			SDL_FRect tabrect = { (float)tabX, 0, (float)tabW, 30 }; //with a height of 30
 			//render it
 			SDL_RenderFillRect(render, &tabrect);
 
