@@ -20,56 +20,57 @@ std::string URLPath; //This holds our path for the URL and is used for simplicit
 
 
 
-
+//DEPRECATED.
 //=======HANDLE WINSOCK FUNCTS=======\\
 
 
 //this starts up our winsock at the beginning, and init's it for everything else
-int StartWinSock()
-{
-	WSAData wsaData; //This WSA data, holds the info about the windows sockets implementation, like the version, description, and system status.
+//int StartWinSock()
+//{
+//	WSAData wsaData; //This WSA data, holds the info about the windows sockets implementation, like the version, description, and system status.
+//
+//
+//	if (WSAStartup(MAKEWORD(2, 2), &wsaData) == 1) //start up our WSA for version 2.2, and set the data structure to our wsaDATA, because wsaDATA is an INT, if we get 1 back, we had an error
+//	{
+//		//failed case
+//		std::cerr << "Failed to init Winsock" << std::endl; //debug for the user
+//		return 1; //return our error code (copy the WSAStartup code)
+//
+//	}
+//	else {
+//		
+//		//passed case
+//		std::cout << "Winsock has been init" << std::endl; //debug for the user
+//		return 0;
+//	
+//	}
+//
+//}//END OF START WIN SOCK
 
 
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) == 1) //start up our WSA for version 2.2, and set the data structure to our wsaDATA, because wsaDATA is an INT, if we get 1 back, we had an error
-	{
-		//failed case
-		std::cerr << "Failed to init Winsock" << std::endl; //debug for the user
-		return 1; //return our error code (copy the WSAStartup code)
+//DEPRECATED.
 
-	}
-	else {
-		
-		//passed case
-		std::cout << "Winsock has been init" << std::endl; //debug for the user
-		return 0;
-	
-	}
-
-}//END OF START WIN SOCK
-
-
-
-//this funct, ends our winsock cleanly.
-int EndWinSock()
-{
-	
-	
-	if (WSACleanup() != 0) //this checks if the WSACleanup did not work.
-	{
-		//failed case
-		std::cerr << "Winsock failed to been stopped" << std::endl; //debug for the user
-		return 1;
-	}
-	else {
-
-		//passed case
-		std::cout << "Winsock has been stopped" << std::endl; //debug for the user
-		return 0;
-
-	}
-
-	
-}//END OF END WIN SOCK
+////this funct, ends our winsock cleanly.
+//int EndWinSock()
+//{
+//	
+//	
+//	if (WSACleanup() != 0) //this checks if the WSACleanup did not work.
+//	{
+//		//failed case
+//		std::cerr << "Winsock failed to been stopped" << std::endl; //debug for the user
+//		return 1;
+//	}
+//	else {
+//
+//		//passed case
+//		std::cout << "Winsock has been stopped" << std::endl; //debug for the user
+//		return 0;
+//
+//	}
+//
+//	
+//}//END OF END WIN SOCK
 
 
 

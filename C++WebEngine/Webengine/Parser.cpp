@@ -1,61 +1,57 @@
-//THIS WILL PARSE THE DATA GOTTEN FROM THE NETWORK SOCKET.
-#include "Parser.h"
+//THIS SCRIPT WILL PARSE THE DATA GOTTEN FROM THE NETWORK SOCKET.
+
+
+#include "Parser.h" 
+
+
 #include "DOMTree.h" //included for the DOM in the dom tree
-#include <vector>
-#include <list>
-#include <unordered_set> //for the check to make it faster
 #include "GUI.h"
-#include <algorithm>    
+#include <string_view>
 
 
-//THIS IS ADDED/DEFINED IN THE DOM
-
-//enum class TokenType { START, TEXT, END, VOID};
-//
-////lets build the token structure
-//struct Token
-//{
-//	//we do the type and the value, as then we can identify the start middle or end to a real value.
-//	//all tokens follow the format "type"
-//	TokenType type;
-//	std::string value; //hold the actual text
-//};
-
-
-//we currently have a bug where blank text is getting through.
-//the way to fix this, is to check if the data is blank, and then decide if we want to parse or not.
-bool iswhitespace(std::string& input)
+//=======CHECK FOR WHITESPACE=======\\
+	
+//CHECK FOR WHITESPACE.
+bool isWhitespace(std::string& input) //this function returns true/false, taking in a single input
 {
-	for (unsigned char c : input)
-	{
-		//checks to see that there are not any blank ones.
-		if (c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\v' && c != '\f' && c != 0xA0) {
-			return false; 
-		}
-	}
+	//check each char, and return if it contains a space.
+	return std::all_of(input.begin(), input.end(), [](unsigned char c) {
+		return std::isspace(c); 
+	});
 
-	//we found whitespace
-	return true;
 }
 
+
+//=======DECODE ENTITIES======\\
+
+//Decode entities is a std::string method taking in a constant string& from outside
 std::string DecodeEntities(const std::string& input)
 {
-	std::string out; //the thing we are gonna return out
-	//save some size in meme for it, using our input size
-	out.reserve(input.size());
-	//do somthin like how we do our main tag stripping
+	//our final output to return. //reserve bytes in memory, using our input.size(), this saves time.
+	std::string out; out.reserve(input.size()); 
+
+	
+
+	//do something like how we do our main tag stripping
 	size_t i = 0;
 
-	while (i < input.size())
+
+
+
+	while (i < input.size()) //while our i is smaller than our input.size
 	{
-		if (input[i] == '&') //check if it starts for our unknown entitites.
+
+		
+		if (input[i] == '&') //check if it starts with & (as that is the start of the chars we want to remove)
 		{
-			size_t semi = input.find(';', i);
-			//check if its not null, or its not bigger than 12 char
+			size_t semi = input.find(';', i); //find the end pos, as then we know its what we are looking for.
+
+			//check if we found the endpos, and its not bigger than 12 char
 			if (semi != std::string::npos && semi - i < 20)
 			{
-				//get the thing
-				std::string entity = input.substr(i, semi - i + 1);
+				//this is gonna be so slow, so a string_view is faster, and does not over allocate!
+				//the std::string_view, takes in the "start", and the "end".
+				std::string_view entity(input.data() + i, semi - i + 1);
 
 				//if it = to any of these, we convert them
 				if (entity == "&nbsp;") { out += ' '; }
@@ -69,26 +65,26 @@ std::string DecodeEntities(const std::string& input)
 				else if (entity == "&laquo;") { out += '<'; out += '<'; }
 				else if (entity == "&raquo;") { out += '>'; out += '>'; }
 				else if (entity == "&#160;") { out += ' '; }
-				else if (entity == "□") { out += ' '; }
+				
+				else if (entity == "&#xFFFD;") { out += ' '; }
+				else if (entity == "&#65533;") { out += ' '; }
 				else if (entity.size() > 3 && entity[1] == '#' && entity[2] == 'x') { i = semi + 1; continue; }
 				else if (entity.size() > 2 && entity[1] == '#') { i = semi + 1; continue; }
 				else
 				{
-					//unkown, just let it through
+					//unknown, just let it through
 					out += input[i];
 					i++;
 					continue;
 				}
+				//after we are done, increase the i + the len of our entity.
 				i = semi + 1;
 				continue;
 			}
 		}
-		//now lets remove werid things (thoes boxes)
-
-
-
-		//changed this to not filter non ascii one at a time
-		out += input[i++];
+		
+		
+		out += input[i++]; //we have made it through the word, go to the next.
 	}
 
 
@@ -99,537 +95,352 @@ std::string DecodeEntities(const std::string& input)
 
 
 
-	return out;
+	return out; //return our final out.
 
-}
+} // END OF DECODE ENTITIES
 
-//Full striptags code, does not handle things like <a href="link">
-std::vector<Token> StripTags(std::string htmldata)
+
+
+
+
+
+//=======STRIP TAGS======\\
+
+//Full StripTags code, does not handle things like <a href="link">
+std::vector<HTMLToken> StripTags(std::string HtmlData)
 {
-	std::vector<Token> tokenList; //saves our tokens, we do a vector to save multiple instances!
+	std::vector<HTMLToken> tokenList; tokenList.reserve(HtmlData.size() / 20); //saves our tokens, we do a vector to save multiple instances!
 
 	//DEFINE SOME VOID TAGS
 	//some tags are allowed to be single, so we will also check for that!
-	//i got the tags from https://developer.mozilla.org/en-US/docs/Glossary/Void_element however it was missing br/ so that was added
-	//this is faster because we can check as if there is no order at all!
-	std::unordered_set<std::string> voidTags = {
+	//I got the tags from https://developer.mozilla.org/en-US/docs/Glossary/Void_element however it was missing quite a few.
+	//we use a static constant, as these never change, and use an unordered_set, as its faster.
+	static const std::unordered_set<std::string_view> voidTags = {
 	"area", "base", "br", "br/", "col", "embed", "hr", "img", "input", 
 	"link", "meta", "param", "source", "track", "wbr", "!doctype html"
 	};
 
 
 	
-	std::cout << "Running Striptags" << std::endl; //just some debug
+	std::cout << "Running StripTags" << std::endl; //just some debug
+
+
 	size_t htmlStart = 0; //this var sets where i starts (changes if its HTTPS or just HTTP)
 
-	//first lets remove the htmldata \r\n\r\n, this is a index, so we will just start from this point in our loop.
-	//we check, because if we have https this wont work, and we will pull some random tags lol
-	if (htmldata.find("\r\n\r\n") == std::string::npos)
-	{
-		htmlStart = 0; //we do this because using winInet, it alr removes that stuff, so we dont have to do it!
-	}
-	else {
-		 htmlStart = htmldata.find("\r\n\r\n") + 4; //http does not, so we still do.
-	}
 	
-
-	size_t i = htmlStart; 	//size_t is much better than int. This is our starting spot, from the stuff above
-
-
-	int len = htmldata.length(); //get the length of the html data
+	size_t i = htmlStart; 	//size_t is much better than int. This is our starting point.
+	int len = HtmlData.length(); //get the length of the html data
 
 
 
 
 
 
-
-
-
-
-
-
-
-	std::string Savevar; //we will use this in our loop to add to our stack.
+	std::string SaveVar; //we will use this in our loop to add to our stack.
 
 
 	
-	std::vector < std::string > TokenStack; //so we are going to use a list, we use a list because we can check everything, and if they match, we remove from the list. but ofc we add it to the Tokenlist above
-
-
-	//first lets build the loop.
-
-	//MAIN CHANGE
-	//ok, the main thing that i changed, is i went from fufuling multiple conditions with one if, to looping through each <> or <\> and checking if it meets the condtions for a TEXT block
-	//a START or and END, this allows it to work so much better, and order the text, because before we printed <> TEXT </> together, now we dont.
+	std::vector < std::string> TokenStack; TokenStack.reserve(64); //create a list with a string view, this is faster, as we dont need alocation, and we make it a vector, to store strings.
 
 
 
-	while (i < len) //while our i is greater then our len, so we keep going till our i cant find anymore
+	while (i < len) //repeat till i > than the len.
 	{
 		
 		
-		size_t nextTag = htmldata.find('<', i); //we first find the first spot.
+		size_t nextTag = HtmlData.find('<', i); //we find the next '<'tag>
 
 
-		//we need this because i lowky forgot it, and it ended up crashing lol
-		//it checks to make sure that we have found all our things, and if we have we exit.
+		//we check if we found the tag, if we did'nt, we have finished, and can quit.
 		if (nextTag == std::string::npos)
 		{
 			break; //we have finished.	
 		}
 
-		//We do this because text is stored between chars like for example <Hello> the index of < is 0 and the index of > is 6.
-		//if nexttag is bigger, it means we have text inbetween!
-		//this works for nested tags because <><> has no space! even if it does <> <> we ignore whitespaces
+		//we check if the next tag is > then the i, that means we have text between the "<"next tag> and our <current tag>
 		if (nextTag > i)
 		{
-			std::string text = htmldata.substr(i, nextTag - i);//we grab the data between our "i" and a certain amount of chars after, making sure we grab all our text
+			std::string text;
+			text.assign(HtmlData.substr(i, nextTag - i));//we grab the text in between, by getting next tags "<".
 
-				if (!iswhitespace(text)) //our funct to check if we have whitespace
-				{
-
-
-					//we do this lower now
-					Token textT;
-
-					//we just made a temp token, now we need to do 
-					textT.value = DecodeEntities(text);
-					textT.type = TokenType::TEXT;
-					tokenList.push_back(textT);
-
-					//std::cout << "Found Text: " << text << std::endl;
-				}
-		}
-
-
-		//now we move our i to our next token, because we just found one!
-		i = nextTag;
-
-		//we have to add this, because what ended up happin is that we could find the < but not the > so it would freeze
-		size_t closePos = htmldata.find('>', i);
-		if (closePos == std::string::npos) {
-			break; 
-		}
-
-		
-
-
-		
-
-
-		//if we are good: 
-		//a mistake to watch out for, is that substr, looks for starting char, and length of char, not startpoint and endpoint (i keep messing that up lol)
-		Savevar = htmldata.substr(i, (closePos - i + 1)); //this basicly splits and grabs the data between i and our end '>'
-		//std::cout << Savevar << std::endl; //little telem
-		Token currenttoken; //build a temp class
-
-
-			//ok this checks that it contains the full tag, then also checks if there is a / at the end
-			//these both need to be true, so if its somthing like <div> it will return false, running the else!
-			if(Savevar.length() > 1 && Savevar[1] == '/'){
-
-				//ok now we know there is, we first check if the tokenstack is empty (this was for our starting stuff)
-				//then we check that our token we are trying to match is the same as our savevar, and that our savevar is a <\> tag
-				std::string closeName = Savevar.substr(2, Savevar.length() - 3);
-
-				size_t spacePos = closeName.find(' ');
-				if (spacePos != std::string::npos) //make sure thats not null lol
-				{
-					//std::cout << "FOUND ONE! ";
-					//we have a space! because we do lets find and remove it.
-					closeName = closeName.substr(0, spacePos);
-				}
-
-				bool matchFound = false;
-
-				//if we have stuff in our tokenstack
-				while (!TokenStack.empty())
-				{
-					//check if our top current TokenStack "Token" is the same as the one we are looking for
-					if (TokenStack.back() == closeName)
-					{
-						//we found a match! we add it to the list at the end
-						matchFound = true;
-						//we delate the matched tag!
-						TokenStack.pop_back();
-						break;
-
-					}
+			if (!isWhitespace(text)) //check if we have whitespace.
+			{
 					
+				HTMLToken textT; //we passed the test, we now create the temp token value
 					
-					//because we found a match we break, and that allows us to fix a bug!
-					//it catches if we have open tags
-					TokenStack.pop_back();
-				}
-
-				if (matchFound)
+				//check if we have a &, for decoding
+				if (text.find('&') == std::string::npos)
 				{
-					//std::cout << "Match found! " << std::endl;
-					currenttoken.type = TokenType::END;
-					currenttoken.value = Savevar;
-					tokenList.push_back(currenttoken);
+					textT.value = text; //we have'nt found one.
 				}
+				else { //we have found one
+					textT.value = DecodeEntities(text); //now we pass the text, filtering it first.
+				}
+					
+				textT.type = TokenType::TEXT; //then we set the type for the DOM
+				tokenList.push_back(textT); //finally we send it to our list.
 			}
+		}
 
-			else { //ok this is NOT a closing tag
-			
-			
-				//first we need just the tag name
-				std::string tagName = Savevar.substr(1, Savevar.length() - 2);
-				 
-			
-				if (!tagName.empty() && tagName.back() == '/') { //lets us handle things like <img/>
-					tagName.pop_back();
-				}
 
-				//this checks to see if we have any other properties like <a href="google.com">
-				size_t spacePos = tagName.find(' ');
-				if (spacePos != std::string::npos) //make sure thats not null lol
+		
+		i = nextTag;// now we set our i to the "<" so we can save it for the next part
+
+		//ok, check if we can find the close tag, (as we are finding the <>)
+		size_t closePos = HtmlData.find('>', i);
+		if (closePos == std::string::npos) {
+			break; //exit the loop, fail condition
+		}
+
+		
+
+		//a mistake to watch out for, is that substr, looks for starting char, and length of char, not start point and endpoint (i keep messing that up lol)
+		SaveVar.assign(HtmlData, i, (closePos - i + 1));
+		
+		HTMLToken CurrentToken; //temp class
+
+
+		//check if this an end tag, the savevar needs to be < 1 (cannot be <>), and the second char ([1]), is a '/'
+		if (SaveVar.length() > 1 && SaveVar[1] == '/') {
+
+			//get the close name, we remove the </, and the, and the var - 3 (to remove the >)
+			std::string closeName = SaveVar.substr(2, SaveVar.length() - 3);
+
+			size_t spacePos = closeName.find(' '); //check for spaces.
+
+			if (spacePos != std::string::npos) { closeName = closeName.substr(0, spacePos); } //we have a space! because we do lets find and remove it.
+
+			bool matchFound = false; //a temp var, for checking if we have found a match.
+
+
+			while (!TokenStack.empty()) //only loop, IF we have stuff in our TokenStack.
+			{
+
+				if (TokenStack.back() == closeName) //check if our current token matches 
 				{
-					//std::cout << "FOUND ONE! ";
-					//we have a space! because we do lets find and remove it.
-					tagName = tagName.substr(0, spacePos);
-				}
+					//we found a match! we add it to the list at the end
+					matchFound = true;
 
-				std::transform(tagName.begin(), tagName.end(), tagName.begin(), ::tolower); //force everything to be lowercase
-
-				//before we throw in the towel, lets check to see if its one of our void tags
-				//we check if its not = to voidtags.end() because if we get to the end of a vector and cant find nothing, we are ok with that!
-				if ((voidTags.contains(tagName)))
-				{
-					//currently we do nothing with this, but thats ok, we have a VOID tag, so we will in the future!
-					//std::cout << "Void Tag Found! " << Savevar << std::endl;
-					currenttoken.type = TokenType::START;
-					currenttoken.value = Savevar;
-					tokenList.push_back(currenttoken);
-
-					// close the tag right after, i didnt do this before and it just wreaked everything.
-					Token CloseToken;
-					CloseToken.type = TokenType::END;
-					CloseToken.value = "</" + tagName + ">";
-					tokenList.push_back(CloseToken);
-
-
+					//we remove the matched tag!
+					TokenStack.pop_back();
+					break;
 
 				}
 				else {
-
-					currenttoken.type = TokenType::START;
-					currenttoken.value = Savevar;
-					tokenList.push_back(currenttoken);
-
-					TokenStack.push_back(tagName);
+					TokenStack.pop_back(); //we pop the token back, and check the next one.
 				}
+
+			}
+
+	
+			if (matchFound) //now that we have looped through each token in the stack, we now check if we found a match.
+			{
+				CurrentToken.type = TokenType::END; //set the token type, to the end token
+				CurrentToken.value = SaveVar; //set the value to our <'example'>
+				tokenList.push_back(CurrentToken); //send it to our list.
+			}
+		}
+
+		else { //If this is not a closing tag
+			std::string tagName;
+			tagName.assign(SaveVar, 1, SaveVar.length() - 2); //get the tag name, without the <>
+				 
+			
+			if (!tagName.empty() && tagName.back() == '/') { //handle self closing tags, like <br/>, we remove the '/'
+				tagName.pop_back();
+			}
+
+
+
+			//this checks to see if we have any other properties like <a href="google.com">
+			size_t spacePos = tagName.find(' ');
+			if (spacePos != std::string::npos) //we fulfill the condition
+			{
+				tagName = tagName.substr(0, spacePos); //we just remove it rn, TODO - SAVE THE VALUE.
+			}
+
+			std::transform(tagName.begin(), tagName.end(), tagName.begin(), ::tolower); //force everything to be lowercase
+
+			
+			if ((voidTags.contains(tagName))) //before we throw in the towel, lets check to see if its one of our void tags
+			{
+				//we will break it if we just have a single non pair, so we convert it to a pair.
+				
+				CurrentToken.type = TokenType::START; //set the type to start
+				CurrentToken.value = SaveVar; //set the value <example>
+				tokenList.push_back(CurrentToken); //save the token
+
+				
+				HTMLToken CloseToken; //temp class token, for our closing condition.
+
+				CloseToken.type = TokenType::END; //set the type to end
+				CloseToken.value = "</" + tagName + ">"; //set the value to </example>
+				tokenList.push_back(CloseToken); //send it back.
+
+			}
+			else { //not a void tag, but a start tag
+				 
+				CurrentToken.type = TokenType::START; //set the type to start
+				CurrentToken.value = SaveVar; //set the value <example>
+				tokenList.push_back(CurrentToken); //save the token
+
+				TokenStack.push_back(tagName); //save the name, like <'example'>
+			}
 
 
 				
-			}
+		}
 				
 
 			
-			i = i + Savevar.length(); //to not index the same thing again, we set the next i point, past the <, so that we find the next point
+		i = i + SaveVar.length(); //to not index the same thing again, we set the next i point, past the <, so that we find the next point
 	}
 		
-	
+	//we have gone through everything.
 
 	//cleanness
 	std::cout << "-------------" << std::endl;
-	//For debug (and fun) lets print the tags without a partner :(
-
-	if (TokenStack.size() <= 0)
-	{
-		std::cout << "No extra tags found. :)" << std::endl;
-	}
-	else
-	{
-		//turns out we end up saving a few tags just with a bug, it doesn't effect the main thing, so if it aint broke, dont fix it!
-
-		//UPDATE the bug has been fixed!
-			std::copy(TokenStack.begin(), TokenStack.end(), std::ostream_iterator<std::string>(std::cout, " "));
-
-			std::cout << std::endl;
-			std::cout << "Extra tags found. This wont be a problem." << std::endl;
-	}
-
-	std::cout << "Done!" << std::endl;
-	//cleanness
-	std::cout << "-------------" << std::endl;
 
 
-	std::cout << "Final Tokens:" << std::endl;
-	//we want to print the token combos, just as a debug!
-	//for (int i = 0; i < tokenList.size(); i++)
-	//{
-	//	//ok now we loop through and print
-	//	//as our final thing
-	//	std::cout << tokenList[i].value << std::endl;
-	//}
+	std::cout << "\r"; //return \r, as its faster.
 
-	std::cout << std::endl;
+	return tokenList; //return our processed list
 
-	return tokenList;
+} //END OF STRIPTAGS
 
-}
 
-//removed old stuff
 
-//now all functions can parse much faster than before.
-std::string pullTITLE(std::string htmldata)
+
+
+
+//std::string stripTagBlocks
+//this will strip the tags, as we do that every time, but we can use one funct, rather than 3
+
+//=======STRIP TAG BLOCKS======\\
+
+std::string StripTagBlocks(const std::string& HtmlData, const std::string& start, const std::string& end)
 {
-	std::string titlepos;
-	//there should only be one title btw, so just grab that ig
-	size_t startpos = htmldata.find("<title");
-	if (startpos == std::string::npos)
+	std::string ReturnHtmlData; ReturnHtmlData.reserve(HtmlData.size()); //holds our html data, we reserve the data, so its faster.
+
+	size_t pos = 0;
+
+	while (true)
 	{
-		return "unk tab name";
+		size_t StartPos = HtmlData.find(start, pos); //check if we can find our start tag
+		if(StartPos == std::string::npos) { ReturnHtmlData.append(HtmlData, pos, std::string::npos); break;} //this checks if it exists, if it dont, we assume we are done, and finish appending.
+
+		ReturnHtmlData.append(HtmlData, pos, StartPos - pos); //add our data rn, taking from HtmlData and going from i to out.
+
+		size_t EndPos = HtmlData.find(end, StartPos+ start.size()); //check if we can find our end tag
+		if (EndPos == std::string::npos) { ReturnHtmlData.append(HtmlData, pos, std::string::npos); break; } //this checks if it exists, if it dont, we assume we are done, and finish appending.
+
+
+
+		//now we want to move it forward, so we don't detect again, and find the next one.
+		pos = EndPos + end.size();
 	}
 
+	//we are done, return.
+
+	return ReturnHtmlData;
+
+} //END OF StripTagBlocks
 
 
-	size_t endpos = htmldata.find("</title>");
-	if (endpos == std::string::npos)
-	{
-		return "unk tab name";
-	}
 
-	titlepos = htmldata.substr(startpos + 7, endpos - (startpos + 7));
-	//grab between 
 
-	return titlepos;
 
-}
 
-//these classes will be populate eventualy, to actully tokenize, and render css, but not today.
-//this was updated to a loop, because https sites can have more than one stylesheet.
-std::string ManageCSS(const std::string& htmldata)
+
+
+
+
+//=======MANAGE CSS======\\
+
+
+std::string ManageCSS(const std::string& HtmlData) { return StripTagBlocks(HtmlData, "<style", "</style>"); } //remove everything between <style> and </style>
+
+//=======MANAGE JAVASCIRPT======\\
+
+std::string ManageJAVASCIRPT(const std::string& HtmlData) { return StripTagBlocks(HtmlData, "<script", "</script>"); } //remove everything between <script and </script>
+
+
+//=======MANAGE COMMENTS======\\
+
+std::string ManageCOMMENTS(const std::string& HtmlData) { return StripTagBlocks(HtmlData, "<!--", "-->"); } //remove everything between <!-- and -->
+
+//=======MANAGE NO SCRIPT======\\
+
+std::string ManageNoScript(const std::string& HtmlData) { return StripTagBlocks(HtmlData, "<noscript", "</noscript>"); } //remove everything between <noscript> and </noscript>
+
+//=======MANAGE TITLE======\\
+
+std::string ManageTITLE(const std::string& HtmlData) { return StripTagBlocks(HtmlData, "<title", "</title>"); } //remove everything between <title> and </title>
+
+
+
+
+
+
+
+
+
+
+//=======REMOVE EVERYTHING BUT CSS======\\
+
+std::string RemoveEverythingButCSS(std::string input) //this returns a string, and takes in a string.
 {
-	
-	std::string returnhtmldata;
-	returnhtmldata.reserve(htmldata.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
-
-	//we do the same for strip tags, instead of scanning everything, we just find and remove!
-	size_t i = 0;
-	const size_t len = htmldata.size();
-
-	while (i < len) //same as strip tags
-	{
-		size_t startpos = htmldata.find("<style", i); //find the first half, from the i (so we dont check back from the start)
-		if (startpos == std::string::npos)
-		{
-			//we need to make sure we save it
-			returnhtmldata.append(htmldata, i, len - i); //we return our data, taking from htmldata, and going from i to out
-			break;
-		}
-
-		returnhtmldata.append(htmldata, i, startpos - i);  //we return our data, taking from htmldata, and going from i to out
-
-		size_t endpos = htmldata.find("</style>", startpos);
-		if (endpos == std::string::npos)
-		{
-			break;
-
-		}
-		//Currently all we want to do in this is to just remove all the CSS, so lets find the css tags, and remove them.
-	//super simple, look for the style parts, (as they are constant across all websites) and remove everything inbetween.
-	//however some sites may not have a stylesheet, so we should check.
-
-
-		i = endpos + std::string("</style>").length(); //same as the erase but we dont erase anything, and its dynamic now!
-		//if we are good, return this.
-	}
+	std::string ReturnHtmlData; 
+	ReturnHtmlData.reserve(input.size()); //what this does, is reserve a chunk that does'nt need to be recalculated over and over.
 
 	
-	return returnhtmldata;
+	size_t pos = 0; //the current pos of our cursor
 
-}
-
-//we wont work with JAVASCIRPT right now (we might if i run out of things on this project)
-//this was updated as https can have more than one <script> area
-
-std::string ManageJAVASCIRPT(const std::string& htmldata)
-{
-
-	std::string returnhtmldata;
-	returnhtmldata.reserve(htmldata.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
-
-	//we do the same for strip tags, instead of scanning everything, we just find and remove!
-	size_t i = 0;
-	const size_t len = htmldata.size();
-
-	while (i < len) //same as strip tags
+	while (true) 
 	{
-		size_t startpos = htmldata.find("<script", i); //find the first half, from the i (so we dont check back from the start)
-		if (startpos == std::string::npos)
-		{
-			//we need to make sure we save it
-			returnhtmldata.append(htmldata, i, len - i); //we return our data, taking from htmldata, and going from i to out
-			break;
-		}
-
-		returnhtmldata.append(htmldata, i, startpos - i);  //we return our data, taking from htmldata, and going from i to out
-
-		size_t endpos = htmldata.find("</script>", startpos);
-		if (endpos == std::string::npos)
-		{
-			break;
-
-		}
-		//Currently all we want to do in this is to just remove all the JAVA, so lets find the JAVA tags, and remove them.
-	//super simple, look for the style parts, (as they are constant across all websites) and remove everything inbetween.
-	//however some sites may not have a stylesheet, so we should check.
+		size_t StartPos = input.find("<style", pos); //first find the start pos
+		if (StartPos == std::string::npos){ break; } //if we can't find it, break
 
 
-		i = endpos + std::string("</script>").length(); //same as the erase but we dont erase anything, and its dynamic now!
-		//if we are good, return this.
+
+		size_t tag_end = input.find('>', StartPos); //then find the '>' of the '<style' 
+		if (tag_end == std::string::npos) { break; } //if we can't find it, break
+
+		size_t endpos = input.find("</style>", tag_end); //then find the end pos tag, '</style>'
+		if (endpos == std::string::npos) { break; } //if we can't find it, break
+
+
+		//then we want add to our final, adding the inside part to our css list.
+		ReturnHtmlData.append(input, (tag_end + 1), (endpos - StartPos - 7));
+		
+
+		//then we check for the next one, and repeat!
+		pos = endpos + std::string("</style>").length(); 
+		
 	}
+	return ReturnHtmlData; //return the data
 
 
-	return returnhtmldata;
-
-}
-
-
-
-std::string ManageCOMMENTS(const std::string& htmldata)
-{
-
-	std::string returnhtmldata;
-	returnhtmldata.reserve(htmldata.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
-
-	//we do the same for strip tags, instead of scanning everything, we just find and remove!
-	size_t i = 0;
-	const size_t len = htmldata.size();
-
-	while (i < len) //same as strip tags
-	{
-		size_t startpos = htmldata.find("<!--", i); //find the first half, from the i (so we dont check back from the start)
-		if (startpos == std::string::npos)
-		{
-			//we need to make sure we save it
-			returnhtmldata.append(htmldata, i, len - i); //we return our data, taking from htmldata, and going from i to out
-			break;
-		}
-
-		returnhtmldata.append(htmldata, i, startpos - i);  //we return our data, taking from htmldata, and going from i to out
-
-		size_t endpos = htmldata.find("-->", startpos);
-		if (endpos == std::string::npos)
-		{
-			break;
-
-		}
-		//Currently all we want to do in this is to just remove all the comments, so lets find the comment tags, and remove them.
-	//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
-	//however some sites may not have comments , so we should check.
-
-
-		i = endpos + std::string("-->").length(); //same as the erase but we dont erase anything, and its dynamic now!
-		//if we are good, return this.
-	}
-
-
-	return returnhtmldata;
-
-}
-
-std::string ManageNoScript(const std::string& htmldata)
-{
-
-	std::string returnhtmldata;
-	returnhtmldata.reserve(htmldata.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
-
-	//we do the same for strip tags, instead of scanning everything, we just find and remove!
-	size_t i = 0;
-	const size_t len = htmldata.size();
-
-	while (i < len) //same as strip tags
-	{
-		size_t startpos = htmldata.find("<noscript", i); //find the first half, from the i (so we dont check back from the start)
-		if (startpos == std::string::npos)
-		{
-			//we need to make sure we save it
-			returnhtmldata.append(htmldata, i, len - i); //we return our data, taking from htmldata, and going from i to out
-			break;
-		}
-
-		returnhtmldata.append(htmldata, i, startpos - i);  //we return our data, taking from htmldata, and going from i to out
-
-		size_t endpos = htmldata.find("</noscript>", startpos);
-		if (endpos == std::string::npos)
-		{
-			break;
-
-		}
-		//Currently all we want to do in this is to just remove all the No scirpt tags, so lets find the json tags, and remove them.
-		//super simple, look for the scirpt tags, (as they are constant across all websites) and remove everything inbetween.
-		//however some sites may not have json, so we should check.
-
-
-		i = endpos + std::string("</noscript>").length(); //same as the erase but we dont erase anything, and its dynamic now!
-		//if we are good, return this.
-	}
-
-
-	return returnhtmldata;
-
-}
-
-std::string RemoveEverythingButCSS(std::string input)
-{
-	std::string returnhtmldata;
-	returnhtmldata.reserve(input.size()); //what this does, is reserve a chunk that doesnt need to be recalculated over and over.
-
-	//we do the same for strip tags, instead of scanning everything, we just find and remove!
-	size_t i = 0;
-	const size_t len = input.size();
-
-	while (i < len) //same as strip tags
-	{
-		size_t startpos = input.find("<style", i); //find the first half, from the i (so we dont check back from the start)
-
-		if (startpos == std::string::npos)
-		{
-			//we need to make sure we save it
-			break;
-		}
-
-		size_t startpos_endtag = input.find('>', startpos); //check if we have a proper closing tag
-		if (startpos_endtag == std::string::npos) //we dont, so break (i should do this with everything else, but im lowkey lazy
-		{
-			break;
-		}
-
-		size_t endpos = input.find("</style>", startpos_endtag); //check if we have a proper closing tag
-		if (endpos == std::string::npos) //we dont, so break (i should do this with everything else, but im lowkey lazy
-		{
-			break;
-		}
-
-
-		//grab the inside part
-		returnhtmldata.append(input, (startpos_endtag + 1), (endpos - startpos - 7)); // to remove the other tags
-		//Currently all we want to do in this is to just remove all the CSS, so lets find the css tags, and remove them.
-	//super simple, look for the style parts, (as they are constant across all websites) and remove everything inbetween.
-	//however some sites may not have a stylesheet, so we should check.
-
-
-		i = endpos + std::string("</style>").length(); //same as the erase but we dont erase anything, and its dynamic now!
-		//if we are good, return this.
-	}
-	std::cout << returnhtmldata << std::endl; //DEBUG
-
-	return returnhtmldata; //return the data
-
-
-}
+} //END OF RemoveEverythingButCSS
 
 
 
-//this is diffrent from the ManageCSS, this will parse CSS!
-int StripCSS(std::string input) {
 
-	std::vector<CSSRule> CSS;
+//=======STRIP CSS======\\
+
+
+//this is different from the ManageCSS, this will parse CSS!
+
+int StripCSS(std::string input) { //this returns an int, and takes in a string.
+
+	const size_t len = input.size(); //we only change this once, this saves a bit of time!
+
+
+
+	//its stored as [NAME] { Properties }
+	std::vector<CSSToken> CSS; //this is a constructer that holds our CSS data
+	CSS.reserve(len / 10); //we get the entire html, and we /10, as CSS is much smaller than html.
+
 	//Ok, now we have our stuff, the good news is it so much simpler to tokenize than something like our main html
 	//we need to make a dynamic properties list thing, and deal with how we manage that
 	//body{
@@ -649,92 +460,83 @@ int StripCSS(std::string input) {
 	//}
 
 
-	//its stored as [NAME] { Properties }
-	
-	//ok we first build the loop
-	size_t cursor = 0; // we need this to track where we are in the string, rather than erasing it, this is for faster performace.
 
-	while (cursor < input.size())
+	//ok we first build the loop
+	size_t cursor = 0; // we need this to track where we are in the string, rather than erasing it, this is for faster performance.
+	
+
+	while (cursor < len) //while our cursor is less than our Input Size
 	{
 		//find the first thing, we can do that by looking for { as that is the start
-		CSSRule temp; //reset every loop.
+		CSSToken temp; //reset every loop. This holds our temp CSS
 
 
-		//search for open brace, but from START of cursor, not from 0
-		//that lets us move up without removing anything, and is faster
+		//first search for our '{', starting from the pos of our cursor
 		size_t start_pos = input.find("{", cursor);
-		if (start_pos == std::string::npos){break;}
+		if (start_pos == std::string::npos){break;} //if we cannot find our '{', we break.
 
-		//we find the id now, the get the properties later
-		//first lets get the str from the [h1] {
-		//for example
-		//we can get it by making a temp var
-		std::string get = input.substr(cursor, start_pos - cursor);
-
-		//ok so we erase, we first check if the spot is space ::isspace
-		//if it is, we catolag all the things that are spaces, then we
-		//use erase, and that removes them!, we remove between the start and end of Get
-		get.erase(std::remove_if(get.begin(), get.end(), ::isspace), get.end()); //got this off the internet
-		std::cout << "ID: " << get << std::endl; //DEBUG
-		temp.id = get;
+	
+		//get the start id, "like h1", we get the raw len, and + cursor, then the startpos of the { - the cursor, this lets us find our 'h1'
+		std::string_view id(input.data() + cursor, start_pos - cursor);
 
 
-		//find the closing brace, but use startpos so we dont grab a } from before
-		size_t end_pos = input.find("}", start_pos); //to make it a bit faster
-		if (end_pos == std::string::npos){break;}
+		//find the closing brace, but use StartPos so we don't grab a } from before
+		size_t end_pos = input.find("}", start_pos);
+		if (end_pos == std::string::npos){break;} //if we cannot find our '}', we break.
 
-		//std::string parseProperties;
-
-		//parseProperties = input.substr(start_pos + 1, (end_pos - start_pos - 1)); //this is the length we want, from our start pos, to our end pos.
-		//ok now that we found the start, lets go back to the start of the input, and pull this out
-		//std::cout << "PROPERTIES: " << parseProperties << std::endl;
+		
 
 
-		//now lets make the parser, we want to find each ;, keep the text behind it, then add it to our temp properties
+
+
+		//now lets make the parser, we want to find each ';', keep the text behind it, then add it to our temp properties
 		size_t i = start_pos + 1;
+
 		while (i < end_pos) //between i and end pos
 		{
-			size_t semi = input.find(";", i);
-			std::string getsemi;
+			size_t semi = input.find(";", i); //first we check for ';'
+		
 			//now we need to find the ;, and save and remove the ; and anything before it.
 			size_t prop_start = i;
 
 			size_t prop_end;
 			if (semi == std::string::npos || semi > end_pos) //check if we are done
 			{
-				//get the last one that is missing the semicolen, this means we are at the last one 
+				//get the last one that is missing the semicolon, this means we are at the last one 
 				prop_end = end_pos; //we read the closing then
-				i = end_pos; //make the loop end (if you dont do this, it freezes)
+				i = end_pos; //make the loop end (if you don't do this, it freezes)
 			}
 			else {
-				//we arnt done, so we first pull it out
+				//we are not done, so we first pull it out
 				prop_end = semi;
 				//go to the next one
 				i = semi + 1; //we check for the next property
 			}
 
+
 			//grab the one property using the start and end we just did
 			//we need to use prop_start instead of i, because i is already moved forward
-			getsemi = input.substr(prop_start, prop_end - prop_start);
-		
-			//We cannot do this, because css needs spaces in some spots.
-			//getsemi.erase(std::remove_if(getsemi.begin(), getsemi.end(), ::isspace), getsemi.end());
+			std::string_view GetSemi(input.data() + prop_start, prop_end - prop_start);
 
-	
-
-			//remove all the whitespace, but not the spaces, as we need thoes
-			if (getsemi.find_first_not_of(" \t\n\r") != std::string::npos && getsemi.find_last_not_of(" \t\n\r") != std::string::npos)
+			//remove all the whitespace, but not the spaces, as we need those
+			
+			//trim the whitespace at the start, without having to copy
+			while (!GetSemi.empty() && isspace(GetSemi.front()))
 			{
-				getsemi = getsemi.substr(getsemi.find_first_not_of(" \t\n\r"), (getsemi.find_last_not_of(" \t\n\r") - getsemi.find_first_not_of(" \t\n\r") + 1));
+				GetSemi.remove_prefix(1);
+			}
+			//trim the whitespace at the end, without having to copy
+			while (!GetSemi.empty() && isspace(GetSemi.back()))
+			{
+				GetSemi.remove_suffix(1);
+			}
 
-				std::cout << "PROPERTIES: " << getsemi << std::endl; //DEBUG
 
-
-				//ok, now that we found stuff, lets now add it ot the temp
-
-				temp.properties.push_back(getsemi);
-
-				//thats all we do!
+			//now just check, to make sure we have something
+			if (!GetSemi.empty())
+			{
+				//ok, now that we found stuff, lets now add it to the temp
+				temp.properties.push_back(std::string(GetSemi));
 			}
 
 			//move us up
@@ -744,19 +546,11 @@ int StripCSS(std::string input) {
 		}
 
 
+		
+		CSS.push_back(temp);//send the temp, to our CSS.
 
+		//go past this part, to start on our next part
 
-
-
-
-		//after we are done
-		//input.replace(0, (end_pos + 1), ""); //remove all the stuff between h1 and } (for now), for just getting the headers
-		//ok, now lets grab the line
-
-		//we push back everything now.
-		CSS.push_back(temp); //add the temp to it
-
-		//go to the next pos
 		cursor = end_pos + 1;
 	}
 
@@ -765,46 +559,85 @@ int StripCSS(std::string input) {
 
 
 
-	std::cout << "DONE! " << std::endl;
+	std::cout << "DONE! " << std::endl; //DEBUG
 
 	//send it to our DOMTREE
-
 	CSSDOM(CSS);
 
 
-	return 0;
-}
+	return 0; //done
+} //END OF STRIP CSS
 
 
 
 
 
+//=======PULL TITLE======\\
+
+std::string PullTITLE(const std::string HtmlData) //PullTITLE returns an std::string, and takes a single string as input
+{
+	std::string TitlePos; //temp var, to hold our final input
+
+	//there is only one title, so we find the first part
+	size_t StartPos = HtmlData.find("<title");
+	if (StartPos == std::string::npos) //however, there are times where we don't have a title, so lets check.
+	{
+		return "unk tab name"; //fail, we could not find one, so lets return a temp tab name.
+	}
 
 
-int Parser(std::string input)
+	//there is only one title, so we find the last part
+	size_t endpos = HtmlData.find("</title>");
+	if (endpos == std::string::npos)
+	{
+		return "unk tab name"; //fail, we could not find the end part, so lets return a temp tab name.
+	}
+
+
+	TitlePos = HtmlData.substr(StartPos + 7, endpos - (StartPos + 7)); //now that we have found the pos of the start tag, and the end tag, we can grab it.
+
+
+	return TitlePos; //return our title
+
+}// END OF PULLTITLE
+
+
+//=======PARSER======\\
+
+int Parser(std::string input) //this is the global class, and will manage the data we get from the network parser. It returns an int, and takes in a single string as input
 {
 
-	//all this is doing, is removing, the json part, then the css part, then all of the tags, just to get the final text for this basic parser.
-	//we want to do this first, as we need to parse it in the DOMTREE
+	//strip the CSS.
 	StripCSS(
 		RemoveEverythingButCSS(input));
 
+	//strip to get the html, then send it to the DOM.
 	DOM(StripTags
 		(ManageNoScript(
 			ManageCOMMENTS(
-				ManageCSS(
-					ManageJAVASCIRPT(input))))));//not great to nest, but its ok
+					ManageCSS(
+						ManageJAVASCIRPT(
+								ManageTITLE(input
+							)
+						)
+					)
+				)
+			) 
+		)
+	);
 	
 
 	
 	//grab the title
-	std::string title = pullTITLE(input);
-	if (!title.empty())
+	std::string title = PullTITLE(input);
+
+	if (!title.empty()) //Insure we do not send a empty title.
 	{
-		SetTabTitle(title);
+		SetTabTitle(title); //Sending to a DOM class
 	}
-	//Sending to a DOM class
+	
 
 
-	return 0;
-}
+	return 0; //Done
+
+} //END OF PARSER

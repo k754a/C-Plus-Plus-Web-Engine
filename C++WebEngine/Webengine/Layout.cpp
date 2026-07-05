@@ -18,7 +18,7 @@
 
 //looks through all our CSS rules to find the one that matches our tag in our tree
 //basicy we look through everything, and we pass in "H1" we match it and return the proprites
-CSSRule* FindID(std::string input)
+CSSToken* FindID(std::string input)
 {
 	//loop and check through each element
 	for (int i = 0; i < globalCSS.size(); i++)
@@ -34,7 +34,7 @@ CSSRule* FindID(std::string input)
 
 //now we want to get proprites
 //we will loop throught the properties, and match
-std::string FindProperty(CSSRule* rule, std::string propertyName)
+std::string FindProperty(CSSToken* rule, std::string propertyName)
 {
 	for (int i = 0; i < rule->properties.size(); i++)
 	{
@@ -64,7 +64,7 @@ bool IsAbsolute(Node* node, int& outX, int& outY)
 	//i first want to look through the nodes tag, to see if it has it
 	//we check that it has css values, if not, we return false
 
-	CSSRule* id = FindID(node->tagValue);
+	CSSToken* id = FindID(node->tagValue);
 	if (id == nullptr)
 	{
 		return false;
@@ -120,7 +120,7 @@ bool IsFlex(Node* node)
 	//i first want to look through the nodes tag, to see if it has it
 	//we check that it has css values, if not, we return false
 
-	CSSRule* id = FindID(node->tagValue);
+	CSSToken* id = FindID(node->tagValue);
 	if (id == nullptr)
 	{
 		return false;
@@ -254,7 +254,7 @@ void MeasureNodes(Node* node, int fontsize)
 
 
 	//same thing in the old generate layout tree.
-	CSSRule* id = FindID(node->tagValue);
+	CSSToken* id = FindID(node->tagValue);
 
 	//check if its not null
 	if (id != nullptr)
@@ -365,7 +365,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 		}
 
-		CSSRule* id = FindID(node->tagValue);
+		CSSToken* id = FindID(node->tagValue);
 
 		//check if its not null
 		if (id != nullptr)
@@ -737,270 +737,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 
 
-
-
-//
-//void GenerateLayoutTree(Node* node, int& currentXpos, int& currentYpos, int fontsize, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref)
-//{
-//	
-//	if (node->tag == NODETYPE::START)
-//	{
-//		//if we have one
-//		if (!node->href.empty())
-//		{
-//			//std::cout << "LINK HREF FOUND" << std::endl;
-//			currentHref = node->href;
-//
-//
-//
-//		}
-//		
-//		CSSRule* id = FindID(node->tagValue);
-//
-//		//check if its not null
-//		if (id != nullptr)
-//		{
-//			std::string fs = FindProperty(id, "font-size"); //check each one for font size
-//
-//			if (!fs.empty())
-//			{
-//				//rm the spaces
-//				while (!fs.empty() && std::isspace((unsigned char)fs.front())) {
-//					fs.erase(fs.begin());
-//				}
-//
-//				//std::cout << "Getting char size" << std::endl;
-//				//ok now we set our font size
-//				//fonts are marked like 16px, so we need to get the numbers before the nums
-//				if (std::isdigit(fs[0])) //check to avoid a crash
-//				{
-//					fontsize = std::stoi(fs) * 2; //we * by 2, cause it would be super small
-//				}
-//				//fontsize = std::stoi(fs) * 2; 
-//			}
-//
-//
-//
-//			std::string bg = FindProperty(id, "background-color"); //check each one for font size
-//			if (bg.empty())
-//			{
-//				bg = FindProperty(id, "background"); //if it fails the first time, check for this
-//			}
-//			if (!bg.empty()) //if we get either.
-//			{
-//				std::cout << "Getting hex code" << std::endl;
-//
-//				if (bg.find("var(") != std::string::npos)
-//				{
-//					//we found somthing like
-//					std::cout << "ERROR, CSS Defined with Var, Auto Skipping page color!" << std::endl;
-//					std::cout << "This is not a problem :)" << std::endl;
-//
-//					return;
-//				}
-//				//ok now we set our font size
-//				//fonts are marked like 16px, so we need to get the numbers before the nums
-//
-//				std::cout << "BG RAW: [" << bg << "]" << std::endl;
-//
-//				RGB parsed = ParseHexColor(bg);
-//				//we do this, as there is other bg definitions in things like the <divs>, we only want the bg (currently) for the body.
-//				if (node->tagValue == "body")
-//				{
-//
-//					
-//					backgroundColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we * by 2, cause it would be super small
-//				}
-//				else {
-//					bgColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 };
-//					hasBg = true;
-//				}
-//
-//			}
-//
-//
-//			//now support text color
-//			std::string tc = FindProperty(id, "color");
-//			if (!tc.empty())
-//			{
-//				RGB parsed = ParseHexColor(tc);
-//				textColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we * by 2, cause it would be super small
-//			}
-//
-//
-//		}
-//		else {
-//			//give it that predefined
-//			if (node->tagValue == "h1")
-//			{
-//				fontsize = 96;
-//			}
-//			else if (node->tagValue == "p") {
-//				fontsize = 48;
-//			}
-//			else if (node->tagValue == "a") {
-//				fontsize = 36;
-//			}
-//			else if (node->tagValue == "span") {
-//				fontsize = 36;
-//			}
-//			else {
-//				//defualt size
-//				fontsize = 24;
-//			}
-//		}
-//
-//		//this will let more stuff on one line, and will make the formating better
-//		//first we check if its a structure block tag (div), (p), (h1)
-//		// Block elements: push down to a new line
-//		// added way more elemnets adns tuff
-//		if (node->tagValue == "div" || node->tagValue == "p" ||
-//			node->tagValue == "h1" || node->tagValue == "h2" ||
-//			node->tagValue == "h3" || node->tagValue == "tr" ||
-//			node->tagValue == "li" || node->tagValue == "br")
-//		{
-//			currentYpos += fontsize + 6;
-//			currentXpos = 20;
-//		}
-//
-//		// table cells
-//		if (node->tagValue == "td" || node->tagValue == "th")
-//		{
-//			//gives collums and stuff
-//			currentXpos = ((currentXpos / 200) + 1) * 200;
-//		}
-//
-//
-//
-//
-//		//check if its an image
-//		//check if its a img and its not empty
-//		if (node->tagValue == "img" && !node->src.empty())
-//		{
-//			//create a image 
-//			Layout imgLayout;
-//			imgLayout.node = node;
-//			imgLayout.x = currentXpos;
-//			imgLayout.y = currentYpos;
-//			imgLayout.isImage = true;    //set the img to true
-//
-//			imgLayout.imageAttempted = false;
-//			imgLayout.imageTex = nullptr;   //we dont know the texture yet
-//			imgLayout.fontSize = 0; //no font
-//			imgLayout.textColor = { 0,0,0,255 }; //dont matter
-//			imgLayout.href = currentHref;
-//			//layoutList.push_back(imgLayout); //put 2 in, oops!
-//
-//
-//			//give it a alocated size
-//			int allocatedWidth = 200;
-//			int allocatedHeight = 150;
-//			imgLayout.width = allocatedWidth;
-//			imgLayout.hight = allocatedHeight; 
-//
-//			layoutList.push_back(imgLayout);
-//
-//			//move the cursor to not run into it
-//			currentXpos += allocatedWidth + 15;
-//			if (currentXpos > 1200) {
-//				currentXpos = 20;
-//				currentYpos += allocatedHeight + 15;
-//			}
-//
-//
-//		}
-//
-//
-//
-//
-//
-//
-//
-//
-//		
-//	}
-//	
-//
-//	if (node->tag == NODETYPE::TEXT)
-//	{
-//		//make a var that resets every run
-//		Layout layouttree;
-//		layouttree.x = currentXpos; 
-//		layouttree.y = currentYpos;
-//
-//		if (node->tagValue == "tr")
-//		{
-//			currentYpos += fontsize + 6;
-//			currentXpos = 20; // reset columns for this new row
-//		}
-//
-//		layouttree.node = node;
-//
-//		//when i code css, this will get replaced merging the data.
-//
-//
-//		layouttree.textColor = textColor;
-//
-//		if (!currentHref.empty())
-//		{
-//			layouttree.textColor = { 0, 50, 255, 255 }; //blue
-//		}
-//		layouttree.fontSize = fontsize;
-//
-//		layouttree.bgColor = bgColor;
-//
-//		layouttree.hasBg = hasBg;
-//
-//
-//		layouttree.href = currentHref;
-//
-//		
-//		
-//		//std::cout << layouttree.fontSize << std::endl;
-//
-//		int estimatedTextWidth = (int)(node->tagValue.size() * (fontsize * 0.45));
-//		int estimatedTextHeight = fontsize + 4;
-//
-//		//estimate the size or whateveer and for img
-//		layouttree.width = estimatedTextWidth;
-//		layouttree.hight = estimatedTextHeight;
-//
-//		//send back the node to our layout list, to save
-//		layoutList.push_back(layouttree);
-//
-//		// Advance layout typing alignment cursor safely without overlapping
-//		currentXpos += estimatedTextWidth + 8;
-//
-//		// If we've gone too wide, wrap to next line
-//		currentXpos += (int)(node->tagValue.size() * (fontsize / 2)) + 8;
-//
-//		if (currentXpos > 1400)
-//		{
-//			currentXpos = 20;
-//			currentYpos += fontsize + 4;
-//		}
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//	}
-//	
-//
-//	for (Node* child : node->children)
-//	{
-//		GenerateLayoutTree(child, currentXpos, currentYpos, fontsize, textColor, bgColor, hasBg, currentHref);
-//	}
-//	
-//}
-
 int LayoutTree(Node* node)
 {
 	layoutList.clear(); //we need to do this, or we will have errors
@@ -1013,7 +749,7 @@ int LayoutTree(Node* node)
 	MeasureNodes(node, startingfontsize);
 	
 
-	//ok first we assing the node val to our new layout list
+	//ok first we assign the node val to our new layout list
 	//now we set it to add the node
 	SDL_Color startingTextColor = { 0, 0, 0, 255 };
 
@@ -1022,7 +758,7 @@ int LayoutTree(Node* node)
 																													//current Href starts empty
 	PositionNodes(node, currentX, currentY, startingfontsize, startingTextColor, startingBgColor, startingHasBg, "");
 
-	std::cout << "Layout Compleate." << std::endl;
+	std::cout << "Layout Complete." << std::endl;
 	
 	IMPORT(layoutList);
 	return 0;

@@ -7,74 +7,13 @@
 #include <string>
 #include "Layout.h"
 
-//enum class NODETYPE { START, TEXT, END };
-//struct Node {
-//	NODETYPE tag; //our tag (START, TEXT, END)
-//	std::string tagValue; //the cleaned value, like "a" 
-//	std::vector<Node*> children; //make this node so that we can have depth, like stuff inside the tag
-//	Node* Parent = nullptr; // so we can track the parent
-//
-//};
 
-//this is super slow, so i dont use it lol, but its a good way to see it
-void PrintDomTree(Node* node, int debth = 0)
-{
-	//check if we have anything, we break;
-	if (node == nullptr) return ;
-	std::string indent = ""; //to start
+std::vector<CSSToken> globalCSS;
 
-	//for the len of debth, increase the spacing
-	for (int i = 0; i < debth; i++)
-	{
-		indent = indent + "│  ";
-	}
-
-	//now we check the current node, and see what type it is
-	if (node->tag == NODETYPE::START)
-	{
-		//ok we have text, lets print somthin
-		std::cout << indent << "├── [" << node->tagValue << "]" << std::endl;
-	}
-	if (node->tag == NODETYPE::TEXT)
-	{
-		std::cout << indent << "└──── \" " << node->tagValue << " \"" << std::endl;
-	}
-
-
-
-
-
-	//ok finaly, we advance the amount of children sizes, and what this does, is it runs and routs through all the paths
-	//and these branches stop when we make it to the end (nullptr). this is just a more complex way to do it.
-	for (int i = 0; i < node->children.size(); i++)
-	{
-		PrintDomTree(node->children[i], debth + 1);
-	}
-
-
-
-		
-}
-
-std::vector<CSSRule> globalCSS;
-
-int CSSDOM(std::vector<CSSRule> tokens) {
-
+int CSSDOM(std::vector<CSSToken> tokens) { //this returns an int, and takes in our special CSSToken class.
 	//ok we have the CSSDOM
-
-	//we dont need to do anything lol, so ill just pass it off
-
-
-
+	//we don't need to do anything lol, so ill just pass it off
 	globalCSS = tokens;
-
-
-
-
-
-
-
-
 
 	return 0;
 
@@ -139,7 +78,7 @@ std::string CollapseWhitespace(const std::string& input)
 
 
 
-int DOM(std::vector<Token> tokens)
+int DOM(std::vector<HTMLToken> tokens)
 {
 	
 
@@ -162,7 +101,7 @@ int DOM(std::vector<Token> tokens)
 	for (int i = 0; i < tokens.size(); i++)
 	{
 		//lets set a val at the top, so we dont need to check so many times
-		Token currentToken = tokens[i];
+		HTMLToken currentToken = tokens[i];
 
 
 		//lets do the START first.
@@ -189,8 +128,6 @@ int DOM(std::vector<Token> tokens)
 
 					TempNode->href = rawToken.substr(startpos, endpos - startpos); //grab between start and len of start - end
 
-					//save the url
-					std::cout << "[DEBUG] Parser found link: " << TempNode->href << std::endl;
 				}
 			}
 
@@ -205,8 +142,7 @@ int DOM(std::vector<Token> tokens)
 
 					TempNode->src = rawToken.substr(startpos, endpos - startpos); //grab between start and len of start - end
 
-					//save the url
-					std::cout << "[DEBUG] Image link found: " << TempNode->src << std::endl;
+			
 				}
 			}
 
@@ -254,7 +190,7 @@ int DOM(std::vector<Token> tokens)
 
 			//now that we have simplifyed this token, we need to acctualy assign it and stuff.
 
-			//these 2 assign the Token value (our Modifyed token) And the type (NODETYPE::START)
+			//these 2 assign the HTMLToken value (our Modifyed token) And the type (NODETYPE::START)
 			TempNode->tagValue = MToken;
 			TempNode->tag = NODETYPE::START;
 
@@ -270,10 +206,6 @@ int DOM(std::vector<Token> tokens)
 			//finaly lets update our Current with our temp
 			//this says, move the main dir forward, like how we did it for the Root.
 			Save = TempNode;
-
-
-			//DEBUG
-			std::cout << rawToken << std::endl;
 		}
 
 
@@ -294,7 +226,7 @@ int DOM(std::vector<Token> tokens)
 			//make sure to write it
 			Save->children.push_back(TempNode);
 
-			//we dont do the Save = TempNode, cause we dont wanna move the dir forward on the end of values.
+			//we don't do the Save = TempNode, cause we don't wanna move the dir forward on the end of values.
 
 			//DEBUG
 		}

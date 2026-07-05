@@ -10,7 +10,7 @@
 #include <fstream>  //FOR THE MAIN.HTML READING
 #include <sstream> //NEED SSTREAM FOR THE BUFFER
 
-
+//======MAIN======\\
 
 int main(int argc, char* argv[]) //we give the start of main, a starting int and char 
 {
@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
 
     //=======STARTUP=======\\
 
-    StartWinSock(); //init the winsock, this will be used for our connections and stuff (like connecting to https and http)
+    
     LoadStarredPages(); //load our pages from starred_pages.STAR, and load them into the list
     UpdateHTML();  //we update the main.html, and add our STAR pages.
 
@@ -35,7 +35,6 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
     if (!file.is_open()) { //if we cannot open the file
         std::cout << "Could not open main file." << std::endl; //send an error, as we need this for new tab
 
-        EndWinSock(); //make sure we cleanup
         return -1; //return an error code
     }
     
@@ -48,9 +47,6 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
     Parser(fileinfo); //send the new tab to the parser for rendering
         
 
-     
-
-
    
     //======RENDER-GUI======\\
 
@@ -58,7 +54,7 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
 
  
 
-    EndWinSock(); //close the winsock cleanly
+  
     
     return(0); //end
 

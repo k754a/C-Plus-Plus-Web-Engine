@@ -830,7 +830,7 @@ int GUIRENDER()
 
 	SDL_Renderer* render = SDL_CreateRenderer(window, nullptr);
 
-
+	SDL_SetRenderVSync(render, 1); //enable VSync, to keep performace high!
 
 	//tell SDL we want to record SDL_EVENT_TEXT_INPUTs when the user types
 	SDL_StartTextInput(window); //detect inputs from text
