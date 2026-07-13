@@ -9,10 +9,27 @@
 #include "Profiler.h"
 
 
+#pragma region CSS Handle Code
+
+
+//THIS CODE SECTION HANDLES THE SUBCOMPONETS FOR RENDERING THE CSS, THINGS LIKE FINIDING PROPERTIES, ID's, AND RGB.
+//=====================================================================================================================
+
+//FindID, and FindProperty find the id's and properties in our css tree.
+//IsAbsolute, and IsFlex find if css elements have custom positioning.
+//hexToRgb, and ParseHexColor, handle converting hexvalue's into RGB.
+
+
+//THIS CODE HAS BEEN CREATED BY ME, YOU CAN FREELY USE IT HOWEVER YOU WANT. :)
+
+//=====================================================================================================================
+
+
+
+
 
 
 //looks through all our CSS rules to find the one that matches our tag in our tree
-
 
 //=======Find ID======\\
 
@@ -23,7 +40,7 @@ CSSToken* FindID(const static std::string input) //FIND-ID returns in our custom
 	{
 		if (globalCSS[i].id == input) //if the current id = to the input
 		{
-			return &globalCSS[i]; //we return the id, and the vector string, holding the proprties
+			return &globalCSS[i]; //we return the id, and the vector string, holding the properties
 		}
 	}
 
@@ -52,226 +69,230 @@ std::string FindProperty(const static CSSToken* rule, const static std::string p
 	}
 	//we did'nt find it :(
 	return "";
-}//END OF FIND PROPERTY
+}//END OF FIND-PROPERTY
 
 
-//see if a node has absolute in the css
-//if it does we return true!
-//we need the x and y
-bool IsAbsolute(const static Node* node, int& outX, int& outY)
+//=======IS ABSOLUTE======\\
+
+//function to check if a node is IsAbsolute.
+bool IsAbsolute(const static Node* node, int& outX, int& outY) //IsAbsolute returns a bool, and takes in our custom Node class, our outX int, and our outY int
 {
 	//i first want to look through the nodes tag, to see if it has it
 	//we check that it has css values, if not, we return false
 
+	//using our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), we attempt to find our ID, (with the funct above)
 	CSSToken* id = FindID(node->tagValue);
-	if (id == nullptr)
+	if (id == nullptr) //if we cannot find the "id" of the CSSToken
 	{
-		return false;
+		return false; //fail case.
 	}
 
-	//now letes get the display part, if the element dont have this, we skip
+	
 
-	std::string position = FindProperty(id, "position");
-	if (position.empty())
+	std::string position = FindProperty(id, "position"); //using our FindProperty funct, we attempt to find the word "position" for example -> " position: static;" we use our id, of the tagValue (the inside value, like h1 {'example'}
+	if (position.empty()) //if we cannot find the "position" text of the id
 	{
-		return false;
+		return false; //fail case.
 	}
 
-	//rm the spaces, (same code ive been using in a bunch of other areas lol
-
+	
+	//remove the spaces, check if position contains something, and the front pos, contains a space.
 	while (!position.empty() && std::isspace((unsigned char)position.front()))
-		position.erase(position.begin());
+	{
+		position.erase(position.begin()); //then we remove " " from the pos.
+	}
+		
 
-	//if its flex, we return true
+	//now we check, if the 'position' value exists, in the tag.
 	if (position.find("absolute") != std::string::npos)
 	{
-		//grab the left and top
+		//now, we attempt to find the "left" and the "top", we use are custom search funct, FindProperty, and attempt to find the words.
 		std::string leftStr = FindProperty(id, "left");
 		std::string topStr = FindProperty(id, "top");
 
+		//remove the spaces, check if leftStr contains something, and the front pos, contains a space.
 		while (!leftStr.empty() && std::isspace((unsigned char)leftStr.front()))
+		{
 			leftStr.erase(leftStr.begin());
+		}
+			
+		//if the lefStr contains something, and the first bit after left is a number, ex.58, we set the outX to the digit, so 58, not just the 5 we check for.
 		if (!leftStr.empty() && std::isdigit(leftStr[0])) {
 			outX = std::stoi(leftStr);
 		}
 
+		//remove the spaces, check if topStr contains something, and the front pos, contains a space.
 		while (!topStr.empty() && std::isspace((unsigned char)topStr.front()))
-			topStr.erase(topStr.begin());
-		if (!topStr.empty() && std::isdigit(topStr[0])) {
-			outY = std::stoi(topStr);
+		{
+			topStr.erase(topStr.begin()); //then we remove " " from the pos.
+		}
+			
+		//if the topStr contains something, and the first bit after left is a number, ex.58, we set the outX to the digit, so 58, not just the 5 we check for.
+		if (!topStr.empty() && std::isdigit(topStr[0])) 
+		{
+			outY = std::stoi(topStr); //then we remove " " from the pos.
 		}
 
 
 
-
-
-		return true;
+		return true; //we have determined that the value is absolute, so we return true
 
 	}
 
-	return false;
-}
+	return false; //we have determined that our value is NOT absolute, so we return false.
 
-//see if a node has flex in the css
-//if it does we return true!
-bool IsFlex(const static Node* node)
+}// END OF ISABSOLUTE
+
+
+//=======IS FLEX======\\
+
+//this to check if a node is Flex
+bool IsFlex(const static Node* node) //IsFlex returns a bool, we take in a const static custom Node* class we have.
 {
+	
 	//i first want to look through the nodes tag, to see if it has it
 	//we check that it has css values, if not, we return false
 
+	//using our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), we attempt to find our ID, (with the funct above)
 	CSSToken* id = FindID(node->tagValue);
 	if (id == nullptr)
 	{
 		return false;
 	}
 
-	//now letes get the display part, if the element dont have this, we skip
-
+	
+	//using our FindProperty funct, we attempt to find the word "display" for example -> " display: static;" we use our id, of the tagValue (the inside value, like h1 {'example'}
 	std::string display = FindProperty(id, "display");
 	if (display.empty())
 	{
-		return false;
+		return false; //fail case
 	}
 
-	//rm the spaces, (same code ive been using in a bunch of other areas lol
-
+	
+	//remove the spaces, check if position contains something, and the front pos, contains a space.
 	while (!display.empty() && std::isspace((unsigned char)display.front()))
-		display.erase(display.begin());
+	{
+		display.erase(display.begin()); //then we remove " " from the pos.
+	}
+		
 
-	//if its flex, we return true
+	//now, we attempt to find "flex" in the display id, and we return true our false depending on the output (if we find it or not)
 	return display.find("flex") != std::string::npos;
-}
+
+} //END-OF-ISABSOLUTE
 
 
 
+//--------------------------------------------------------------------------------------------------
 
 
 
+struct RGB { int r, g, b;  }; //Create a custom "RGB" struct, holding 3 ints, r, g, b.
 
+//=======HEX TO RGB======\\
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//for bg and text colors!
-struct RGB { int r, g, b;  };
-
-//got this online! 
-RGB hexToRgb(const static unsigned int hexValue)
+RGB hexToRgb(const static unsigned int hexValue) //This funct returns our custom RGB class ({ int r, g, b;  }), and takes in a single int, holding a converted hexValue, for example 3A5 -> 933 (we convert the 3A5 using ParseHexColor)
 {
-	RGB color;
+	RGB color; //Create a temp RGB var struct.
 	color.r = (hexValue >> 16) & 0xFF; // Extract the first 2 hex digits
 	color.g = (hexValue >> 8) & 0xFF;  // Extract the middle 2 hex digits
 	color.b = hexValue & 0xFF;         // Extract the last 2 hex digits
-	return color;
-}
 
-RGB ParseHexColor(std::string hex)
+	return color; //return the RGB, r, g, b
+} // END OF HEX-TO-RGB
+
+//=======PARSE HEX COLOR======\\
+
+RGB ParseHexColor(std::string hex) // This funct returns our custom RGB class ({ int r, g, b;  }), and takes in a string, holding in a hex value, for example '#3498DB'
 {
-	//css can somtimes have a lot of spaces
-	// #bbbbbb
-	//the problem is, this would cause a huge crash, as the code didnt know what to do.
-	//now, the code will work!
-	//this removes the front spaces
+	//removes spaces from the front, for example ' #bbbbbb' -> '#bbbbbb', we repeat while the hex is not empty, and there is a space in the front.
 	while (!hex.empty() && std::isspace((unsigned char)hex.front()))
 		hex.erase(hex.begin());
 
-	//this removes the back.
+	//removes spaces from the back, for example '#bbbbbb ' -> '#bbbbbb', we repeat while the hex is not empty, and there is a space in the back.
 	while (!hex.empty() && std::isspace((unsigned char)hex.back()))
 		hex.pop_back();
 
-	//remove spaces or #
+	//if our "Hex" contains a value, and the first part of it is '#', we rm it.
 	if (!hex.empty() && hex[0] == '#')
 	{
-		hex = hex.substr(1);
+		hex = hex.substr(1); //create a new 'substring' of the hex, without '#'
 	}
 
-	//expand shortand (#eee) to #eeeeee
+	
 
-	if (hex.size() == 3)
+	if (hex.size() == 3) //check if our hex size, is '3'
 	{
-		hex = std::string() + hex[0] + hex[0]
-			+ hex[1] + hex[1]
-			+ hex[2] + hex[2];
+		//this expands our string, from #bbb -> #bbbbbb
+		hex = std::string() + hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
 	}
 
-	//handle errors
+	//if our hex size is empty, or our hex.size() != 6 chars
 	if (hex.empty() || hex.size() != 6)
 	{
-		std::cout << "Found a invalid hex size, going back to black." << std::endl;
-		RGB error = { 0,0,0, };
-		return error;
+		//if we fulfill the conditions above.
+		RGB error = { 0,0,0, }; //we create a temp RGB, setting the color to black
+
+		return error; //return this 'black' color.
 	}
 
-	//prevent a crash
+	//then, we attempt to run the piece inside the 'try' condition
 	try {
-		unsigned int hexValue = std::stoul(hex, nullptr, 16);
-		return hexToRgb(hexValue);
+		unsigned int hexValue = std::stoul(hex, nullptr, 16); //converts our hex string, into an int.
+
+		return hexToRgb(hexValue); //return our final hexValue, however, we send it to our "hexToRgb" value, to get the RGB for 'RGB' return condition.
 	}
-	catch (...) //any error
+	catch (...) //if we have an error, any error
 	{
-		//just return our error thing
-		RGB error = { 0,0,0, };
-		return error;
+		//we want to prevent crashes, so we return black.
+		RGB error = { 0,0,0, }; //we create a temp RGB, setting the color to black
+		return error; //return this 'black' color.
 	}
 
 
-
-	//convert to our rgb vals!
 	
-}
+} //END OF PARSE-HEX-COLOR
 
 
 
+#pragma endregion //holds our css code
 
 
+#pragma region Nodes Handling Code
+
+std::vector<Layout> layoutList; //create a custom 'vector', holding our custom Layout struct. This is a global list to hold it all
 
 
-std::vector<Layout> layoutList; //list to store the layout
+//=======Measure Nodes======\\
 
-
-
-//measures our node stuff here
-void MeasureNodes(Node* node, int fontsize)
+//Measure Nodes calculates layout dimensions of elements, and accounts for font sizes and images.
+void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning nothing, it takes in our custom 'Node*' struct, and a int.
 {
-	//first check, if the node has been measured, dont do it again
-	if (node->measured) return;
+	
+	if (node->measured) return; //first we pull the 'measured' val from our 'node' struct we import, if it's true, we don't want to handle it again (to save performance), so we end it early.
 
 
-	//same thing in the old generate layout tree.
+	//I first want to look through the nodes tag, to see if it has a tag value tagValue
+	//we check that it has a tagValue, if not, we return false
+
+	//using our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), we attempt to find our tagValue, using find ID, (with the funct above)
 	CSSToken* id = FindID(node->tagValue);
 
-	//check if its not null
-	if (id != nullptr)
+	
+	if (id != nullptr) //insure that the id we have attempted to find, exists, and is NOT null.
 	{
-		std::string fs = FindProperty(id, "font-size"); //check each one for font size
+		std::string fs = FindProperty(id, "font-size"); //now we create a temp string, using our 'FindProperty', ({const static CSSToken* rule, const static std::string propertyName}), we put in our 'id', and what we want to find, the result is added to 'fs'
 
-		//before, we removed spaces, however we dont care no more, so we dont do that (because we are moving text)
-		if (!fs.empty())
+	  
+		if (!fs.empty() && std::isdigit(fs[0])) //check that the font size property is NOT blank, and contains a number.
 		{
-			if (std::isdigit(fs[0])) //check to avoid a crash
-			{
-				fontsize = std::stoi(fs) * 2; //we * by 2, cause it would be super small
-			}
+			fontsize = std::stoi(fs) * 2; //we convert the number from a string "32" -> 32, then * by 2, to make sure its big enough.
 		}
 	}
-	else if (node->tag == NODETYPE::START)
+	else if (node->tag == NODETYPE::START && !node->tagValue.empty()) //If we cannot find our "id" of the text, but it is a START node, and the tagValue is NOT null
 	{
-		//give it that predefined
+		
+		//we use predetermined points, using the nodes tag value.
 		if (node->tagValue == "h1")
 		{
 			fontsize = 96;
@@ -286,31 +307,31 @@ void MeasureNodes(Node* node, int fontsize)
 			fontsize = 36;
 		}
 	}
-	//because we can, ill just handle images real fast
-	//check if its a start node, it has the value "img" and its not null/empty
-	if (node->tag == NODETYPE::START && node->tagValue == "img" && !node->src.empty())
+	
+
+	//HANDLE IMAGES
+	if (node->tag == NODETYPE::START && node->tagValue == "img" && !node->src.empty()) //check if its a START node, the tagValue contains "img", and the link of the img is NOT empty.
 	{
-		//now we just set the sizes
-		//same as before
-		node->measuredWidth = 200;
-		node->measuredHeight = 150;
-		node->measured = true;
-		return;
+		///now we set some temp sizes
+		node->measuredWidth = 200; //W = 200
+		node->measuredHeight = 150; //H = 200
+		node->measured = true; //set the measured flag to 'true" to insure we do NOT measure it again.
+		return; //done.
 	}
 
 
 
 
 
-	//ok handle it if its text
+	//HANDLE TEXT
 	if (node->tag == NODETYPE::TEXT)
 	{
 		//we want to pos the text
-		//we set the width to the len of the text, * the fontsize, with a bit of adjusting!
-		node->measuredWidth = (int)(node->tagValue.size() * (fontsize * 0.45));
-		node->measuredHeight = fontsize + 4;
-		node->measured = true;
-		return;
+		//we set the width to the len of the text, * the font size, with a bit of adjusting!
+		node->measuredWidth = (int)(node->tagValue.size() * (fontsize * 0.45)); //we set the width of the text to the len of the text * (fontsize * 0.45)
+		node->measuredHeight = fontsize + 4; //the height is the fontsize + a bit of buffer '4'
+		node->measured = true; //set the measured flag to 'true" to insure we do NOT measure it again.
+		return; //done.
 	}
 
 
@@ -320,92 +341,90 @@ void MeasureNodes(Node* node, int fontsize)
 	int totalH = 0; //holds our total height size OVERALL
 	int maxW = 0; //holds the widest child we've seen
 
-	//for each child in our children
+	//loop through each child in our node.
+	//this only runs once, as the returns get it before this runs again.
 	for (Node* child : node->children)
 	{
+		
 		//we first measure the child before we use its size
+		MeasureNodes(child, fontsize); //we run this funct again, and we measure and get the size of our child
 
-		MeasureNodes(child, fontsize);
+		
+		//because elements like divs and tables can take up room, we can space text out based on how many there are!
 
-		//now that we know its size, we stack it
-		totalH += child->measuredHeight; //add to our total
-		maxW = std::max(maxW, child->measuredWidth); //we do it like this, because the way we index, we will get the widest child at the end
+		totalH += child->measuredHeight; //now that we know its size, we stack it
+		maxW = std::max(maxW, child->measuredWidth);  //we update the max width, to match the width of the widest child.
 
 	}
 
-	//now that we have measured all our child ones, we now know our size!
-	node->measuredWidth = maxW;
-	node->measuredHeight = totalH;
+	//now that we have measured all our child nodes, we now know our size!
+	node->measuredWidth = maxW; //set the measuredWidth = to our maxWidth
+	node->measuredHeight = totalH; // set the measuredWidth = to our totalHight
 
-	//make sure we mark its done
-	node->measured = true;
-
-
-}
+	
+	node->measured = true; //set the measured flag to 'true" to insure we do NOT measure it again.
 
 
-//this is the poistion part, i split them into functs, just to be a bit cleaner
-//we are gonna adjust our pos, based on a bunch of things :)
-void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref, bool inFlex = false)
+} //END OF MEASURE-NODES
+
+
+
+
+
+//=======Position Nodes======\\
+
+
+//This code handles positioning our nodes, and handling/assigning/creating the layout tree.
+void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref, bool inFlex = false) //this code returns nothing, and takes in 3 ints, our custom Node* class, 2 SDL_COLOR's, 2 Bools, and a String.
 {
 
-	//first we gotta make sure its an open tag, rather than something like text
-	if (node->tag == NODETYPE::START)
+	
+	if (node->tag == NODETYPE::START) //check if the current node's value is a NODETYPE::START tag.
 	{
 		
 
-		//if we have one
+		//check the nodes, 'href' value to see if it contains it.
 		if (!node->href.empty())
-		{
-			//std::cout << "LINK HREF FOUND" << std::endl;
-			currentHref = node->href;
-
-
-
+		{	
+			currentHref = node->href; //if so, we sent the temp currentHref to the current node's one.
 		}
 
+		//I first want to look through the nodes tag, to see if it has a tag value tagValue
+		//we check that it has a tagValue, if not, we return false
+
+		//using our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), we attempt to find our tagValue, using find ID, (with the funct above)
 		CSSToken* id = FindID(node->tagValue);
 
-		//check if its not null
-		if (id != nullptr)
+		
+		if (id != nullptr) //insure we get a value from id, and that it contains a value.
 		{
-			std::string fs = FindProperty(id, "font-size"); //check each one for font size
+			std::string fs = FindProperty(id, "font-size"); //now we create a temp string, using our 'FindProperty', ({const static CSSToken* rule, const static std::string propertyName}), we put in our 'id', and what we want to find, the result is added to 'fs'
 
-			if (!fs.empty())
+			if (!fs.empty()) //make sure the string we just made, contains a value.
 			{
-				//rm the spaces
+				//loop through, and remove the spaces, going through each char in the string
 				while (!fs.empty() && std::isspace((unsigned char)fs.front())) {
 					fs.erase(fs.begin());
 				}
 
-				//std::cout << "Getting char size" << std::endl;
-				//ok now we set our font size
-				//fonts are marked like 16px, so we need to get the numbers before the nums
-				if (std::isdigit(fs[0])) //check to avoid a crash
+				
+				if (std::isdigit(fs[0])) //check if the first char is a number, we do this to avoid errors for the next part.
 				{
-					fontsize = std::stoi(fs) * 2; //we * by 2, cause it would be super small
+					fontsize = std::stoi(fs) * 2;//we convert the number from a string "32" -> 32, then * by 2, to make sure its big enough.
 				}
-				//fontsize = std::stoi(fs) * 2; 
 			}
 
 
 
-			std::string bg = FindProperty(id, "background-color"); //check each one for font size
-			if (bg.empty())
+			std::string bg = FindProperty(id, "background-color"); //using our 'FindProperty', ({const static CSSToken* rule, const static std::string propertyName}), we put in our 'id', and we are trying to find our background-color, then the result is added to 'bg'
+			if (bg.empty()) { bg = FindProperty(id, "background"); } // FALLBACK using our 'FindProperty', ({const static CSSToken* rule, const static std::string propertyName}), we put in our 'id', and we are trying to find our background, then the result is added to 'bg'
+			
+			if (!bg.empty()) //now we check if we got a background value, and continue if we have one
 			{
-				bg = FindProperty(id, "background"); //if it fails the first time, check for this
-			}
-			if (!bg.empty()) //if we get either.
-			{
-				std::cout << "Getting hex code" << std::endl;
+				std::cout << "Getting BG hex code" << std::endl; //DEBUG
 
-				if (bg.find("var(") != std::string::npos)
-				{
-					//we found somthing like
-					std::cout << "ERROR, CSS Defined with Var, Auto Skipping page color!" << std::endl;
-					std::cout << "This is not a problem :)" << std::endl;
-
-					return;
+				if (bg.find("var(") != std::string::npos) {
+					std::cout << "ERROR, CSS Defined with Var, Auto Skipping page color!" << "\r" << "This is not a problem :)" << std::endl; return;
 				}
 				//ok now we set our font size
 				//fonts are marked like 16px, so we need to get the numbers before the nums
@@ -767,4 +786,4 @@ int LayoutTree(Node* node)
 }
 
 
-
+#pragma endregion //holds our node handling code
