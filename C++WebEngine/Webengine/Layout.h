@@ -69,8 +69,10 @@ struct Layout
 	//we add our loaded surfaces to this, to save time
     std::atomic<SDL_Surface*> pendingSurface{ nullptr };
 
+    //for text
+    std::atomic<SDL_Surface*> pendingTextSurface{ nullptr };
 
-   
+    bool textAttempted = false;
 
     //we make copies so that SDL_Surface can use this lol
     Layout() = default;

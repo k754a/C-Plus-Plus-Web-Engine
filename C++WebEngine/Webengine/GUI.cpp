@@ -16,13 +16,16 @@
 #include <windows.h> //for the print
 #include <filesystem> //for the folder handling on the bmp
 #include "Profiler.h" //DEBUG
+#include "ThreadPool.h"
 //MOVED TO TAB MODE.
 
 //this is the layout list, and gets filled in by IMPORT
 //the render loop reads from this 
 std::vector<Layout> mainlayout;
 
+SDL_Texture* loadingTex = nullptr;
 
+ThreadPool gWorkerPool(8); //create a pool.
 
 //wanted to devlop a way to have a back and forward arrow.
 //the way we can do this is have a list with the websites, and 2 buttons besides the input box, if they are pressed, we change the index, going back or forth
@@ -394,6 +397,115 @@ std::string ResolveURL(std::string src, std::string currentUrl)
 
 }
 
+
+
+
+
+
+
+//This function will check, and block some chars we dont want.
+std::string FilterNOTDEF(TTF_Font* font, const std::string& text) //FilterNOTDEF retuns a 'std::string', and takes in a TTF_Font, and a const string.
+{
+	std::string out; //create a temp string
+	out.reserve(text.size()); //reserve memory so we can save on performace.
+
+
+	size_t i = 0;//create a size_t, to hold our loop
+
+	while (i < text.size()) //repeate untill our i is larger than our size of the text.
+	{
+		unsigned char c = text[i]; //set a char to hold our single letter
+
+		int len; //hold the len of our char
+		//figure out how many bytes the char takes
+		if (c < 0x80) {
+			len = 1; //1 byte char
+		}
+		else if (c < 0xE0) {
+			len = 2; //2 byte char
+		}
+		else if (c < 0xF0) {
+			len = 3; //3 byte char
+		}
+		else {
+			len = 4; //4 byte char
+		}
+
+		if (i + len > text.size()) break; //if we have some weird, super long text, break.
+
+		//now lets grab the bits from the lead byte's
+
+		Uint32 bytes;
+		if (len == 1) {  //if the len is just one, easy set to just the char
+			bytes = c;
+		}
+		else { //if its any other len, we need to remove the flag bits
+			bytes = c & (0xFF >> (len + 1));
+		} //keep only the data, remove the flag.
+
+
+
+		//now add in the rest of the bytes
+		for (size_t k = 1; k < len; k++) //cant do i, as we alr using that
+		{
+			Uint32 nextByte = text[i + k] & 0x3F; //grab the 6 data bits from the byte
+			bytes = bytes << 6; //move our bytes left 6
+			bytes = bytes | nextByte; //inject our nextBytes in that open space
+		}
+
+
+		//make sure the font can draw this, if not, we dont keep
+		if (TTF_FontHasGlyph(font, bytes))
+		{
+			out.append(text, i, len); //keep the bytes!
+		}
+
+
+
+
+
+
+		i += len; //skip the string
+
+
+
+	}
+
+	return out; //end
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void PreRender(SDL_Renderer* render, TTF_Font* font)
 {
 	
@@ -457,60 +569,74 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 
 		//make sure its not an image (because then it draws img)
-		if (tabs[activeTab].layout[i].textTex == nullptr && !tabs[activeTab].layout[i].isImage)
+		if (tabs[activeTab].layout[i].textTex == nullptr && !tabs[activeTab].layout[i].isImage && !tabs[activeTab].layout[i].textAttempted)
 		{
+
+			
+
+
 			//grab the text string from our current mainlayout node
 			//the value holds the text.
 			std::string text = tabs[activeTab].layout[i].node->tagValue;// Make sure this holds the text payload!
 
 			//we pull the layout i (loop through everything)
 			//Layout currentLayout = mainlayout[i];
+
+
 			if (!text.empty())
 			{
+				tabs[activeTab].layout[i].textAttempted = true; //set the attempted to true.
 
-				//we set the fonts to diffrent sizes, that our layout dom tree already does!
-				TTF_SetFontSize(font, tabs[activeTab].layout[i].fontSize);
+				//grab everything the thread will need.
+				int fontsize = tabs[activeTab].layout[i].fontSize;
+				SDL_Color color = tabs[activeTab].layout[i].textColor;
+				bool isLink = !tabs[activeTab].layout[i].href.empty(); //if its true, its false, and if its false, its true
 
-				if (!tabs[activeTab].layout[i].href.empty()) {
-					TTF_SetFontStyle(font, TTF_STYLE_UNDERLINE);
-				}
-				else {
-					TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
-				}
 
+				Layout* currentItem = &tabs[activeTab].layout[i];
 
 			
-				//Create the surface (using black text)
-				SDL_Surface* nodeSurf = TTF_RenderText_Solid(font, text.c_str(), 0, tabs[activeTab].layout[i].textColor);
 
-				//Make sure the surface was created successfully
-				if (nodeSurf != nullptr) {
+				gWorkerPool.enqueue([text, fontsize, color, isLink, currentItem]() {
+					
+					TTF_Font* threadFont = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", fontsize); //hold the font for the thread
+					
 
-					////make a texture and update it
-					//SDL_Texture* nodeTex = SDL_CreateTextureFromSurface(render, nodeSurf);
+					if (threadFont == nullptr) return; //if its null, end
+					
+					if(isLink) TTF_SetFontStyle(threadFont, TTF_STYLE_UNDERLINE); //hanlde underline text
+					
+					SDL_Surface* nodeSurf = TTF_RenderText_Solid(threadFont, text.c_str(), 0, color); //create a temp nodeSerf, to hold it
 
-					//SDL_FRect textRec;
-					//textRec.x = currentLayout.x;
-					//textRec.y = currentLayout.y - scrollpos;
+					
+					TTF_CloseFont(threadFont); //done, close it
 
+					if (nodeSurf != nullptr) {
+						currentItem->pendingTextSurface = nodeSurf; //upload the surf
+					
+					}
+					
+					
+				}); //end 
 
-					//save the dimetions of the block of text
-					tabs[activeTab].layout[i].width = nodeSurf->w;
-					tabs[activeTab].layout[i].height = nodeSurf->h;
-
-					//upload the surface from ram to gpu as a texture!
-					// Draw and destroy to prevent mem leaks
-					tabs[activeTab].layout[i].textTex = SDL_CreateTextureFromSurface(render, nodeSurf); //send it to the gpu
-
-					//free the cpu to avoid ram leaks!
-					SDL_DestroySurface(nodeSurf);
-				}
 
 			}
+		}
 
-
-
-
+		//if the surf has something
+		if (tabs[activeTab].layout[i].pendingTextSurface != nullptr)
+		{
+			//if it does
+			SDL_Surface* nodeSurf = tabs[activeTab].layout[i].pendingTextSurface.exchange(nullptr); //grab the node serf, and make a temp var
+			//make sure the node surf worked
+			if (nodeSurf != nullptr)
+			{
+				//assign the properties
+				tabs[activeTab].layout[i].width = nodeSurf->w; //assign the width
+				tabs[activeTab].layout[i].height = nodeSurf->h; //assign the hight
+				tabs[activeTab].layout[i].textTex = SDL_CreateTextureFromSurface(render, nodeSurf); //upload the rendering to the gpu
+				SDL_DestroySurface(nodeSurf); //we are done, now that its on gpu
+			}
 		}
 
 		//DO THE THREAD HERE
@@ -535,7 +661,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 			Layout* currentItem = &tabs[activeTab].layout[i];
 
 			//make the thread
-			std::thread([src, currentItem]() {
+			gWorkerPool.enqueue([src, currentItem]() {
 
 				//download the bytes
 				std::vector<unsigned char> bytes = DownloadImages(src);
@@ -570,7 +696,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 
 
-			}).detach();
+			});
 		}
 
 
@@ -629,74 +755,68 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 int LoadAnimation(SDL_Renderer* render, TTF_Font* font)
 {
-	std::ifstream file("reload.html");
-
-	if (!file.is_open()) {
-		std::cout << "Could not open local file." << std::endl;
-		return -1;
-	}
-	//we dump the file into a buffer
-
-	std::stringstream buffer;
-
-	//load it in 
-	buffer << file.rdbuf();
-
-	//now we load the full file into a temp var
-	//we use the buffer and convert it into a string
-	std::string fileinfo = buffer.str();
-
-	//now we do something diffrent, we just inject it right into the parser to have the same effect
-	Parser(fileinfo);
-
-
-
-
-
-	//now we force render it
-	PreRender(render, font);
-
-
-	//set the background
-	SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255);
-	SDL_RenderClear(render); //clean the render
-
-	//safty check so no crash
+	//reset everything, as we want to make sure we dont have old stuff
 	if (!tabs.empty() && activeTab >= 0 && activeTab < (int)tabs.size())
 	{
-		//force draw the new thing
-		for (int i = 0; i < tabs[activeTab].layout.size(); i++)
+
+		//handle each item in the layout, we want to remove, and reset everything.
+		for (auto& item : tabs[activeTab].layout)
 		{
-			if (tabs[activeTab].layout[i].textTex == nullptr) continue; //skip if we have somthing thats nullptr, no texture
+			//destroy text and images
+			if (item.textTex) { SDL_DestroyTexture(item.textTex); item.textTex = nullptr; }
+			if (item.imageTex) { SDL_DestroyTexture(item.imageTex); item.imageTex = nullptr; }
 
-			//render our text, we make a rectange and assign our text to that!
-			SDL_FRect textrec;
-			textrec.x = tabs[activeTab].layout[i].x;
-			textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;
-			textrec.w = tabs[activeTab].layout[i].width;
-			textrec.h = tabs[activeTab].layout[i].height;
-
-			//draw the bg color
-			if (tabs[activeTab].layout[i].hasBg)
-			{
-				SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); //255 cause we dont want it transparent
-				//fill the rec
-				SDL_RenderFillRect(render, &textrec);
-			}
-
-			//check if we should render an image
-			if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex != nullptr)
-			{
-				SDL_RenderTexture(render, tabs[activeTab].layout[i].imageTex, nullptr, &textrec);
-			}
-			// 2. Otherwise, paint the text
-			else if (tabs[activeTab].layout[i].textTex != nullptr)
-			{
-				SDL_RenderTexture(render, tabs[activeTab].layout[i].textTex, nullptr, &textrec);
-			}
-
+			item.textAttempted = false; //reset
+			item.imageAttempted = false; //reset
+			item.pendingTextSurface = nullptr; //reset
 		}
+		tabs[activeTab].layout.clear(); //clear
+
+		if (tabs[activeTab].domRoot != nullptr)
+		{
+			DeleteTree(tabs[activeTab].domRoot); //destory the old tree
+			tabs[activeTab].domRoot = nullptr;
+		}
+
 	}
+
+
+	//now paint the blank frame
+	SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255);
+	SDL_RenderClear(render);
+
+
+	//render the loading thing
+	if (loadingTex != nullptr) //make sure the loadingTex works.
+	{
+		int WinW, WinH;
+		SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); //get the size of the render
+
+		float texW, texH;
+		SDL_GetTextureSize(loadingTex, &texW, &texH);
+
+
+		SDL_FRect loadingRect;
+		loadingRect.x = 10;
+		loadingRect.y = 48;
+		loadingRect.w = texW;
+		loadingRect.h = texH;
+
+		SDL_RenderTexture(render, loadingTex, nullptr, &loadingRect);
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+	
 	SDL_RenderPresent(render);
 
 	return 0;
@@ -869,12 +989,12 @@ int GUIRENDER()
 	}
 
 
-
 	//Now that we got it init, lets render that font
 	//open the font file from disk.
 	//16 is the defalt size (we change this in PreRender)
 	font = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", 16);
 	TTF_Font* iconFont = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", 28); // For icons
+	TTF_Font* reloadFont = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", 72); // For icons
 	//make sure it worked
 	if (font == nullptr)
 	{
@@ -890,6 +1010,19 @@ int GUIRENDER()
 
 	//clear and remove it
 	SDL_DestroySurface(textserf); //done wiht the text serface
+
+	
+	//make the loading texture
+	SDL_Color loadingColor = { 0,0,0,255 }; //Black
+	SDL_Surface* loadingserf = TTF_RenderText_Solid(reloadFont, "Loading...", 0, loadingColor); //make the surface
+	if (loadingserf != nullptr)
+	{
+		loadingTex = SDL_CreateTextureFromSurface(render, loadingserf);
+		SDL_DestroySurface(loadingserf);
+	}
+
+
+
 
 
 
@@ -973,7 +1106,7 @@ int GUIRENDER()
 
 						//}).detach();
 
-					search(urlInput, true, render, font, activeTab);
+					search(urlInput, true, render, reloadFont, activeTab);
 
 
 
@@ -1042,7 +1175,7 @@ int GUIRENDER()
 							urlInput = tabs[activeTab].SearchHistory[tabs[activeTab].currentSearchPos];
 
 
-							search(urlInput, false, render, font, activeTab);
+							search(urlInput, false, render, reloadFont, activeTab);
 
 
 						}
@@ -1061,7 +1194,7 @@ int GUIRENDER()
 							urlInput = tabs[activeTab].SearchHistory[tabs[activeTab].currentSearchPos];
 
 							//load it now!
-							search(urlInput, false, render, font, activeTab);
+							search(urlInput, false, render, reloadFont, activeTab);
 							//ok, now, get the thing
 						}
 					}
@@ -1080,7 +1213,7 @@ int GUIRENDER()
 							//we load the anim, render it and stuff!
 							//LoadAnimation(render, font);
 
-							search(urlInput, false, render, font, activeTab); //now start the search for the other one.
+							search(urlInput, false, render, reloadFont, activeTab); //now start the search for the other one.
 						}
 
 					}
@@ -1281,7 +1414,7 @@ int GUIRENDER()
 
 
 
-							LoadAnimation(render, font);
+							LoadAnimation(render, reloadFont);
 
 							//check if this is a valid url
 							//note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
@@ -1484,8 +1617,6 @@ int GUIRENDER()
 		//draw the page by looping thorugh the layout list
 		for (int i = 0; i < tabs[activeTab].layout.size(); i++)
 		{
-			if (tabs[activeTab].layout[i].textTex == nullptr && tabs[activeTab].layout[i].imageTex == nullptr) continue; //skip if we have somthing thats nullptr, no texture
-
 			//render our text, we make a rectange and assign our text to that!
 			SDL_FRect textrec;
 			textrec.x = tabs[activeTab].layout[i].x;

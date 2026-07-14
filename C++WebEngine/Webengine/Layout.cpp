@@ -423,24 +423,27 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			{
 				std::cout << "Getting BG hex code" << std::endl; //DEBUG
 
+				//if we find that the css of the bg is defined with a var, we skip, as we dont want an issue.
 				if (bg.find("var(") != std::string::npos) {
-					std::cout << "ERROR, CSS Defined with Var, Auto Skipping page color!" << "\r" << "This is not a problem :)" << std::endl; return;
+					std::cout << "ERROR, CSS Defined with Var, Auto Skipping page color!" << "\r" << "This is not a problem :)" << std::endl; return; //end.
 				}
-				//ok now we set our font size
-				//fonts are marked like 16px, so we need to get the numbers before the nums
+			
 
-				std::cout << "BG RAW: [" << bg << "]" << std::endl;
+				std::cout << "BG RAW: [" << bg << "]" << std::endl; //DEBUG
 
-				RGB parsed = ParseHexColor(bg);
-				//we do this, as there is other bg definitions in things like the <divs>, we only want the bg (currently) for the body.
-				if (node->tagValue == "body")
+				RGB parsed = ParseHexColor(bg); //get the RGB value, by parsing our current hex color, and setting it to RGB
+
+				
+				if (node->tagValue == "body") //how check if the tag value is defined as "body"
 				{
 
 
-					backgroundColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we * by 2, cause it would be super small
+					backgroundColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we set our background color
+					hasBg = true;
 				}
 				else {
-					bgColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 };
+					
+					bgColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we set our background color
 					hasBg = true;
 				}
 

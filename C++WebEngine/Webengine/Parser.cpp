@@ -333,7 +333,7 @@ std::string StripTagBlocks(const std::string& HtmlData, const std::string& start
 		ReturnHtmlData.append(HtmlData, pos, StartPos - pos); //add our data rn, taking from HtmlData and going from i to out.
 
 		size_t EndPos = HtmlData.find(end, StartPos+ start.size()); //check if we can find our end tag
-		if (EndPos == std::string::npos) { ReturnHtmlData.append(HtmlData, pos, std::string::npos); break; } //this checks if it exists, if it dont, we assume we are done, and finish appending.
+		if (EndPos == std::string::npos) {  break; } //this checks if it exists, if it dont, we assume we are done, and finish appending.
 
 
 

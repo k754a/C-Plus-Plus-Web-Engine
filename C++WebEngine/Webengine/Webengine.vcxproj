@@ -159,6 +159,7 @@
     <ClInclude Include="Layout.h" />
     <ClInclude Include="Parser.h" />
     <ClInclude Include="Profiler.h" />
+    <ClInclude Include="ThreadPool.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
