@@ -73,7 +73,31 @@ std::string URLPath; //This holds our path for the URL and is used for simplicit
 //}//END OF END WIN SOCK
 
 
+//=======GetWinINetERRORS=======\\
 
+//grabbed from https://learn.microsoft.com/en-us/windows/win32/wininet/wininet-errors
+std::string GetWinINetERRORS(DWORD errorCode) //this returns a string, and takes in a DWORD errorcode, this is a lookup table for error codes.
+{
+    //first grab the error code, the we compare it, using switch
+    switch (errorCode) {
+    case ERROR_INTERNET_OUT_OF_HANDLES: return "Out of handles";
+    case ERROR_INTERNET_OPERATION_CANCELLED: return "Handle was closed before connection could be complete";
+    case ERROR_INTERNET_TIMEOUT: return "Request timed out";
+    case ERROR_INTERNET_INVALID_URL: return "Invalid URL format";
+    case ERROR_INTERNET_NAME_NOT_RESOLVED: return "Server name could not be resolved";
+    case ERROR_INTERNET_PROTOCOL_NOT_FOUND: return "The requested protocal could not be found";
+    case ERROR_INTERNET_CANNOT_CONNECT: return "Cannot connect to server.";
+    case ERROR_INTERNET_CONNECTION_ABORTED: return "Server aborted connection";
+    case ERROR_INTERNET_CONNECTION_RESET: return "Connection reset by the server";
+    case ERROR_INTERNET_FORCE_RETRY: return "The function needs to do the request.";
+    case ERROR_INTERNET_INVALID_CA: return "SSL/TLS Security -> Invalid Certificate Authority";
+    case ERROR_INTERNET_SEC_CERT_CN_INVALID: return "SSL/TLS Security -> Hostname mismatch on SSL certificate";
+    case ERROR_INTERNET_SEC_CERT_DATE_INVALID: return "SSL/TLS Security -> SSL Certificate has expired";
+    case ERROR_INTERNET_HTTP_TO_HTTPS_ON_REDIR: return "Redirected from HTTP to HTTPS";
+    default:  return std::to_string(errorCode);
+       
+    }
+} //END OF GetWinINetERRORS
 
 
 
@@ -325,6 +349,40 @@ int ConnectSocketHTTPS(std::wstring input)
             //we make an if and when it runs the if it sees if it returns true, and it works
             if (HttpSendRequest(hRequest, headers.c_str(), (DWORD)headers.size(), NULL, 0))
             {
+
+                //check the http status code, as we want to make sure the website did not return a 404.
+                DWORD statusCode = 0; //none
+                DWORD statusCodeSize = sizeof(statusCode); //create another DWORD struct, holding the size of our status code.
+
+                //grab the header info for the http response, we take the request as input, we want to pull the query, then we want the text to go from "200" -> 200
+                // - &statuscode writes the staus code output to the DWORD, and same with the staus code size.
+                if (HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &statusCode, &statusCodeSize, NULL))
+                {
+                    if (statusCode >= 400) //if we get a status code that is bad (greater than 400)
+                    {
+                        
+                        std::string finalERROR = "<h1> [NETWORK ERROR]</h1><h3> Request failed with status " + std::to_string(statusCode) + "</h3>"; //return some html, that the engine can handle
+              
+
+                        if (statusCode == 404) //if we get 404
+                        {
+                            finalERROR = "<h1> [NETWORK ERROR]</h1><h3> Request failed with status 404 - Page not found. </h3>"; //return some html, that the engine can handle
+                            Parser(finalERROR); //send the error!
+                            return -1;
+                            //return -1, but in style
+                        }
+                        else {
+                            Parser(finalERROR); //send the error!
+                            return -1; //just return -1
+                        }
+                    }
+                }
+
+
+
+
+
+
                 //create a buffer, to hold our packets
                 char buffer[4096];
                 DWORD bytesRead = 0; //how many bytes read
@@ -342,8 +400,9 @@ int ConnectSocketHTTPS(std::wstring input)
             }
             else
             {
-                //handle fails
-                std::cout << "Something failed" << std::endl;
+                DWORD err = GetLastError(); //pull the last error we got, and store it in a DWORD datatype
+                std::string finalERROR = "<h1> AW SNAP - Something went wrong...</h1><h3> Reason: " + GetWinINetERRORS(err) + "</h3>"; //return some html, that the engine can handle
+                Parser(finalERROR); //send the error!
                 return -1;
             }
 

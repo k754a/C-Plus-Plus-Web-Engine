@@ -9,7 +9,16 @@
 #include "Profiler.h"
 
 
+
+
+
+
+
 #pragma region CSS Handle Code
+
+
+
+
 
 
 //THIS CODE SECTION HANDLES THE SUBCOMPONETS FOR RENDERING THE CSS, THINGS LIKE FINIDING PROPERTIES, ID's, AND RGB.
@@ -198,6 +207,15 @@ RGB hexToRgb(const static unsigned int hexValue) //This funct returns our custom
 	color.g = (hexValue >> 8) & 0xFF;  // Extract the middle 2 hex digits
 	color.b = hexValue & 0xFF;         // Extract the last 2 hex digits
 
+	if (darkmode) //if darkmode is enabled
+	{
+		//convert r -> (255 -r)
+		color.r = (255 - color.r);
+		//convert g -> (255 -g)
+		color.g = (255 - color.g);
+		//convert b -> (255 -b)
+		color.b = (255 - color.b);
+	}
 	return color; //return the RGB, r, g, b
 } // END OF HEX-TO-RGB
 
@@ -439,7 +457,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 
 					backgroundColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we set our background color
-					hasBg = true;
 				}
 				else {
 					
@@ -774,9 +791,21 @@ int LayoutTree(Node* node)
 
 	//ok first we assign the node val to our new layout list
 	//now we set it to add the node
-	SDL_Color startingTextColor = { 0, 0, 0, 255 };
+	SDL_Color startingTextColor;
+	SDL_Color startingBgColor;
 
-	SDL_Color startingBgColor = { 0, 0, 0, 0 };
+	if (darkmode) //if dark mode
+	{
+		 startingTextColor = { 255, 255, 255, 255 };
+
+		 startingBgColor = { 255, 255, 255, 0 };
+	}
+	else { //else
+		 startingTextColor = { 0, 0, 0, 255 };
+
+		 startingBgColor = { 0, 0, 0, 0 };
+	}
+
 	bool startingHasBg = false;
 																													//current Href starts empty
 	PositionNodes(node, currentX, currentY, startingfontsize, startingTextColor, startingBgColor, startingHasBg, "");

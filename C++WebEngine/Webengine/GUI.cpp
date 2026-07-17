@@ -27,6 +27,8 @@ SDL_Texture* loadingTex = nullptr;
 
 ThreadPool gWorkerPool(8); //create a pool.
 
+ThreadPool gImageThreadPool(4);
+
 //wanted to devlop a way to have a back and forward arrow.
 //the way we can do this is have a list with the websites, and 2 buttons besides the input box, if they are pressed, we change the index, going back or forth
 //this is my thoughs
@@ -80,7 +82,6 @@ std::string currentURL = ""; //hold the url, but does not change till someone pr
 
 std::vector<Tab> tabs;        // all open tabs
 int activeTab = 0;            // active tab open
-
 
 struct TabInit {
 	TabInit() {
@@ -252,6 +253,15 @@ SDL_Color backgroundColor = { 245, 245, 245, 255 }; //white bg, gets changed btw
 //this is called in layout, and repaces whatever was on the screen with the new layout
 int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot)
 {
+	//handle if we have dark mode or not: 
+	if (darkmode)
+	{
+		SDL_Color backgroundColor = { 1, 1, 1, 255 }; //black bg, gets changed, but will stay, if there isnt a defined color
+	}
+	else {
+		SDL_Color backgroundColor = { 245, 245, 245, 255 }; //white bg, gets changed, but will stay, if there isnt a defined color
+	}
+
 	PROFILE("IMPORT"); //PROFILE THE IMPORT
 
 	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size())
@@ -314,93 +324,63 @@ std::string PercentDecode(const std::string& src)
 	return out;
 }
 
-// added this above PreRender
-std::string ResolveURL(std::string src, std::string currentUrl)
+
+std::string ResolveURL(const std::string& targetUrl, const std::string& currentUrl)
 {
-	std::string decoded = ""; //thing to hold decoded
-
-	src = PercentDecode(src);
-	//we gotta do a lot of things to get the image url right, as images got the weirdest urls oat
-
-	size_t i = 0;
-	//same loop we always do
-	while (i < src.size())
-	{
-		//remove the &amps;
-		if (src.substr(i, 5) == "&amp;")
-		{
-			decoded += "&"; //add a & to replace it
-			i += 5;
-		}
-		else {
-			decoded += src[i++]; //just add the normal val to the decoded
-		}
-	}
-	src = decoded;
-
+	//make sure its not blank
+	if (targetUrl.empty()) return targetUrl;
 	//if its good use as is
-	if (src.find("http://") == 0 || src.find("https://") == 0) return src;
+	if (targetUrl.find("http://") == 0 || targetUrl.find("https://") == 0) return targetUrl;
 
 
-	//make sure the url has a https:// on it
-	std::string base = currentUrl;
-	if (base.find("://") == std::string::npos)
+	//handle urls like //example.com
+	if (targetUrl.find("//", 0) == 0)
 	{
-		//if we dont have it, we add it
-		base = "https://" + base;
+		return "https:" + targetUrl; //fix it to be https://example.com
 	}
 
 	//get the domain part, not the full link
 	std::string domain = "";
-	size_t protoend = base.find("://");
+	size_t protoend = currentUrl.find("://");
 	//if we find the protoend
 	if (protoend != std::string::npos)
 	{
-		size_t domainEnd = base.find("/", protoend + 3); //get the end of it
+		size_t domainEnd = currentUrl.find("/", protoend + 3); //get the end of it
 		if (domainEnd != std::string::npos)
 		{
-			domain = base.substr(0, domainEnd); //get it like https://Example.com
+			domain = currentUrl.substr(0, domainEnd); //get it like https://Example.com
 		}
 		else {
-			domain = base; //no path, this is the domain
+			domain = currentUrl; //no path, this is the domain
 		}
 	}
+	
+	//handle absolute paths like /assets/example.png -> https://Example.coom/assets/example.com
 
+	if (targetUrl[0] == '/')
+	{
+		return domain + targetUrl;
+	}
 
 	//get the direc of the current page for the paths
-	std::string direcotry = domain;
-	size_t lastSlash = base.rfind("/");
-	size_t protoSlash = base.find("://");
+	std::string directory = domain;
+	size_t lastSlash = currentUrl.rfind("/");
+	size_t protoSlash = currentUrl.find("://");
 
 	//make sure the last slash isnt appart of the ://
 	if (lastSlash != std::string::npos && lastSlash > protoSlash + 3)
 	{
-		direcotry = base.substr(0, lastSlash);
+		directory = currentUrl.substr(0, lastSlash);
 	}
 
-
-	//handle absolute paths like /assets/example.png -> https://Example.coom/assets/example.com
-	if (src[0] == '/')
-	{
-		return domain + src;
-	}
 
 
 	//reletive path
 
-	return direcotry + "/" + src;
-
-
-
-
+	return directory + "/" + targetUrl;
 
 
 }
-
-
-
-
-
 
 
 //This function will check, and block some chars we dont want.
@@ -597,7 +577,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 			
 
-				gWorkerPool.enqueue([text, fontsize, color, isLink, currentItem]() {
+				gImageThreadPool.enqueue([text, fontsize, color, isLink, currentItem]() {
 					
 					TTF_Font* threadFont = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", fontsize); //hold the font for the thread
 					
@@ -782,7 +762,14 @@ int LoadAnimation(SDL_Renderer* render, TTF_Font* font)
 
 
 	//now paint the blank frame
-	SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255);
+	if (darkmode) //darkmode (inverse)
+	{
+		SDL_SetRenderDrawColor(render, (255 - backgroundColor.r), (255 - backgroundColor.g), (255 -backgroundColor.b), 255);
+	}
+	else {
+		SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255);
+	}
+	
 	SDL_RenderClear(render);
 
 
@@ -835,76 +822,97 @@ void SetTabTitle(std::string title)
 
 
 
-const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
-const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 
 
 
-
-int search(std::string input, bool addToHistory, SDL_Renderer* render, TTF_Font* font, int CurrentTab)
+void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool addToHistory = true) //handle links, as they can sometimes have /path. simmilar to Resolve url
 {
+	if (target.empty()) return;
+
+	//check if its a search or a website, because the old error was that somtimes we would search websites
+	std::string resolvedTarget = target; //make a string to change and modify as we flush out our link.
+
+	//its a url if any of these conditions are met, aswell as no spaces.
+	bool isUrl = (target.find("http://") == 0 || target.find("https://") == 0 || target[0] == '/' || target.find('.') != std::string::npos) && (target.find(' ') == std::string::npos);
+
+	if (!isUrl) //if it not a url
+	{
+		//its a search.
+		std::string query = target;
+		std::replace(query.begin(), query.end(), ' ', '+'); //replace all ' ' with +
+		resolvedTarget = "lite.duckduckgo.com/lite/?q=" + query; //combine it
+	}
+	else { //it is a url!
+		resolvedTarget = ResolveURL(target, tabs[activeTab].url);
+	}
+
 	
-	LoadAnimation(render, font);
-
-
-
-
-
-	if (std::regex_match(input, httpsPattern) || std::regex_match(input, httpPattern)) {
-		std::cout << "https url!" << std::endl;
-		std::wstring temp(input.begin(), input.end());
-		ConnectSocketHTTPS(temp);
-
-
-		//SearchHistory.push_back(input);
-		//now that we understand its a valid url, lets attempt a socket connect.
-		//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
-	}
-
-	// --- Inside search() in GUI.cpp ---
-	if (!std::regex_match(input, httpPattern) && !std::regex_match(input, httpsPattern)) {
-		//if we dont match https or http, its prob a search, so lets do that
-		std::string query = "";
-
-
-		//ok if its a space, we repace it with a +
-
-		for (int i = 0; i < input.size(); i++)
-		{
-			//std::cout << "Attempting search " << input << std::endl;
-
-			if (input[i] == ' ')
-			{
-				query += "+";
-			}
-			else {
-				query += input[i];
-			}
-		}
-
-		input = "lite.duckduckgo.com/lite/?q=" + query;
-		urlInput = input;
-		//send it to https
-		std::wstring temp(input.begin(), input.end());
-		ConnectSocketHTTPS(temp);
-	}
 
 	if (addToHistory) {
 
-		
+
 		//if we went back and searched somthing new, deleate that multiverse
-		if (tabs[activeTab].currentSearchPos < (int)tabs[activeTab].SearchHistory.size() - 1) {
-			tabs[activeTab].SearchHistory.resize(tabs[activeTab].currentSearchPos + 1);
+		if (tabs[activeTab].historypos < (int)tabs[activeTab].history.size() - 1) {
+			tabs[activeTab].history.resize(tabs[activeTab].historypos + 1);
+		}
+		//prevent duplicates
+		if (tabs[activeTab].history.empty() || tabs[activeTab].history.back() != resolvedTarget)
+		{
+			tabs[activeTab].history.push_back(resolvedTarget);
+			tabs[activeTab].historypos = tabs[activeTab].history.size() - 1; // Keep index at the end
 		}
 
-		tabs[activeTab].SearchHistory.push_back(input);
-		tabs[activeTab].currentSearchPos = tabs[activeTab].SearchHistory.size() - 1; // Keep index at the end
 	}
 
+	tabs[activeTab].layout.clear();
 
+	//make a temp layout that pretends to be a parsed thing
+	Layout loadingMSG;
+	loadingMSG.x = 10;
+	loadingMSG.y = 150;
+	loadingMSG.fontSize = 72;
+	loadingMSG.isImage = false;
 
-	return 0;
+	//make the texture
+	SDL_Color loadColor;
+	if (darkmode)
+	{
+		loadColor = SDL_Color{ 255, 255, 255, 255 };
+	}
+	else {
+		loadColor = SDL_Color{ 0, 0, 0, 255 };
+	}
+	//make a surf
+	int ogFontSize = TTF_GetFontSize(font);
+	TTF_SetFontSize(font, 72);
+	SDL_Surface* loadSurf = TTF_RenderText_Solid(font, "Loading...", 0, loadColor);
+
+	TTF_SetFontSize(font, ogFontSize);
+	if (loadSurf != nullptr)
+	{
+		loadingMSG.textTex = SDL_CreateTextureFromSurface(render, loadSurf);
+		loadingMSG.width = loadSurf->w;
+		loadingMSG.height = loadSurf->h;
+		SDL_DestroySurface(loadSurf);
+	}
+	tabs[activeTab].layout.push_back(loadingMSG);
+	//update the active tab
+	tabs[activeTab].url = resolvedTarget;
+	urlInput = resolvedTarget;
+	std::wstring wUrl(resolvedTarget.begin(), resolvedTarget.end());
+	gWorkerPool.enqueue([wUrl]() {
+		ConnectSocketHTTPS(wUrl);
+	});
+	
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -1004,22 +1012,43 @@ int GUIRENDER()
  
 
 	//lets make the text, we set the font, the info we want to render, length, and finaly color
-
-	SDL_Surface* textserf = TTF_RenderText_Solid(font, "Browse++", 0, SDL_Color(255, 255, 255, 0));
-	fontText = SDL_CreateTextureFromSurface(render, textserf);
-
-	//clear and remove it
-	SDL_DestroySurface(textserf); //done wiht the text serface
-
-	
-	//make the loading texture
-	SDL_Color loadingColor = { 0,0,0,255 }; //Black
-	SDL_Surface* loadingserf = TTF_RenderText_Solid(reloadFont, "Loading...", 0, loadingColor); //make the surface
-	if (loadingserf != nullptr)
+	if (darkmode) //if darkmode
 	{
-		loadingTex = SDL_CreateTextureFromSurface(render, loadingserf);
-		SDL_DestroySurface(loadingserf);
+		SDL_Surface* textserf = TTF_RenderText_Solid(font, "Browse++", 0, SDL_Color(0, 0, 0, 0)); //draw black
+		fontText = SDL_CreateTextureFromSurface(render, textserf);
+
+		//clear and remove it
+		SDL_DestroySurface(textserf); //done wiht the text serface
+
+
+		//make the loading texture
+		SDL_Color loadingColor = { 255,255,255,255 }; //WHITE
+		SDL_Surface* loadingserf = TTF_RenderText_Solid(reloadFont, "Loading...", 0, loadingColor); //make the surface
+		if (loadingserf != nullptr)
+		{
+			loadingTex = SDL_CreateTextureFromSurface(render, loadingserf);
+			SDL_DestroySurface(loadingserf);
+		}
 	}
+	else //if lightmode.
+	{
+		SDL_Surface* textserf = TTF_RenderText_Solid(font, "Browse++", 0, SDL_Color(255, 255, 255, 0));
+		fontText = SDL_CreateTextureFromSurface(render, textserf);
+
+		//clear and remove it
+		SDL_DestroySurface(textserf); //done wiht the text serface
+
+
+		//make the loading texture
+		SDL_Color loadingColor = { 0,0,0,255 }; //Black
+		SDL_Surface* loadingserf = TTF_RenderText_Solid(reloadFont, "Loading...", 0, loadingColor); //make the surface
+		if (loadingserf != nullptr)
+		{
+			loadingTex = SDL_CreateTextureFromSurface(render, loadingserf);
+			SDL_DestroySurface(loadingserf);
+		}
+	}
+	
 
 
 
@@ -1092,21 +1121,7 @@ int GUIRENDER()
 					//ok lets make this work.
 
 
-					std::string input = urlInput;
-					//First, we need to prompt the user, what URL are they attempting to connect too?
-					//std::cout << "Type the URL to open it: "; //CAN NOW BE HTTPS!!!!
-
-					//pulls the input, then creates a new line for cleaness
-					//std::cin >> input; std::cout << std::endl;
-
-
-					//these 2 blocks autodetect if its a https or http.
-					//std::thread([input]()
-					//	{
-
-						//}).detach();
-
-					search(urlInput, true, render, reloadFont, activeTab);
+					NavigateTo(urlInput, render, font, true);
 
 
 
@@ -1166,18 +1181,13 @@ int GUIRENDER()
 
 						
 						//first check, is our index var for the area >= 0? (we need this so we dont have an error
-						if (tabs[activeTab].currentSearchPos > 0) //we do > than 0, as we dont want to have an error
+						if (tabs[activeTab].historypos > 0) //we do > than 0, as we dont want to have an error
 						{
-							tabs[activeTab].currentSearchPos = tabs[activeTab].currentSearchPos - 1; //remove 1 from the searchpos
-							//std::cout << "BACK " << currentSearchPos << std::endl;
-							//ok, now, get the thing
-
-							urlInput = tabs[activeTab].SearchHistory[tabs[activeTab].currentSearchPos];
-
-
-							search(urlInput, false, render, reloadFont, activeTab);
-
-
+							tabs[activeTab].historypos--;
+							std::string prevURL = tabs[activeTab].history[tabs[activeTab].historypos];
+							urlInput = prevURL;
+							
+							NavigateTo(prevURL, render, font, false);
 						}
 					}
 
@@ -1186,15 +1196,12 @@ int GUIRENDER()
 
 
 						//std::cout << "FORWARD " << currentSearchPos << std::endl;
-						if (!tabs[activeTab].SearchHistory.empty() && tabs[activeTab].currentSearchPos < (int)tabs[activeTab].SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
+						if (tabs[activeTab].historypos < (int)tabs[activeTab].history.size() - 1) //we do > than 0, as we dont want to have an error
 						{
-							tabs[activeTab].currentSearchPos = tabs[activeTab].currentSearchPos + 1; //add 1 from the searchpos
-							//std::cout << "FORWARD " << currentSearchPos << std::endl;
-
-							urlInput = tabs[activeTab].SearchHistory[tabs[activeTab].currentSearchPos];
-
-							//load it now!
-							search(urlInput, false, render, reloadFont, activeTab);
+							tabs[activeTab].historypos++;
+							std::string nextURL = tabs[activeTab].history[tabs[activeTab].historypos];
+							urlInput = nextURL;
+							NavigateTo(nextURL, render, font, false);
 							//ok, now, get the thing
 						}
 					}
@@ -1213,7 +1220,7 @@ int GUIRENDER()
 							//we load the anim, render it and stuff!
 							//LoadAnimation(render, font);
 
-							search(urlInput, false, render, reloadFont, activeTab); //now start the search for the other one.
+							NavigateTo(urlInput, render, font, false);
 						}
 
 					}
@@ -1230,7 +1237,7 @@ int GUIRENDER()
 							return -1;
 						}
 						//we dump the file into a buffer
-
+						LoadAnimation(render, font);
 						std::stringstream buffer;
 
 						//load it in 
@@ -1384,56 +1391,9 @@ int GUIRENDER()
 							{
 								finalUrl = realDest;
 							}
-
-							//we got a few issues with the url links, as they break lol, so to fix, we add a https for it!
-							if (finalUrl.size() >= 2 && finalUrl[0] == '/' && finalUrl[1] == '/')
-							{
-								//fix it
-								finalUrl = "https:" + finalUrl;
-							}
-
-
-
-
-
-						
-
-							//if our links are kinda weird, and arnt the full thing (wikipedia does this a lot lol
-							if (!std::regex_search(finalUrl, httpPattern) && !std::regex_search(finalUrl, httpsPattern))
-							{
-								size_t endstr = urlInput.find("/", urlInput.find("://") + 3);
-								std::string basedomain = urlInput.substr(0, endstr);
-
-								//add them together
-								// We also add a "/" in the middle just in case the link doesnt have one
-								finalUrl = basedomain + (finalUrl.empty() || finalUrl[0] != '/' ? "/" : "") + finalUrl;
-							}
-
-							urlInput = finalUrl;
-							//std::cout << "URLINPUT: " << urlInput << std::endl;
-
-
-
-							LoadAnimation(render, reloadFont);
-
-							//check if this is a valid url
-							//note, this will assume that this is a valid url, if it follows the design scheme, but it may not be, so we then do a network test on the server (attempt to check its status)
 							
-
-							if (std::regex_match(urlInput, httpsPattern) || std::regex_match(urlInput, httpPattern)) {
-								std::cout << "https url!" << std::endl;
-								std::wstring temp(urlInput.begin(), urlInput.end());
-								ConnectSocketHTTPS(temp);
-
-
-								tabs[activeTab].SearchHistory.push_back(urlInput);
-								//now that we understand its a valid url, lets attempt a socket connect.
-								//[FOR DEBUG, THE CONNECTSOCKET(input) IS NOT IN HERE, AS TO SAVE TIME.
-							}
-
-
-
-							tabs[activeTab].currentSearchPos = tabs[activeTab].SearchHistory.size() - 1;
+							urlInput = finalUrl;
+							NavigateTo(finalUrl, render, font, true);
 
 							break;
 
@@ -1605,14 +1565,25 @@ int GUIRENDER()
 		PreRender(render, font);
 
 		//Clear the screen
-		SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255); // auto choses based on the site!
+		//set it to the darkmode/lightmode
+
+		if (darkmode) //inverse
+		{
+			SDL_SetRenderDrawColor(render, (255 - backgroundColor.r), (255 - backgroundColor.g), (255 - backgroundColor.b), 255); // auto choses based on the site!
+		}
+		else{
+			SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255); // auto choses based on the site!
+		}
 		SDL_RenderClear(render);
 
 		//Loop through the layout list
 
 		//// 3. Present the screen
 		//SDL_RenderPresent(render);
-
+		if (tabs[activeTab].layout.empty() && tabs[activeTab].url != "" && tabs[activeTab].url != "main.html")
+		{
+			
+		}
 
 		//draw the page by looping thorugh the layout list
 		for (int i = 0; i < tabs[activeTab].layout.size(); i++)
@@ -1627,7 +1598,14 @@ int GUIRENDER()
 			//draw the bg color
 			if (tabs[activeTab].layout[i].hasBg)
 			{
-				SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); //255 cause we dont want it transparent
+				if (darkmode) //inverse
+				{
+					SDL_SetRenderDrawColor(render, (255 - tabs[activeTab].layout[i].bgColor.r), (255 - tabs[activeTab].layout[i].bgColor.g), (255 - tabs[activeTab].layout[i].bgColor.b),  255); //255 cause we dont want it transparent
+				}
+				else {
+					SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); //255 cause we dont want it transparent
+				}
+				
 				//fill the rec
 				SDL_RenderFillRect(render, &textrec);
 			}
@@ -1675,7 +1653,14 @@ int GUIRENDER()
 		float scaleX = 1.0f, scaleY = 1.0f;
 		SDL_GetRenderScale(render, &scaleX, &scaleY);
 
-		SDL_SetRenderDrawColor(render, 245, 245, 245, 255);
+		if (darkmode) //serach scroll bar color bg
+		{
+			SDL_SetRenderDrawColor(render, 10, 10, 10, 255);
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 245, 245, 245, 255);
+		}
+	
 		SDL_FRect searchBarBg = { 0, 30, (float)WinW, 39 };
 		SDL_RenderFillRect(render, &searchBarBg);
 
@@ -1690,8 +1675,15 @@ int GUIRENDER()
 		float uiTopBarHeight = 70.0f; 
 		float trackHeight = WinH - uiTopBarHeight;
 
-		//draw the bar
-		SDL_SetRenderDrawColor(render, 224, 224, 224, 255);
+		//draw the scroll bar
+		if (darkmode)
+		{
+			SDL_SetRenderDrawColor(render, 31, 31, 31, 255);
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 224, 224, 224, 255);
+		}
+		
 		SDL_FRect scrollTrack = { WinW - scrollBarWidth, uiTopBarHeight, scrollBarWidth, trackHeight };
 		SDL_RenderFillRect(render, &scrollTrack);
 
@@ -1704,16 +1696,24 @@ int GUIRENDER()
 		float barY = uiTopBarHeight + (scrollPercentage * (trackHeight - barHeight));
 
 		//draw it
-		SDL_SetRenderDrawColor(render, 192, 192, 192, 255);
+		if (darkmode) //darkmode - inverted
+		{
+			SDL_SetRenderDrawColor(render, 63, 63, 63, 255);
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 192, 192, 192, 255);
+		}
+		
 		SDL_FRect scrollbar = { WinW - scrollBarWidth, barY, scrollBarWidth, barHeight };
 		SDL_RenderFillRect(render, &scrollbar);
 
-
+	
 		SDL_SetRenderDrawColor(render, 255, 255, 255, 180); // White top/left highlight
 		SDL_RenderLine(render, scrollbar.x, scrollbar.y, scrollbar.x + scrollbar.w, scrollbar.y);
 		SDL_RenderLine(render, scrollbar.x, scrollbar.y, scrollbar.x, scrollbar.y + scrollbar.h);
 
-		SDL_SetRenderDrawColor(render, 100, 100, 100, 255); 
+	
+		SDL_SetRenderDrawColor(render, 100, 100, 100, 255);
 		SDL_RenderLine(render, scrollbar.x, scrollbar.y + scrollbar.h, scrollbar.x + scrollbar.w, scrollbar.y + scrollbar.h);
 		SDL_RenderLine(render, scrollbar.x + scrollbar.w, scrollbar.y, scrollbar.x + scrollbar.w, scrollbar.y + scrollbar.h);
 
@@ -1771,7 +1771,14 @@ int GUIRENDER()
 			backBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
 			backBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
 			backBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
-			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			if (darkmode) //darkmode
+			{
+				SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
+			}
+			else {
+				SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			}
+			
 			SDL_RenderFillRect(render, &backBtn);
 		}
 		else {
@@ -1779,12 +1786,27 @@ int GUIRENDER()
 			backBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
 			backBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
 			backBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
-			SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
+			if (darkmode)
+			{
+				SDL_SetRenderDrawColor(render, 20, 20, 20, 255);
+			}
+			else {
+				SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
+			}
+			
 			SDL_RenderFillRect(render, &backBtn);
 		}
 
 
-		SDL_Color textColor = { 0, 0, 0, 255 };
+		SDL_Color textColor; //do not affect this, as we want the buttons to be this color no matter what.
+		if (darkmode)
+		{
+			 textColor = { 255, 255, 255, 255 };
+		}
+		else {
+			 textColor = { 0, 0, 0, 255 };
+		}
+		
 
 		//handle my monitor
 	
@@ -1821,7 +1843,13 @@ int GUIRENDER()
 			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
 			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
 
-			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			if (darkmode) //darkmode
+			{
+				SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
+			}
+			else {
+				SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			}
 			SDL_RenderFillRect(render, &fwdBtn);
 		}
 		else {
@@ -1832,7 +1860,13 @@ int GUIRENDER()
 			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
 			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
 
-			SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
+			if (darkmode)
+			{
+				SDL_SetRenderDrawColor(render, 20, 20, 20, 255);
+			}
+			else {
+				SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
+			}
 			SDL_RenderFillRect(render, &fwdBtn);
 		}
 
@@ -1871,7 +1905,13 @@ int GUIRENDER()
 		reloadButton.y = topMargin;
 		reloadButton.w = btnSize;
 		reloadButton.h = btnSize;
-		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		if (darkmode) //darkmode
+		{
+			SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		}
 		SDL_RenderFillRect(render, &reloadButton);
 
 		SDL_Surface* reloadSurf = TTF_RenderText_Solid(iconFont, "њ", 0, textColor);
@@ -1900,7 +1940,13 @@ int GUIRENDER()
 			homeBtn.y = topMargin;
 			homeBtn.w = btnSize;
 			homeBtn.h = btnSize;
-			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			if (darkmode) //darkmode
+			{
+				SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
+			}
+			else {
+				SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			}
 			SDL_RenderFillRect(render, &homeBtn);
 		
 
@@ -1937,8 +1983,14 @@ int GUIRENDER()
 			SDL_floorf(searchW * scaleX) / scaleX,
 			SDL_floorf(btnSize * scaleY) / scaleY
 		};
-
-		SDL_SetRenderDrawColor(render, 240, 240, 240, 255); //draw a grayish color
+		if (darkmode) //handle dark mode
+		{
+			SDL_SetRenderDrawColor(render, 15, 15, 15, 255); //draw a grayish color
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 240, 240, 240, 255); //draw a grayish color
+		}
+		
 		//fill the rec with this
 		SDL_RenderFillRect(render, &bar);
 
@@ -1947,12 +1999,28 @@ int GUIRENDER()
 		TTF_SetFontSize(font, 17); //define the font size
 		std::string displayText = urlInput;
 		//set the txt color
-		SDL_Color color = { 0,0,0,255 }; //black
+
+		SDL_Color color;
+		if (darkmode) //handle dark mode
+		{
+			color = { 255,255,255,255 };
+		}
+		else {
+			color = { 0,0,0,255 };
+		}
+		
 
 		if (urlInput.empty()) //check if its empty
 		{
 			displayText = "ы Enter a url...";
-			color = { 180, 180, 180, 255 }; //just a dark gray
+			if (darkmode) //handle dark mode
+			{
+				color = { 75, 75, 75, 255 }; //just a dark gray
+			}
+			else{
+				color = { 180, 180, 180, 255 }; //just a dark gray
+			}
+			
 		}
 
 		//render it!
@@ -1984,7 +2052,15 @@ int GUIRENDER()
 				//draw it now
 				//urlSurf-w is the total pixel width of the string
 				float cursorX = bar.x + 8 + urlSurf->w + 1;
-				SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
+				if (darkmode) //handle dark mode
+				{
+					SDL_SetRenderDrawColor(render, 255, 255, 255, 255);
+				}
+				else {
+					SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
+				}
+
+				
 				SDL_RenderLine(render, cursorX, bar.y + 5, cursorX, bar.y + 23);
 
 			}
@@ -2009,10 +2085,24 @@ int GUIRENDER()
 		
 		if (isStarred)
 		{
-			SDL_SetRenderDrawColor(render, 255, 255, 0, 255);
+			if (darkmode)//darkmode
+			{
+				SDL_SetRenderDrawColor(render, 0, 0, 255, 255);
+			}
+			else {
+				SDL_SetRenderDrawColor(render, 255, 255, 0, 255); 
+			}
+			
 		}
 		else {
-			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			if (darkmode) //darkmode
+			{
+				SDL_SetRenderDrawColor(render, 55, 55, 55, 255); 
+			}
+			else {
+				SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			}
+			
 		}
 
 
@@ -2052,7 +2142,13 @@ int GUIRENDER()
 		printerBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
 		printerBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
 
-		SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		if (darkmode) //darkmode
+		{
+			SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+		}
 		SDL_RenderFillRect(render, &printerBtn);
 
 		//RENDER PRINTER
@@ -2097,7 +2193,14 @@ int GUIRENDER()
 
 
 		//draw the background of the taskbar.
-		SDL_SetRenderDrawColor(render, 210, 210, 210, 255);
+		if (darkmode) //darkmode
+		{
+			SDL_SetRenderDrawColor(render, 45, 45, 45, 255); //make the taskbar bg inverted.
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 210, 210, 210, 255);
+		}
+		
 		SDL_FRect tabBarBg = { 0, 0, (float)WinW, 30 };
 		SDL_RenderFillRect(render, &tabBarBg);
 
@@ -2112,9 +2215,29 @@ int GUIRENDER()
 
 			//change the color based on the tab (if its active or not)
 			if (t == activeTab)
-				SDL_SetRenderDrawColor(render, 245, 245, 245, 255);
+			{
+				if (darkmode) //darkmode
+				{
+					SDL_SetRenderDrawColor(render, 10, 10, 10, 255); //make the taskbar img inverted, active)
+				}
+				else {
+					SDL_SetRenderDrawColor(render, 245, 245, 245, 255);
+				}
+			}
+				
 			else
-				SDL_SetRenderDrawColor(render, 190, 190, 190, 255);
+			{
+				if (darkmode)
+				{
+					SDL_SetRenderDrawColor(render, 65, 65, 65, 255);  //make the taskbar img inverted, unactive.
+				}
+				else {
+					SDL_SetRenderDrawColor(render, 190, 190, 190, 255);
+				}
+				
+				
+			}
+				
 
 			//make our tab rec, putting in our tab width and pos
 			SDL_FRect tabrect = { (float)tabX, 0, (float)tabW, 30 }; //with a height of 30
@@ -2126,7 +2249,15 @@ int GUIRENDER()
 			//ok now lets draw the tab text (gonna be the <title> text)
 			TTF_SetFontSize(font, 13);
 			//set the color to black, and the title to the title
-			SDL_Color tabTextColor = { 0,0,0,255 };
+			SDL_Color tabTextColor;
+			if (darkmode) //darkmode
+			{
+				tabTextColor = { 255,255,255,255 };
+			}
+			else {
+				tabTextColor = { 0,0,0,255 };
+			}
+			
 			
 			std::string tabTitle = tabs[t].title;
 
@@ -2195,15 +2326,29 @@ int GUIRENDER()
 
 
 		//draw the + for the tabs
-		SDL_SetRenderDrawColor(render, 180, 180, 180, 255);
+		if (darkmode) //darkmode
+		{
+			SDL_SetRenderDrawColor(render, 75, 75, 75, 255); //inverted
+		}
+		else {
+			SDL_SetRenderDrawColor(render, 180, 180, 180, 255);
+		}
 		//make the button for it
 		SDL_FRect newTabBtn = { (float)tabX, 2, 26, 26 };
 
 		//fill it
 		SDL_RenderFillRect(render, &newTabBtn);
 
+		SDL_Surface* plusSurf;
+
 		//just a copy and paste atp
-		SDL_Surface* plusSurf = TTF_RenderText_Solid(font, "+", 0, { 0,0,0,255 });
+		if (darkmode) //darkmode
+		{
+			plusSurf = TTF_RenderText_Solid(font, "+", 0, { 255,255,255,255 });
+		}
+		else {
+			plusSurf = TTF_RenderText_Solid(font, "+", 0, { 0,0,0,255 });
+		}
 
 		//make sure we have made it
 		if (plusSurf != nullptr)

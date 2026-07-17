@@ -153,6 +153,7 @@
     <ClCompile Include="Webengine.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="config.h" />
     <ClInclude Include="ConnectSocket.h" />
     <ClInclude Include="DOMTree.h" />
     <ClInclude Include="GUI.h" />
