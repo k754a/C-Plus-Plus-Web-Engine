@@ -22,7 +22,6 @@ struct Tab //tab struct
 	int maxscroll = 3000; //the max scroll for the tab
 	std::vector<std::string> history = {}; //give each tab its own history (currently we have it for the main one)
 	int historypos = -1; //the pos for history/
-
 	//hold the tabs search history!
 	std::vector <std::string> SearchHistory = {};
 
@@ -53,7 +52,7 @@ struct Tab //tab struct
 
 
 
-
+extern float zoomAmount;
 
 
 void SetTabTitle(std::string title);

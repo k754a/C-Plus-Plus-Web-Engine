@@ -20,7 +20,6 @@
 
 
 
-
 //THIS CODE SECTION HANDLES THE SUBCOMPONETS FOR RENDERING THE CSS, THINGS LIKE FINIDING PROPERTIES, ID's, AND RGB.
 //=====================================================================================================================
 
@@ -783,7 +782,7 @@ int LayoutTree(Node* node)
 
 	int currentY = 120; //update this, to fix text clipping
 	int currentX = 10;
-	int startingfontsize = 14;
+	int startingfontsize = (int)(14 * zoomAmount);
 
 
 	MeasureNodes(node, startingfontsize);
