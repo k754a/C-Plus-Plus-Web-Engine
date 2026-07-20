@@ -3,7 +3,7 @@
   <img src="searchimg.jpg" width="48%">
 </p>
 <p align="center">
-  <img src="websiteexample.jpg" width="70%">
+  <img src="websiteexample.png" width="70%">
 </p>
 
 

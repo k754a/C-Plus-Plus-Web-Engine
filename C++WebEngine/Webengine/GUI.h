@@ -6,7 +6,7 @@
 #include <iostream>
 #include <atomic>
 #include "Layout.h" //need for the structs
-
+#include <chrono> //load the c-time.
 
 extern SDL_Color backgroundColor; // default white, but this needs to be global.
 
@@ -30,6 +30,12 @@ struct Tab //tab struct
 	int currentSearchPos = -1;
 
 	Node* domRoot = nullptr;
+
+	int loadGen = 0;
+
+	//tab id is assigned off time, and this allows a unique id every time.
+	//use long long to compress it, to prevent hitting the max on int
+	long long tabID = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); //create a tab id, for the new tab. set it to the current time to prevent overlap.
 
 };
 

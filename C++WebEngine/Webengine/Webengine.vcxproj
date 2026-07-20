@@ -118,6 +118,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\Libraries\SDL3_image\lib\x64;C:\Libraries\SDL3\lib\x64;C:\Libraries\SDL_ttf\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>SDL3.lib;SDL3_ttf.lib;SDL3_image.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OptimizeReferences>false</OptimizeReferences>
+      <EnableCOMDATFolding>false</EnableCOMDATFolding>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>

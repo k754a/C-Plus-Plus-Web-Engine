@@ -25,9 +25,13 @@ std::vector<Layout> mainlayout;
 
 SDL_Texture* loadingTex = nullptr;
 
-ThreadPool gWorkerPool(8); //create a pool.
+ThreadPool gNavPool(4); //create a pool.
 
-ThreadPool gImageThreadPool(4);
+ThreadPool gImageDownloadPool(6); std::mutex gTabsMutex; std::recursive_mutex gTTFMutex; 
+
+ThreadPool gTextRenderPool(4);
+
+int lastsearchedtabID;
 
 //wanted to devlop a way to have a back and forward arrow.
 //the way we can do this is have a list with the websites, and 2 buttons besides the input box, if they are pressed, we change the index, going back or forth
@@ -253,6 +257,8 @@ SDL_Color backgroundColor = { 245, 245, 245, 255 }; //white bg, gets changed btw
 //this is called in layout, and repaces whatever was on the screen with the new layout
 int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot)
 {
+	
+
 	//handle if we have dark mode or not: 
 	if (darkmode)
 	{
@@ -269,6 +275,8 @@ int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot)
 		std::cout << "IMPORT called before tabs ready." << std::endl;
 		return -1;
 	}
+
+	std::lock_guard<std::mutex> lock(gTabsMutex);
 
 	scrollpos = 40; //reset the scroll pos, for new web sites
 	tabs[activeTab].scrollpos = 40;
@@ -289,6 +297,12 @@ int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot)
 	}
 
 	tabs[activeTab].domRoot = newRoot;
+	//tag the tab with the gen, when i make it
+	int gen = tabs[activeTab].loadGen;
+	for (auto& item : layoutGOTTEN)
+	{
+		item.loadGen = gen;
+	}
 
 	tabs[activeTab].layout = layoutGOTTEN;
 	tabs[activeTab].url = urlInput;
@@ -329,7 +343,7 @@ std::string ResolveURL(const std::string& targetUrl, const std::string& currentU
 {
 	//make sure its not blank
 	if (targetUrl.empty()) return targetUrl;
-	//if its good use as is
+
 	if (targetUrl.find("http://") == 0 || targetUrl.find("https://") == 0) return targetUrl;
 
 
@@ -383,114 +397,12 @@ std::string ResolveURL(const std::string& targetUrl, const std::string& currentU
 }
 
 
-//This function will check, and block some chars we dont want.
-std::string FilterNOTDEF(TTF_Font* font, const std::string& text) //FilterNOTDEF retuns a 'std::string', and takes in a TTF_Font, and a const string.
-{
-	std::string out; //create a temp string
-	out.reserve(text.size()); //reserve memory so we can save on performace.
-
-
-	size_t i = 0;//create a size_t, to hold our loop
-
-	while (i < text.size()) //repeate untill our i is larger than our size of the text.
-	{
-		unsigned char c = text[i]; //set a char to hold our single letter
-
-		int len; //hold the len of our char
-		//figure out how many bytes the char takes
-		if (c < 0x80) {
-			len = 1; //1 byte char
-		}
-		else if (c < 0xE0) {
-			len = 2; //2 byte char
-		}
-		else if (c < 0xF0) {
-			len = 3; //3 byte char
-		}
-		else {
-			len = 4; //4 byte char
-		}
-
-		if (i + len > text.size()) break; //if we have some weird, super long text, break.
-
-		//now lets grab the bits from the lead byte's
-
-		Uint32 bytes;
-		if (len == 1) {  //if the len is just one, easy set to just the char
-			bytes = c;
-		}
-		else { //if its any other len, we need to remove the flag bits
-			bytes = c & (0xFF >> (len + 1));
-		} //keep only the data, remove the flag.
-
-
-
-		//now add in the rest of the bytes
-		for (size_t k = 1; k < len; k++) //cant do i, as we alr using that
-		{
-			Uint32 nextByte = text[i + k] & 0x3F; //grab the 6 data bits from the byte
-			bytes = bytes << 6; //move our bytes left 6
-			bytes = bytes | nextByte; //inject our nextBytes in that open space
-		}
-
-
-		//make sure the font can draw this, if not, we dont keep
-		if (TTF_FontHasGlyph(font, bytes))
-		{
-			out.append(text, i, len); //keep the bytes!
-		}
-
-
-
-
-
-
-		i += len; //skip the string
-
-
-
-	}
-
-	return out; //end
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 void PreRender(SDL_Renderer* render, TTF_Font* font)
 {
-	
+	std::lock_guard<std::mutex> lock(gTabsMutex);
 
-	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size())  return; //if we have no active tabs, ignore
+	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size() && lastsearchedtabID == tabs[activeTab].tabID)  return; //if we have no active tabs, ignore
 
 	int xtrack = 20;
 	int ytrack = 120; //issues with the y track, now fixed!
@@ -573,12 +485,15 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 				bool isLink = !tabs[activeTab].layout[i].href.empty(); //if its true, its false, and if its false, its true
 
 
-				Layout* currentItem = &tabs[activeTab].layout[i];
-
 			
+				int currentTabID = activeTab;
+				int myGen = tabs[activeTab].layout[i].loadGen;
+				int currentIndex = i;
 
-				gImageThreadPool.enqueue([text, fontsize, color, isLink, currentItem]() {
+				gTextRenderPool.enqueue([text, fontsize, color, isLink, currentTabID, myGen, currentIndex]() {
 					
+					std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+
 					TTF_Font* threadFont = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", fontsize); //hold the font for the thread
 					
 
@@ -592,8 +507,25 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 					TTF_CloseFont(threadFont); //done, close it
 
 					if (nodeSurf != nullptr) {
-						currentItem->pendingTextSurface = nodeSurf; //upload the surf
-					
+
+						std::lock_guard<std::mutex> lock(gTabsMutex);
+
+						if (currentTabID < 0 || currentTabID >= (int)tabs.size())
+						{
+							SDL_DestroySurface(nodeSurf);
+						}
+						else if (tabs[currentTabID].loadGen != myGen)
+						{
+							SDL_DestroySurface(nodeSurf);
+						}
+						else if (currentIndex < 0 || currentIndex >= (int)tabs[currentTabID].layout.size()) 
+						{
+							SDL_DestroySurface(nodeSurf);
+						}
+						else {
+							tabs[currentTabID].layout[currentIndex].pendingTextSurface = nodeSurf;   
+						}
+
 					}
 					
 					
@@ -638,13 +570,18 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 			std::cout << "Download IMG" << std::endl;
 
 
-			Layout* currentItem = &tabs[activeTab].layout[i];
+			//Layout* currentItem = &tabs[activeTab].layout[i];
+
+			int currentTabID = activeTab;
+			int myGen = tabs[activeTab].layout[i].loadGen;
+			int currentIndex = i;
+			std::string srcCopy = src;
 
 			//make the thread
-			gWorkerPool.enqueue([src, currentItem]() {
+			gImageDownloadPool.enqueue([srcCopy, currentTabID, myGen, currentIndex]() {
 
 				//download the bytes
-				std::vector<unsigned char> bytes = DownloadImages(src);
+				std::vector<unsigned char> bytes = DownloadImages(srcCopy);
 				if (!bytes.empty())
 				{
 
@@ -657,8 +594,25 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 						SDL_Surface* imageSurf = IMG_Load_IO(io, 1); //one closes the io after
 						if (imageSurf != nullptr) //make sure its made correctly
 						{
-							currentItem->pendingSurface = imageSurf;
-							std::cout << "IMG Downloaded into RAM" << std::endl;
+							std::lock_guard<std::mutex> lock(gTabsMutex);
+							if (currentTabID < 0 || currentTabID >= (int)tabs.size())
+							{
+								SDL_DestroySurface(imageSurf);
+							}
+							else if (tabs[currentTabID].loadGen != myGen)
+							{
+								SDL_DestroySurface(imageSurf);
+							}
+							else if (currentTabID < 0 || currentIndex >= (int)tabs[currentTabID].layout.size())
+							{
+								SDL_DestroySurface(imageSurf);
+							}
+							else {
+								std::cout << "IMG Downloaded into RAM" << std::endl;
+								tabs[currentTabID].layout[currentIndex].pendingSurface = imageSurf;
+							
+							}
+							
 						}
 						else {
 							std::cout << "ERROR - Trying To Download IMG" << std::endl;
@@ -735,31 +689,37 @@ void PreRender(SDL_Renderer* render, TTF_Font* font)
 
 int LoadAnimation(SDL_Renderer* render, TTF_Font* font)
 {
-	//reset everything, as we want to make sure we dont have old stuff
-	if (!tabs.empty() && activeTab >= 0 && activeTab < (int)tabs.size())
 	{
-
-		//handle each item in the layout, we want to remove, and reset everything.
-		for (auto& item : tabs[activeTab].layout)
+		std::lock_guard<std::mutex> lock(gTabsMutex);
+		//reset everything, as we want to make sure we dont have old stuff
+		if (!tabs.empty() && activeTab >= 0 && activeTab < (int)tabs.size())
 		{
-			//destroy text and images
-			if (item.textTex) { SDL_DestroyTexture(item.textTex); item.textTex = nullptr; }
-			if (item.imageTex) { SDL_DestroyTexture(item.imageTex); item.imageTex = nullptr; }
 
-			item.textAttempted = false; //reset
-			item.imageAttempted = false; //reset
-			item.pendingTextSurface = nullptr; //reset
+			//handle each item in the layout, we want to remove, and reset everything.
+			for (auto& item : tabs[activeTab].layout)
+			{
+				//destroy text and images
+				if (item.textTex) { SDL_DestroyTexture(item.textTex); item.textTex = nullptr; }
+				if (item.imageTex) { SDL_DestroyTexture(item.imageTex); item.imageTex = nullptr; }
+
+				item.textAttempted = false; //reset
+				item.imageAttempted = false; //reset
+				item.pendingTextSurface = nullptr; //reset
+			}
+			int MainTabId = activeTab; //save the tab it belongs too
+			int myGen = ++tabs[activeTab].loadGen; //move the load gen up one
+
+
+			tabs[activeTab].layout.clear(); //clear
+
+			if (tabs[activeTab].domRoot != nullptr)
+			{
+				DeleteTree(tabs[activeTab].domRoot); //destory the old tree
+				tabs[activeTab].domRoot = nullptr;
+			}
+
 		}
-		tabs[activeTab].layout.clear(); //clear
-
-		if (tabs[activeTab].domRoot != nullptr)
-		{
-			DeleteTree(tabs[activeTab].domRoot); //destory the old tree
-			tabs[activeTab].domRoot = nullptr;
-		}
-
 	}
-
 
 	//now paint the blank frame
 	if (darkmode) //darkmode (inverse)
@@ -827,13 +787,50 @@ void SetTabTitle(std::string title)
 
 void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool addToHistory = true) //handle links, as they can sometimes have /path. simmilar to Resolve url
 {
+	std::cout << "target-> " << target << std::endl;
+
 	if (target.empty()) return;
+
+	//if its good use as is
+	//check if its the new::tab
+	if (target.find("new::tab") == 0)
+	{
+		std::cout << "FOUND NEW TAB" << std::endl; //
+		std::ifstream file("main.html");
+
+		if (!file.is_open()) {
+			std::cout << "Could not open local file." << std::endl;
+			return;
+		}
+		//we dump the file into a buffer
+		LoadAnimation(render, font);
+		std::stringstream buffer;
+
+		//load it in 
+		buffer << file.rdbuf();
+
+		//now we load the full file into a temp var
+		//we use the buffer and convert it into a string
+		std::string fileinfo = buffer.str();
+
+		//now we do something diffrent, we just inject it right into the parser to have the same effect
+		Parser(fileinfo);
+
+		//lets clear the url input too
+		urlInput = "";
+		return;
+	}
+
+	
 
 	//check if its a search or a website, because the old error was that somtimes we would search websites
 	std::string resolvedTarget = target; //make a string to change and modify as we flush out our link.
 
 	//its a url if any of these conditions are met, aswell as no spaces.
 	bool isUrl = (target.find("http://") == 0 || target.find("https://") == 0 || target[0] == '/' || target.find('.') != std::string::npos) && (target.find(' ') == std::string::npos);
+
+	std::lock_guard<std::mutex> lock(gTabsMutex);
+
 
 	if (!isUrl) //if it not a url
 	{
@@ -864,8 +861,7 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 
 	}
 
-	tabs[activeTab].layout.clear();
-
+	
 	//make a temp layout that pretends to be a parsed thing
 	Layout loadingMSG;
 	loadingMSG.x = 10;
@@ -883,6 +879,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 		loadColor = SDL_Color{ 0, 0, 0, 255 };
 	}
 	//make a surf
+	std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+
 	int ogFontSize = TTF_GetFontSize(font);
 	TTF_SetFontSize(font, 72);
 	SDL_Surface* loadSurf = TTF_RenderText_Solid(font, "Loading...", 0, loadColor);
@@ -895,12 +893,15 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 		loadingMSG.height = loadSurf->h;
 		SDL_DestroySurface(loadSurf);
 	}
+	
+	tabs[activeTab].layout.clear();
+
 	tabs[activeTab].layout.push_back(loadingMSG);
 	//update the active tab
 	tabs[activeTab].url = resolvedTarget;
 	urlInput = resolvedTarget;
 	std::wstring wUrl(resolvedTarget.begin(), resolvedTarget.end());
-	gWorkerPool.enqueue([wUrl]() {
+	gNavPool.enqueue([wUrl]() {
 		ConnectSocketHTTPS(wUrl);
 	});
 	
@@ -1085,6 +1086,7 @@ int GUIRENDER()
 			//if we detect the wheel scrolled
 			if (event.type == SDL_EVENT_MOUSE_WHEEL)
 			{
+				 std::lock_guard<std::mutex> lock(gTabsMutex);
 				//scrolling up, but instead of 1px, its 80!
 				tabs[activeTab].scrollpos -= event.wheel.y * 80;
 				if (tabs[activeTab].scrollpos < 40)
@@ -1120,7 +1122,7 @@ int GUIRENDER()
 
 					//ok lets make this work.
 
-
+					lastsearchedtabID = tabs[activeTab].tabID;
 					NavigateTo(urlInput, render, font, true);
 
 
@@ -1186,7 +1188,7 @@ int GUIRENDER()
 							tabs[activeTab].historypos--;
 							std::string prevURL = tabs[activeTab].history[tabs[activeTab].historypos];
 							urlInput = prevURL;
-							
+							std::cout << prevURL;
 							NavigateTo(prevURL, render, font, false);
 						}
 					}
@@ -1201,12 +1203,14 @@ int GUIRENDER()
 							tabs[activeTab].historypos++;
 							std::string nextURL = tabs[activeTab].history[tabs[activeTab].historypos];
 							urlInput = nextURL;
+							currentURL = ""; //reset
+							tabs[activeTab].url = "";  //reset
 							NavigateTo(nextURL, render, font, false);
 							//ok, now, get the thing
 						}
 					}
 
-
+					
 
 
 					if (mouseX >= reloadBtnRect.x && mouseX <= (reloadBtnRect.x + reloadBtnRect.w) &&
@@ -1315,7 +1319,7 @@ int GUIRENDER()
 					//ok this is my plan for the star button, we save the stars, to a txt file, its a toggle, so it saves between loads of the browser, through a custom file (idk what yet tho)
 					//we update the saved links in the https main thing, so its easy to get back to them, and a uncheck removes them, udpates the main.html, and continues!
 					if (mouseX >= starBtnRect.x && mouseX <= (starBtnRect.x + starBtnRect.w) &&
-						mouseY >= starBtnRect.y && mouseY <= (starBtnRect.y + starBtnRect.h)) {
+						mouseY >= starBtnRect.y && mouseY <= (starBtnRect.y + starBtnRect.h) && currentURL != "") {
 
 						//first we get the current url
 						std::string currentSite = currentURL;
@@ -1361,45 +1365,53 @@ int GUIRENDER()
 
 
 
-
-					for (int i = 0; i < tabs[activeTab].layout.size(); i++)
+					bool linkwasClicked = false; //handle links
+					std::string clickedURL;
 					{
-						//skip ones that arnt links
-						if (tabs[activeTab].layout[i].textTex == nullptr) continue;
-						if (tabs[activeTab].layout[i].href.empty()) continue;
-
-						//ok we have a link, now lets adjust the activator block
-						float screeny = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;
-
-						//calculate if we are over it
-						if (mouseX >= tabs[activeTab].layout[i].x && mouseX <= (tabs[activeTab].layout[i].x + tabs[activeTab].layout[i].width) &&
-							mouseY >= screeny && mouseY <= (screeny + tabs[activeTab].layout[i].height))
+						std::lock_guard<std::mutex> lock(gTabsMutex);
+						for (int i = 0; i < tabs[activeTab].layout.size(); i++)
 						{
+							//skip ones that arnt links
+							if (tabs[activeTab].layout[i].textTex == nullptr) continue;
+							if (tabs[activeTab].layout[i].href.empty()) continue;
 
+							//ok we have a link, now lets adjust the activator block
+							float screeny = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;
 
-
-							std::cout << "link pressed" << std::endl;
-
-
-
-
-							std::string finalUrl = tabs[activeTab].layout[i].href;
-
-
-							std::string realDest = FixURLREDIRECT(finalUrl);
-							if (!realDest.empty())
+							//calculate if we are over it
+							if (mouseX >= tabs[activeTab].layout[i].x && mouseX <= (tabs[activeTab].layout[i].x + tabs[activeTab].layout[i].width) &&
+								mouseY >= screeny && mouseY <= (screeny + tabs[activeTab].layout[i].height))
 							{
-								finalUrl = realDest;
+
+
+
+								std::cout << "link pressed" << std::endl;
+
+
+
+
+								std::string finalUrl = tabs[activeTab].layout[i].href;
+
+
+								std::string realDest = FixURLREDIRECT(finalUrl);
+								if (!realDest.empty())
+								{
+									finalUrl = realDest;
+								}
+
+								clickedURL = finalUrl;
+								linkwasClicked = true;
+
+								break;
+
 							}
-							
-							urlInput = finalUrl;
-							NavigateTo(finalUrl, render, font, true);
-
-							break;
-
 						}
-					} 
-
+					}
+					if (linkwasClicked)
+					{
+						urlInput = clickedURL;
+						NavigateTo(clickedURL, render, font, true);
+					}
 
 					//now we settup button detection for the tabs
 					if (mouseY < 30) //instead of checking tabs every time (thats super slow lol) we just first check if its in the right spot
@@ -1418,6 +1430,9 @@ int GUIRENDER()
 							//check for intersects
 							if (mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= 2 && mouseY <= 28 && tabs.size() > 1)
 							{
+								std::lock_guard<std::mutex> lock(gTabsMutex); 
+
+
 								if (tabs[t].domRoot != nullptr)
 								{
 									DeleteTree(tabs[t].domRoot);
@@ -1455,6 +1470,7 @@ int GUIRENDER()
 							//check if the tab was clicked
 							if (mouseX >= tabX && mouseX <= tabX + tabW)
 							{
+								std::lock_guard<std::mutex> lock(gTabsMutex);
 								activeTab = t;
 
 								urlInput = tabs[activeTab].url;
@@ -1471,12 +1487,17 @@ int GUIRENDER()
 						int newTabX = tabs.size() * (tabW + 2);
 						if (mouseX >= newTabX && mouseX <= newTabX + 26)
 						{
+							
 							Tab newTab;
 							newTab.title = "New Tab";
 							//push it back
-							tabs.push_back(newTab);
-							//update the active tab
-							activeTab = tabs.size() - 1;
+							{
+								std::lock_guard<std::mutex> lock(gTabsMutex);
+								tabs.push_back(newTab);
+								//update the active tab
+								activeTab = tabs.size() - 1;
+							}
+						
 							//reset the url input
 							urlInput = "";
 
@@ -1500,8 +1521,12 @@ int GUIRENDER()
 							//now we do something diffrent, we just inject it right into the parser to have the same effect
 							Parser(fileinfo);
 
+							//handle if a tab has no history (fill in with new::tab)
+							tabs[activeTab].history.insert(tabs[activeTab].history.begin(), "new::tab");
+							tabs[activeTab].historypos++;
+							std::lock_guard<std::mutex> lock2(gTabsMutex);
 							//load it early!
-
+							std::cout << "TAB-ID -> " << tabs[activeTab].tabID << std::endl; //DEBUG
 
 						}
 
@@ -1586,60 +1611,62 @@ int GUIRENDER()
 		}
 
 		//draw the page by looping thorugh the layout list
-		for (int i = 0; i < tabs[activeTab].layout.size(); i++)
 		{
-			//render our text, we make a rectange and assign our text to that!
-			SDL_FRect textrec;
-			textrec.x = tabs[activeTab].layout[i].x;
-			textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;
-			textrec.w = tabs[activeTab].layout[i].width;
-			textrec.h = tabs[activeTab].layout[i].height;
-
-			//draw the bg color
-			if (tabs[activeTab].layout[i].hasBg)
+			std::lock_guard<std::mutex> lock(gTabsMutex);
+			for (int i = 0; i < tabs[activeTab].layout.size(); i++)
 			{
-				if (darkmode) //inverse
+				//render our text, we make a rectange and assign our text to that!
+				SDL_FRect textrec;
+				textrec.x = tabs[activeTab].layout[i].x;
+				textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;
+				textrec.w = tabs[activeTab].layout[i].width;
+				textrec.h = tabs[activeTab].layout[i].height;
+
+				//draw the bg color
+				if (tabs[activeTab].layout[i].hasBg)
 				{
-					SDL_SetRenderDrawColor(render, (255 - tabs[activeTab].layout[i].bgColor.r), (255 - tabs[activeTab].layout[i].bgColor.g), (255 - tabs[activeTab].layout[i].bgColor.b),  255); //255 cause we dont want it transparent
+					if (darkmode) //inverse
+					{
+						SDL_SetRenderDrawColor(render, (255 - tabs[activeTab].layout[i].bgColor.r), (255 - tabs[activeTab].layout[i].bgColor.g), (255 - tabs[activeTab].layout[i].bgColor.b), 255); //255 cause we dont want it transparent
+					}
+					else {
+						SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); //255 cause we dont want it transparent
+					}
+
+					//fill the rec
+					SDL_RenderFillRect(render, &textrec);
 				}
-				else {
-					SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); //255 cause we dont want it transparent
+
+				//draw image or text now
+				//check if we got an image, and if the texture has somthing
+				if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex != nullptr)
+				{
+					//for now, we are gonna clamp images
+					//if (textrec.w > 300)
+					//{
+					//	float scale = 300 / textrec.w; //make a scale thing, so we adjust right
+					//	textrec.w = 300; //se the width to 300
+					//	textrec.h = (int)(textrec.h * scale); //so that the scale is accurate
+					//}
+
+					SDL_RenderTexture(render, tabs[activeTab].layout[i].imageTex, nullptr, &textrec);
 				}
-				
-				//fill the rec
-				SDL_RenderFillRect(render, &textrec);
+				//if our text contains something
+				else if (tabs[activeTab].layout[i].textTex != nullptr)
+				{
+					SDL_RenderTexture(render, tabs[activeTab].layout[i].textTex, nullptr, &textrec);
+				}
+
+
+
+
+
+
+
+
+
 			}
-
-			//draw image or text now
-			//check if we got an image, and if the texture has somthing
-			if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex != nullptr)
-			{
-				//for now, we are gonna clamp images
-				//if (textrec.w > 300)
-				//{
-				//	float scale = 300 / textrec.w; //make a scale thing, so we adjust right
-				//	textrec.w = 300; //se the width to 300
-				//	textrec.h = (int)(textrec.h * scale); //so that the scale is accurate
-				//}
-
-				SDL_RenderTexture(render, tabs[activeTab].layout[i].imageTex, nullptr, &textrec);
-			}
-			//if our text contains something
-			else if (tabs[activeTab].layout[i].textTex != nullptr)
-			{
-				SDL_RenderTexture(render, tabs[activeTab].layout[i].textTex, nullptr, &textrec);
-			}
-
-
-
-
-
-
-
-			
-
 		}
-
 
 		//icons! Home, Reload, Back+Forth arrows, search, star, printer
 		//љ њ ђ ы ж ξ
@@ -1812,7 +1839,11 @@ int GUIRENDER()
 	
 
 		//BACK ARROW
-		SDL_Surface* backSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);
+		SDL_Surface* backSurf; 
+		{
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+			backSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);
+		}
 		if (backSurf != nullptr)
 		{
 			SDL_Texture* backTex = SDL_CreateTextureFromSurface(render, backSurf);
@@ -1872,7 +1903,11 @@ int GUIRENDER()
 
 
 		//FORWARD ARROW
-		SDL_Surface* forwardSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);
+		SDL_Surface* forwardSurf; 
+		{
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+			forwardSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);
+		}
 		if (forwardSurf != nullptr)
 		{
 			//flip the sprite, as currently its ugly lol
@@ -1914,7 +1949,12 @@ int GUIRENDER()
 		}
 		SDL_RenderFillRect(render, &reloadButton);
 
-		SDL_Surface* reloadSurf = TTF_RenderText_Solid(iconFont, "њ", 0, textColor);
+		SDL_Surface* reloadSurf;
+		{
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+			reloadSurf = TTF_RenderText_Solid(iconFont, "њ", 0, textColor);
+		}
+
 		if (reloadSurf != nullptr)
 		{
 			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, reloadSurf);
@@ -1952,7 +1992,12 @@ int GUIRENDER()
 
 		
 		
-		SDL_Surface* homeSurf = TTF_RenderText_Blended(iconFont, "љ", 0, textColor);
+		SDL_Surface* homeSurf; 
+		{
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+			homeSurf = TTF_RenderText_Blended(iconFont, "љ", 0, textColor);
+		}
+
 		if (homeSurf != nullptr)
 		{
 			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, homeSurf);
@@ -1994,7 +2039,7 @@ int GUIRENDER()
 		//fill the rec with this
 		SDL_RenderFillRect(render, &bar);
 
-
+		std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
 		//draw the text typed
 		TTF_SetFontSize(font, 17); //define the font size
 		std::string displayText = urlInput;
@@ -2112,7 +2157,12 @@ int GUIRENDER()
 		SDL_RenderFillRect(render, &starBtn);
 
 		//RENDER STAR
-		SDL_Surface* starSurf = TTF_RenderText_Solid(iconFont, "ж", 0, textColor);
+		SDL_Surface* starSurf;
+		{
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+			starSurf = TTF_RenderText_Solid(iconFont, "ж", 0, textColor);
+		}
+
 		if (starSurf != nullptr)
 		{
 			SDL_Texture* starTex = SDL_CreateTextureFromSurface(render, starSurf);
@@ -2152,7 +2202,12 @@ int GUIRENDER()
 		SDL_RenderFillRect(render, &printerBtn);
 
 		//RENDER PRINTER
-		SDL_Surface* printerSurf = TTF_RenderText_Solid(iconFont, "ξ", 0, textColor);
+		SDL_Surface* printerSurf;
+		{
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+			printerSurf = TTF_RenderText_Solid(iconFont, "ξ", 0, textColor);
+		}
+
 		if (printerSurf != nullptr)
 		{
 			SDL_Texture* printerTex = SDL_CreateTextureFromSurface(render, printerSurf);
@@ -2245,7 +2300,7 @@ int GUIRENDER()
 			SDL_RenderFillRect(render, &tabrect);
 
 
-
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
 			//ok now lets draw the tab text (gonna be the <title> text)
 			TTF_SetFontSize(font, 13);
 			//set the color to black, and the title to the title
@@ -2342,12 +2397,15 @@ int GUIRENDER()
 		SDL_Surface* plusSurf;
 
 		//just a copy and paste atp
-		if (darkmode) //darkmode
 		{
-			plusSurf = TTF_RenderText_Solid(font, "+", 0, { 255,255,255,255 });
-		}
-		else {
-			plusSurf = TTF_RenderText_Solid(font, "+", 0, { 0,0,0,255 });
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+			if (darkmode) //darkmode
+			{
+				plusSurf = TTF_RenderText_Solid(font, "+", 0, { 255,255,255,255 });
+			}
+			else {
+				plusSurf = TTF_RenderText_Solid(font, "+", 0, { 0,0,0,255 });
+			}
 		}
 
 		//make sure we have made it

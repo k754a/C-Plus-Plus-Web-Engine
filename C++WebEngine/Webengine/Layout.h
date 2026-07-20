@@ -63,7 +63,7 @@ struct Layout
 	//this will speed up stuff
 	bool isImage = false;
 
-
+    int loadGen = 0; //set when the layout is created.
 	//because we attempt to pull multiple times, we gotta make sure we dont get stuck in a loop
 	bool imageAttempted = false;
 
@@ -79,7 +79,6 @@ struct Layout
     //we make copies so that SDL_Surface can use this lol
     Layout() = default;
 
-    // 2. Custom Copy Constructor
     Layout(const Layout& other)
     {
         node = other.node;
@@ -99,9 +98,10 @@ struct Layout
         imageAttempted = other.imageAttempted;
 
         pendingSurface.store(other.pendingSurface.load());
+
+        loadGen = other.loadGen;
     }
 
-    // 3. Custom Copy Assignment Operator
     Layout& operator=(const Layout& other)
     {
         if (this != &other)
@@ -121,6 +121,7 @@ struct Layout
             imageTex = other.imageTex;
             imageAttempted = other.imageAttempted;
 
+            loadGen = other.loadGen;
           
             pendingSurface.store(other.pendingSurface.load());
         }
