@@ -7,6 +7,8 @@
 #include <atomic>
 #include "Layout.h" //need for the structs
 #include <chrono> //load the c-time.
+#include <fstream>  //for loading local files
+#include <sstream> // for the buffer
 
 extern SDL_Color backgroundColor; // default white, but this needs to be global.
 

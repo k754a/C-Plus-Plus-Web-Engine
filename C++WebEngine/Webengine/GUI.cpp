@@ -1,165 +1,135 @@
 //THIS IS THE WINDOW RENDER
 //(THIS WILL TAKE IN MULTIPLE INPUTS, FROM Layout.cpp, and Webengine.cpp.
 
+#pragma region //Imports from the project file headers.
 
-#include "GUI.h"
-#include <SDL3/SDL.h> //include the SDL3 lib
-#include <SDL3_ttf/SDL_ttf.h> //fonts lib
-#include <thread> //lets us do our multiple searches in one run
-#include <regex> //checking for https or http format
-#include <iostream>
-#include "ConnectSocket.h" //pulls our validate string global libary
-#include <fstream>  //for loading local files
-#include <sstream> // for the buffer
-#include "Parser.h"
-#include <SDL3_image/SDL_image.h>
-#include <windows.h> //for the print
-#include <filesystem> //for the folder handling on the bmp
-#include "Profiler.h" //DEBUG
-#include "ThreadPool.h"
-//MOVED TO TAB MODE.
+//=======IMPORTS-WEBENGINE-FILE'S=======\\
 
-//this is the layout list, and gets filled in by IMPORT
-//the render loop reads from this 
-std::vector<Layout> mainlayout;
+#include "ThreadPool.h" //for handling all our ThreadPool functs.
+#include "GUI.h" //import from GUI.h file, holds the TAB struct, and a few other global classes.
+#include "Parser.h" //used for sending some parts stright to the parser (like for the tab::new)
+#include "Profiler.h" //used for handling the performace analization of some functs.
+#include "ConnectSocket.h" //allows to send a request to connect socket.cpp -> parser.cpp -> Domtree -> Layout -> GUI.cpp tab render!
 
-SDL_Texture* loadingTex = nullptr;
-
-ThreadPool gNavPool(4); //create a pool.
-
-ThreadPool gImageDownloadPool(6); std::mutex gTabsMutex; std::recursive_mutex gTTFMutex; 
-
-ThreadPool gTextRenderPool(4);
-
-int lastsearchedtabID;
-
-//wanted to devlop a way to have a back and forward arrow.
-//the way we can do this is have a list with the websites, and 2 buttons besides the input box, if they are pressed, we change the index, going back or forth
-//this is my thoughs
-
-//SEARCH -> ADD TO LIST -> SAVED
-
-//WHEN BUTTON PRESSED (either or) -> LOOK FORWARD OR BACKWARD IN THE LIST -> COMPARE TILL WE FIND THE INDEX -> MOVE BACK ONE.
+#pragma endregion
 
 
+#pragma region //Imports from the projects external libs.
+
+//=======IMPORTS-GLOBAL-LIBS'S=======\\
+
+#include <SDL3/SDL.h> //include the SDL3 lib - For all the box and screen rendering.
+#include <SDL3_ttf/SDL_ttf.h> //fonts lib - For all the fonts, and loading and handling the font.
+#include <SDL3_image/SDL_image.h> //images lib - For all the Image rendering, and handling it.
+
+#include <filesystem> //for just the print window button, just that.
 
 
-// create the first tab immediately at startup before anything else runs
-// this has to be here, not in GUIRENDER, because Parser/IMPORT run before GUIRENDER sets up tabs
-
-//make the first tab (it crashes if you dont btw)
-
-//C++ global structs always run first, so we can make it instantly
+#pragma endregion
 
 
-//MOVED CURRENT SEARCH HISTORY, AS WE NEED SEPRATE ONES FOR TABS!
+SDL_Texture* loadingTex = nullptr; //holds our GLOBAL loadingTexture "texture" -> so that multiple classes can use it! (displays just the loading...)
 
-//
-////SUDO CODE
-////if(SearchHistory[i] == urlInput && searchHistory.length() > 1){
-////
-////	urlInput = SearchHistory[i - 1];
-//// 
-//// 
-//// 
-//// 
-////}
-//
-////we we search, we add one to the top, if we search, and our current pos is back one from our search history, we will overwrite that history.
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-////the pos and how far weve scrolled down for the page
-////starts at the top of the page 0, and increases as the user scrolls down.
-////its subtracted from each elements y, so it gives the illiusion of scrolling.
-int scrollpos = 40;
+std::string SearchProvider = "lite.duckduckgo.com/lite/?q="; //you can change this to whatever you want. (note, most do not work)
 
-std::string urlInput = "";    // holds the url we type
-std::string currentURL = ""; //hold the url, but does not change till someone presses search!
+#pragma region //Threads and Mutex global vars.
 
-std::vector<Tab> tabs;        // all open tabs
-int activeTab = 0;            // active tab open
+//=======CREATE THREAD HANDLERS=======\\
 
-struct TabInit {
+ThreadPool gNavPool(4); //A ThreadPool, that handles networking at the same time the main loop runs.
+std::mutex gTabsMutex; //Prevent other threads from accessing the same mem and resources at the same time. this prevents crashes, and is used an a few parts. used for the tabs.
+
+
+ThreadPool gTextRenderPool(4);  //A ThreadPool, that handles text rendering at the same time the main loop runs.
+std::recursive_mutex gTTFMutex; //same as the other mutex but can be locked more than once, and used for the text.
+
+
+ThreadPool gImageDownloadPool(6);  //A ThreadPool, that handles Image downloads at the same time the main loop runs.
+
+
+
+
+#pragma endregion
+
+#pragma region //Global vars.
+
+
+SDL_Color backgroundColor = { 245, 245, 245, 255 }; //handles the bg color of the page, does change (is white on start)
+
+
+
+
+std::vector<std::string> starredPages; //create a string vector list to hold our starred, saved pages!
+
+
+float zoomAmount = 1.0f; //global float to handle the zoom amount
+
+
+std::string urlInput = "";    // holds the url we type in the input box
+std::string currentURL = ""; //hold the url, but does not save till we press search.
+
+std::vector<Tab> tabs;        // a vector that holds our custom tab struct, allowing us to create tabs, and save data to them.
+int activeTab = 0;            // holds the amount of tabs open
+int lastsearchedtabID; //holds the id of the last searched tab.
+
+#pragma endregion
+
+#pragma region //Create First Tab (On Start)
+
+//=======BUILD THE NEW TAB - ON FIRST START=======\\
+
+struct TabInit { //as soon as GUI is started, we run this before everything, this allows us to create a new tab.
 	TabInit() {
-		Tab t;
-		t.title = "New Tab";
-		tabs.push_back(t);
-		activeTab = 0;
-		lastsearchedtabID = tabs[0].tabID;
+		Tab t; //create a temp tab struct named "t"
+		t.title = "New Tab"; //assign a title
+		t.url = "new::tab"; //set the url to new::tab
+
+		t.history.push_back("new::tab"); //set the history to new::tab
+		t.historypos = 0; //set the history pos to 0 (starting)
+
+		tabs.push_back(t); //push back to our main tabs vector list
+		activeTab = 0; //set the activeTab to 0 (as in a vector, 0 is the first element)
+		lastsearchedtabID = tabs[0].tabID; //update the last searched i
 		
 	}
-} _tabInit;
+} _tabInit; //insure it runs on start
 
-float zoomAmount = 1.0f;
+#pragma endregion
 
-//======DELETE TREE======\\
+#pragma region //Handle Star Functions
 
-void DeleteTree(Node* node) //this takes in our custom node tree, and returns nothing.
+//=======LOAD STARRED PAGES=======\\
+
+int LoadStarredPages() //load star pages returns an int, and takes nothing in
 {
-	//insure that our node is not null
-	if (node == nullptr) return; //error case, just return
+	
+	starredPages.clear(); //takes our global vector<string> class, and removes everything from it on start
 
-	for (Node* child : node->children) //loop through every child in this node
+	std::ifstream bookmarks("starred_pages.STAR"); //attempt to open our starred_pages.STAR file
+	if (!bookmarks.is_open()) return false; //if we cannot find it, we return false
+	
+	std::string line; //create a temp string var.
+
+	while (std::getline(bookmarks, line)) //while getting each line of the file returns true, (it exists), and set the 'line' var to it
 	{
-		DeleteTree(child); //for each child we call this, to destroy its child's.
-	}
-	node->children.clear();
-
-	delete node; //we have made it to the bottom, destroy ourselves.
-}
-
-
-
-std::vector<std::string> starredPages; //hold our starred, saved pages!
-int LoadStarredPages()
-{
-	//fist clean our vector, just in case
-	starredPages.clear();
-
-	//then open the file
-	std::ifstream bookmarks("starred_pages.STAR");
-
-	//before we do anything, make sure that its open, (cause we will 100% crash lol)
-	if (bookmarks.is_open())
-	{
-		std::string line;
-
-		//read the file line by line, and then add it to the starredPages
-		//when we have no more lines, we can return false
-		while (std::getline(bookmarks, line))
-		{
-			//ignore blank lines
-			if (!line.empty())
-			{
-				//add it
-				starredPages.push_back(line);
-			}
-		}
-		bookmarks.close();
+		
+		if (!line.empty()) //ignore blank lines (skip
+			starredPages.push_back(line); //if its not blank, we add it to the starred pages
 	}
 
-	return 0;
-}
+	return 0; //end
 
+} //END OF LoadStarredPages
 
-//now we update the html!
+//=======UPDATE HTML=======\\
 
-int UpdateHTML()
+int UpdateHTML() //UPDATE HTML returns an int, and takes nothing in
 {
-	std::ofstream htmlFile("main.html", std::ios::trunc); //make sure to overwrite it on open
+	std::ofstream htmlFile("main.html", std::ios::trunc);  //open the file "main.html" but overwrite everything in it
 
-	//checks to make sure that its good!
-	if (htmlFile.is_open())
+	if (htmlFile.is_open()) //make sure we have it open
 	{
-				//first add the stuff to it: 
+				//add to the html file, the html base
 				htmlFile << R"(<!DOCTYPE html><html lang="en"><head>
 			<link rel="icon" href="data:,">
 			<meta name="viewport" content="width=device-width, initial-scale=1">
@@ -194,763 +164,329 @@ int UpdateHTML()
        
 
 				<h1>To start, search anything. ы </h1>
-				<h1>‎ </h1>
+				<h1>&nbsp;</h1>
 		)";
 
-			//now we loop through each starred page, and print them!
-		if (!starredPages.empty()) //we display somthin else if they are empty!
+			
+		if (!starredPages.empty()) //make sure that the starred pages list contain something
 		{
-			htmlFile << "        <br>Starred Pages:\n"; //display the star pages
-			for (const std::string& site : starredPages) { //go through each one, and add it to the file
+			htmlFile << "        <br>Starred Pages:\n"; //small starred page header
+			for (const std::string& site : starredPages) { //go through each line in starPages
 				
-				htmlFile << "        <p>ж -<a href=\"" << site << "\">" << site << "</a></p>\n";
+				htmlFile << "        <p>ж -<a href=\"" << site << "\">" << site << "</a></p>\n"; //add the site to the html file, as a new line
 			}
 		}
-		else {
-			htmlFile << "<br>No Starred Pages\n";
+		else { //does not contain anything
+			htmlFile << "<br>No Starred Pages\n"; //display that
 		}
 
-		htmlFile << R"(    </div></body></html>)"; 
+		htmlFile << R"(    </div></body></html>)"; //end peices, to insure its valid html
 
 
-		//close the file
-		htmlFile.close();
+		htmlFile.close(); //close the file
+
 
 
 	}
-	return 0;
-}
+	return 0; //end, return 0
+} //END OF UpdateHTML
 
 
 
+#pragma endregion
 
+#pragma region //Handle Import (holds IMPORT)
 
+//=======IMPORT=======\\
 
+//this is called in layout, and replaces whatever was on the screen with the new layout
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-bool urlBarFocused = true;    // currently we have no other inputs, so we can always have this focused!
-SDL_Color backgroundColor = { 245, 245, 245, 255 }; //white bg, gets changed btw
-
-
-//this is called in layout, and repaces whatever was on the screen with the new layout
-int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot)
+int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot) //IMPORT
 {
+	PROFILE("IMPORT"); //Send the recording to the PROFILE funct, to measure its speed.
+	std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock for the tab, this prevents crashes by preventing other functions with this lock, from changing the data preventing 2 things writing 1 data
 	
+	//if we have nothing in the tabs, or no active tabs, or activeTab is greater than the amount of tabs currently, we debug, and break to prevent an error
+	if (tabs.empty() || activeTab < 0 || activeTab >= static_cast<int>(tabs.size())) { std::cout << "IMPORT called before tabs ready." << std::endl; return -1; }
 
-	//handle if we have dark mode or not: 
-	if (darkmode)
-	{
-		SDL_Color backgroundColor = { 1, 1, 1, 255 }; //black bg, gets changed, but will stay, if there isnt a defined color
-	}
-	else {
-		SDL_Color backgroundColor = { 245, 245, 245, 255 }; //white bg, gets changed, but will stay, if there isnt a defined color
-	}
+	
+	int idx = -1; //temp int to hold the current tab index
+	for (int i = 0 ; i < (int)tabs.size(); i++) { //loop through each tab in our list
 
-	PROFILE("IMPORT"); //PROFILE THE IMPORT
-
-	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size())
-	{
-		std::cout << "IMPORT called before tabs ready." << std::endl;
-		return -1;
-	}
-
-	std::lock_guard<std::mutex> lock(gTabsMutex);
-	int idx = -1; //index of the tab
-
-	for (int i = 0 ; i < (int)tabs.size(); i++)
-	{
-		if (tabs[i].tabID == lastsearchedtabID) //loop till we find the correct tab
-		{
-			//set the idx to it
-			idx = i;
-			break;
-		}
-	}
-
-	if (idx == -1) //if we cannot find the tab
-	{
-		DeleteTree(newRoot); //rm the tree to prevent a mem leak
-		return -1;
-	}
-
-
-
-	scrollpos = 40; //reset the scroll pos, for new web sites
-	tabs[idx].scrollpos = 40;
-	//we need to destroy all the old textures, as these are loaded in gpu mem
-	for (int i = 0; i < tabs[idx].layout.size(); i++)
-	{
-		if (tabs[idx].layout[i].textTex != nullptr) //check to make sure we dont double free
-		{
-			SDL_DestroyTexture(tabs[idx].layout[i].textTex); //tells the gpu to free this
-			tabs[idx].layout[i].textTex = nullptr; //set it to null so we dont do it twice, and crash
-		}
-	}
-
-	//rm the old tree
-	if (tabs[idx].domRoot != nullptr)
-	{
-		DeleteTree(tabs[idx].domRoot);
-	}
-
-	tabs[idx].domRoot = newRoot;
-	//tag the tab with the gen, when i make it
-	int gen = tabs[idx].loadGen;
-	for (auto& item : layoutGOTTEN)
-	{
-		item.loadGen = gen;
-	}
-
-	tabs[idx].layout = layoutGOTTEN;
-
-	if (idx == activeTab)
-	{
-		tabs[idx].url = urlInput;
+		//to make sure we update only the active tab, we loop through and check the active tab, 
+		//if we find it, we set the idx to the 'i' and break.
+		if (tabs[i].tabID == lastsearchedtabID) { idx = i; break; } 
 	}
 	
-	currentURL = urlInput;
-	std::cout << "Updated" << std::endl;
-	return 0;
-}
-//moved to this, for speed!
-//this uploads the textures to the gpu
-//the idea is that we only do the GPU stuff once a layout, then assign this to a texture, that moves
+	//if our idx did not change (set to -1 at the start), we know we could not find it, so do some cleanup, and break to prevent any errors.
+	if (idx == -1) { DeleteTree(newRoot); return -1; } 
 
-std::string PercentDecode(const std::string& src)
+
+	auto& tab = tabs[idx]; //small reference so i don't need to repeat ' tabs[idx] ' everywhere
+
+	for (auto& item : tab.layout) { //loops through each 'item' in the tab.layout
+		if (item.textTex) SDL_DestroyTexture(item.textTex); //if each item's textTex contains old stuff, (if it contains anything it returns true) destroy it.
+	}
+	if (tab.domRoot != nullptr) { DeleteTree(tabs[idx].domRoot); } //again, if our tab contains any old stuff in the domroot, destory. (using DeleteTree in Layout.cpp)
+
+	for (auto& item : layoutGOTTEN) item.loadGen = tab.loadGen; //for each item in layoutGOTTEN, we assign the loadgen value from our tab.loadgen
+
+	tab.domRoot = newRoot; //update the tab with our new domRoot
+	tab.scrollpos = 40; //reset the tabs scroll pos to '40'
+	tab.layout = layoutGOTTEN; //update the old layout with our newer layoutGOTTEN vector
+	if (idx == activeTab) { tabs[idx].url = urlInput; } //if the id of the tab = to the current tab, update the url with url input.
+	currentURL = urlInput; //update the current url setting it to the urlInput.
+	
+	return 0; //return 0
+} //END OF IMPORT
+
+
+#pragma endregion
+
+#pragma region //Handle URL PARSING
+
+
+//=======Percent Decode=======\\
+
+std::string PercentDecode(const std::string& src) //Percent Decode returns a std::string, and takes in a const string
 {
-	std::string out;
-	for (size_t i = 0; i < src.size(); i++)
+	std::string out; //create a temp string to hold our final output.
+	for (size_t i = 0; i < src.size(); i++) //for each char in src.size
 	{
-		if (src[i] == '%' && i + 2 < src.size())
+		if (src[i] == '%' && i + 2 < src.size()) //if src contains a % and i + 2 is not greater than the size.
 		{
-			std::string hex = src.substr(i + 1, 2);
-			char decoded = (char)std::stoul(hex, nullptr, 16);
-			out += decoded;
-			i += 2;
+			std::string hex = src.substr(i + 1, 2); //create a temp hex, where we grab the 2 hex chars after the %
+			char decoded = (char)std::stoul(hex, nullptr, 16); //convert the hex string from base 16 to a normal char
+			out += decoded; //add it to our output string
+			i += 2; //now we skip, as we just finished handling the 2 before.
 		}
-		else if (src[i] == '+') //handle things like +'s in urls
+		else if (src[i] == '+') //if src contains a +
 		{
-			out += ' ';
+			out += ' '; //replace the plus for a blank char
 		}
 		else
 		{
-			out += src[i];
+			out += src[i]; //if its a normal char, just add it on normally
 		}
 	}
-	return out;
-}
+	return out; //return the final string
+
+} //END OF PercentDecode
 
 
-std::string ResolveURL(const std::string& targetUrl, const std::string& currentUrl)
+//=======Resolve URL=======\\
+
+std::string ResolveURL(const std::string& targetUrl, const std::string& currentUrl) //ResolveURL takes in 2 const strings, a target url, and the current url, and returns a string
 {
-	//make sure its not blank
-	if (targetUrl.empty()) return targetUrl;
+	if (targetUrl.empty()) return targetUrl; //if the url is empty, just return, as we don't want to deal with that
 
-	if (targetUrl.find("http://") == 0 || targetUrl.find("https://") == 0) return targetUrl;
+	if (targetUrl.find("http://") == 0 || targetUrl.find("https://") == 0) return targetUrl; //if it starts as a full url, just return, we are good.
+	if (targetUrl.find("//", 0) == 0) { return "https:" + targetUrl; } //if it starts like '//' add the https: + // + example.com
 
-
-	//handle urls like //example.com
-	if (targetUrl.find("//", 0) == 0)
-	{
-		return "https:" + targetUrl; //fix it to be https://example.com
-	}
-
-	//get the domain part, not the full link
-	std::string domain = "";
+	
+	//std::string domain = "";
 	size_t protoend = currentUrl.find("://");
-	//if we find the protoend
-	if (protoend != std::string::npos)
+	if (protoend == std::string::npos) return targetUrl; //The URL does'nt have the :// style, so return and end.
+
+
+	size_t pathStart = currentURL.find('/', protoend + 3); //create a size_t var, that takes the value of where the / is.
+
+
+	//handle absolute paths like /assets/example.png -> https://Example.com/assets/example.com
+	if (targetUrl[0] == '/') //if the start of the targetURL, is a / (like /image.png)
 	{
-		size_t domainEnd = currentUrl.find("/", protoend + 3); //get the end of it
-		if (domainEnd != std::string::npos)
+		std::string domain; //make a temp string 'domain'
+		if (pathStart != std::string::npos) //if the pathStart contains something
 		{
-			domain = currentUrl.substr(0, domainEnd); //get it like https://Example.com
+			domain = currentUrl.substr(0, pathStart); // we set the domain to the currenturl from the start, to pathstart (https://Example.com)
 		}
 		else {
-			domain = currentUrl; //no path, this is the domain
+			return domain = currentUrl; //the path start does'nt have a '/' so we can guess there is no substring.
 		}
+		return domain + targetUrl; //return the domain + the targeturl https://example.com + /example.png
 	}
-	
-	//handle absolute paths like /assets/example.png -> https://Example.coom/assets/example.com
 
-	if (targetUrl[0] == '/')
+
+	//handle something like images/pic.png
+	size_t lastSlash = currentUrl.rfind('/'); //create a temp size t, turns out rfind is faster.
+	if (lastSlash != std::string::npos && lastSlash > protoend + 2) //if the lastSlash contains something, and lastSlash > protoend + 2
 	{
-		return domain + targetUrl;
+		return currentURL.substr(0, lastSlash + 1) + targetUrl; //if so, we return, grabbing our full url so https://Example.com/assets/example.com
 	}
 
-	//get the direc of the current page for the paths
-	std::string directory = domain;
-	size_t lastSlash = currentUrl.rfind("/");
-	size_t protoSlash = currentUrl.find("://");
 
-	//make sure the last slash isnt appart of the ://
-	if (lastSlash != std::string::npos && lastSlash > protoSlash + 3)
+
+	//handle if we don't have any / after the domain
+	std::string Fallback;
+	if (pathStart != std::string::npos)
 	{
-		directory = currentUrl.substr(0, lastSlash);
-	}
-
-
-
-	//reletive path
-
-	return directory + "/" + targetUrl;
-
-
-}
-
-
-
-void PreRender(SDL_Renderer* render, TTF_Font* font)
-{
-	std::lock_guard<std::mutex> lock(gTabsMutex);
-
-	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size() && lastsearchedtabID == tabs[activeTab].tabID)  return; //if we have no active tabs, ignore
-
-	int xtrack = 20;
-	int ytrack = 120; //issues with the y track, now fixed!
-	int lasty = -1; //set to -1 for first run so we allways small first run
-	int maxLineHeight = 0; //fix clipping
-
-	for (int i = 0; i < tabs[activeTab].layout.size(); i++) {
-
-		//if the item already has a texture
-		//we skip so we dont rerender it
-
-		//this old one worked, but didnt handle stuf flike line breaks or tabs cells or colums
-		//if (lasty != -1 && mainlayout[i].y > lasty) {
-		//	xtrack = 20;
-
-		//	ytrack += (maxLineHeight + 15);
-		//	maxLineHeight = 0;
-		//}
-
-		//check if we placed not the very first item, but an item, then we check that the y assigned is bigger than the curent, so that means we should be on a new line ish
-		if (lasty != -1 && tabs[activeTab].layout[i].y > lasty) //check if this is a colum or line break
-		{
-			xtrack = 20;
-			ytrack += (maxLineHeight + 15);
-			maxLineHeight = 0;
-		}
-
-		lasty = tabs[activeTab].layout[i].y;
-		//if we dedtect this as a cell with a x offset, do that
-
-
-		//check if this is a table with a colum offset and stuff
-		if (tabs[activeTab].layout[i].x > 20)
-		{
-			//pick whatever is furthest right 
-			int colX = (xtrack > tabs[activeTab].layout[i].x) ? xtrack : tabs[activeTab].layout[i].x; //my max dont work, so i had to use google to fix ts
-			tabs[activeTab].layout[i].x = colX;
-			xtrack = colX;
-		}
-		else
-		{
-			//if its normal or whatever
-			tabs[activeTab].layout[i].x = xtrack;
-		}
-
-
-
-
-
-
-		tabs[activeTab].layout[i].y = ytrack;
-
-
-
-
-
-
-		//make sure its not an image (because then it draws img)
-		if (tabs[activeTab].layout[i].textTex == nullptr && !tabs[activeTab].layout[i].isImage && !tabs[activeTab].layout[i].textAttempted)
-		{
-
-			
-
-
-			//grab the text string from our current mainlayout node
-			//the value holds the text.
-			std::string text = tabs[activeTab].layout[i].node->tagValue;// Make sure this holds the text payload!
-
-			//we pull the layout i (loop through everything)
-			//Layout currentLayout = mainlayout[i];
-
-
-			if (!text.empty())
-			{
-				tabs[activeTab].layout[i].textAttempted = true; //set the attempted to true.
-
-				//grab everything the thread will need.
-				int fontsize = tabs[activeTab].layout[i].fontSize;
-				SDL_Color color = tabs[activeTab].layout[i].textColor;
-				bool isLink = !tabs[activeTab].layout[i].href.empty(); //if its true, its false, and if its false, its true
-
-
-			
-				int currentTabID = activeTab;
-				int myGen = tabs[activeTab].layout[i].loadGen;
-				int currentIndex = i;
-
-				gTextRenderPool.enqueue([text, fontsize, color, isLink, currentTabID, myGen, currentIndex]() {
-					
-					std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-
-					TTF_Font* threadFont = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", fontsize); //hold the font for the thread
-					
-
-					if (threadFont == nullptr) return; //if its null, end
-					
-					if(isLink) TTF_SetFontStyle(threadFont, TTF_STYLE_UNDERLINE); //hanlde underline text
-					
-					SDL_Surface* nodeSurf = TTF_RenderText_Solid(threadFont, text.c_str(), 0, color); //create a temp nodeSerf, to hold it
-
-					
-					TTF_CloseFont(threadFont); //done, close it
-
-					if (nodeSurf != nullptr) {
-
-						std::lock_guard<std::mutex> lock(gTabsMutex);
-
-						if (currentTabID < 0 || currentTabID >= (int)tabs.size())
-						{
-							SDL_DestroySurface(nodeSurf);
-						}
-						else if (tabs[currentTabID].loadGen != myGen)
-						{
-							SDL_DestroySurface(nodeSurf);
-						}
-						else if (currentIndex < 0 || currentIndex >= (int)tabs[currentTabID].layout.size()) 
-						{
-							SDL_DestroySurface(nodeSurf);
-						}
-						else {
-							tabs[currentTabID].layout[currentIndex].pendingTextSurface = nodeSurf;   
-						}
-
-					}
-					
-					
-				}); //end 
-
-
-			}
-		}
-
-		//if the surf has something
-		if (tabs[activeTab].layout[i].pendingTextSurface != nullptr)
-		{
-			//if it does
-			SDL_Surface* nodeSurf = tabs[activeTab].layout[i].pendingTextSurface.exchange(nullptr); //grab the node serf, and make a temp var
-			//make sure the node surf worked
-			if (nodeSurf != nullptr)
-			{
-				//assign the properties
-				tabs[activeTab].layout[i].width = nodeSurf->w; //assign the width
-				tabs[activeTab].layout[i].height = nodeSurf->h; //assign the hight
-				tabs[activeTab].layout[i].textTex = SDL_CreateTextureFromSurface(render, nodeSurf); //upload the rendering to the gpu
-				SDL_DestroySurface(nodeSurf); //we are done, now that its on gpu
-			}
-		}
-
-		//DO THE THREAD HERE
-
-		//do somthing similar for images
-		//first check if its an image, if it doesnt have a texture, and src has somthing
-		if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex == nullptr && tabs[activeTab].layout[i].node->src != "" && !tabs[activeTab].layout[i].imageAttempted)
-		{
-
-			tabs[activeTab].layout[i].imageAttempted = true;
-
-
-			std::string src = tabs[activeTab].layout[i].node->src; //set it to the src value
-
-			
-			src = ResolveURL(src, urlInput);
-			std::cout << "[IMG] Resolved URL: " << src << std::endl;
-
-			std::cout << "Download IMG" << std::endl;
-
-
-			//Layout* currentItem = &tabs[activeTab].layout[i];
-
-			int currentTabID = activeTab;
-			int myGen = tabs[activeTab].layout[i].loadGen;
-			int currentIndex = i;
-			std::string srcCopy = src;
-
-			//make the thread
-			gImageDownloadPool.enqueue([srcCopy, currentTabID, myGen, currentIndex]() {
-
-				//download the bytes
-				std::vector<unsigned char> bytes = DownloadImages(srcCopy);
-				if (!bytes.empty())
-				{
-
-					//load from mem using the SDL3_IMG
-												 //grab the bytes, and the size of it
-					SDL_IOStream* io = SDL_IOFromMem(bytes.data(), (int)bytes.size());
-					if (io != nullptr)
-					{
-						//make a serf for it
-						SDL_Surface* imageSurf = IMG_Load_IO(io, 1); //one closes the io after
-						if (imageSurf != nullptr) //make sure its made correctly
-						{
-							std::lock_guard<std::mutex> lock(gTabsMutex);
-							if (currentTabID < 0 || currentTabID >= (int)tabs.size())
-							{
-								SDL_DestroySurface(imageSurf);
-							}
-							else if (tabs[currentTabID].loadGen != myGen)
-							{
-								SDL_DestroySurface(imageSurf);
-							}
-							else if (currentTabID < 0 || currentIndex >= (int)tabs[currentTabID].layout.size())
-							{
-								SDL_DestroySurface(imageSurf);
-							}
-							else {
-								std::cout << "IMG Downloaded into RAM" << std::endl;
-								tabs[currentTabID].layout[currentIndex].pendingSurface = imageSurf;
-							
-							}
-							
-						}
-						else {
-							std::cout << "ERROR - Trying To Download IMG" << std::endl;
-
-							std::cout << "FROM THIS - " << urlInput << std::endl;
-						}
-					}
-				}
-				else {
-					std::cout << "ERROR - No image detected" << std::endl;
-				}
-
-
-
-
-
-
-			});
-		}
-
-
-
-
-		if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].pendingSurface != nullptr)
-		{
-			SDL_Surface* surf = tabs[activeTab].layout[i].pendingSurface.exchange(nullptr); //load the surf
-
-			if (surf != nullptr)
-			{
-				tabs[activeTab].layout[i].imageTex = SDL_CreateTextureFromSurface(render, surf);
-
-				//save the sizes of it now
-				tabs[activeTab].layout[i].width = surf->w;
-				tabs[activeTab].layout[i].height = surf->h;
-
-				//clear the surf for performace
-				SDL_DestroySurface(surf);
-
-				std::cout << "IMG Downloaded" << std::endl;
-
-			}
-		}
-			
-
-
-		TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
-
-		if (tabs[activeTab].layout[i].height > maxLineHeight)
-		{
-			maxLineHeight = tabs[activeTab].layout[i].height;
-		}
-
-
-
-		xtrack += (tabs[activeTab].layout[i].width + 12);
-
-
-	}
-
-
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-int LoadAnimation(SDL_Renderer* render, TTF_Font* font)
-{
-	{
-		std::lock_guard<std::mutex> lock(gTabsMutex);
-		//reset everything, as we want to make sure we dont have old stuff
-		if (!tabs.empty() && activeTab >= 0 && activeTab < (int)tabs.size())
-		{
-
-			//handle each item in the layout, we want to remove, and reset everything.
-			for (auto& item : tabs[activeTab].layout)
-			{
-				//destroy text and images
-				if (item.textTex) { SDL_DestroyTexture(item.textTex); item.textTex = nullptr; }
-				if (item.imageTex) { SDL_DestroyTexture(item.imageTex); item.imageTex = nullptr; }
-
-				item.textAttempted = false; //reset
-				item.imageAttempted = false; //reset
-				item.pendingTextSurface = nullptr; //reset
-			}
-			int MainTabId = activeTab; //save the tab it belongs too
-			int myGen = ++tabs[activeTab].loadGen; //move the load gen up one
-
-
-			tabs[activeTab].layout.clear(); //clear
-
-			if (tabs[activeTab].domRoot != nullptr)
-			{
-				DeleteTree(tabs[activeTab].domRoot); //destory the old tree
-				tabs[activeTab].domRoot = nullptr;
-			}
-
-		}
-	}
-
-	//now paint the blank frame
-	if (darkmode) //darkmode (inverse)
-	{
-		SDL_SetRenderDrawColor(render, (255 - backgroundColor.r), (255 - backgroundColor.g), (255 -backgroundColor.b), 255);
+		Fallback = currentUrl.substr(0, pathStart); //because pathstart contains a / we can go from 0 to pathstart
 	}
 	else {
-		SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255);
-	}
-	
-	SDL_RenderClear(render);
-
-
-	//render the loading thing
-	if (loadingTex != nullptr) //make sure the loadingTex works.
-	{
-		int WinW, WinH;
-		SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); //get the size of the render
-
-		float texW, texH;
-		SDL_GetTextureSize(loadingTex, &texW, &texH);
-
-
-		SDL_FRect loadingRect;
-		loadingRect.x = 10;
-		loadingRect.y = 48;
-		loadingRect.w = texW;
-		loadingRect.h = texH;
-
-		SDL_RenderTexture(render, loadingTex, nullptr, &loadingRect);
+		Fallback = currentUrl; //we could not find a / so we assume its basic
 	}
 
+	return Fallback + "/" + targetUrl; //return the final stuff
+
+
+} //END OF ResolveURL
 
 
 
-
-
-
-
-
-
-
-
-	
-	SDL_RenderPresent(render);
-
-	return 0;
-
-}
-
-
-
-
-//SET THE TAB TITLE
-
-void SetTabTitle(std::string title)
+void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool addToHistory = true) //Navigate To, takes in a string, a SDL_RENDER, and a FONT, and a single bool, and returns nothing.
 {
-	std::lock_guard<std::mutex> lock(gTabsMutex);
-	for (auto& t : tabs)
+	std::cout << "target-> " << target << std::endl;//DEBUG
+
+	if (target.empty()) return; //if the target is empty, to save time, just return.
+
+	
+	if (target.find("new::tab") == 0) //check if the target contains the value new::tab
 	{
-		if (t.tabID == lastsearchedtabID)
+		std::cout << "FOUND NEW TAB" << std::endl; //DEBUG
+
+		LoadStarredPages(); //make sure StarredPages are up to date
+		UpdateHTML(); //Update the html with the new stars
+
+
+		std::ifstream file("main.html"); //open the main.html file
+
+		if (!file.is_open()) { std::cout << "Could not open local file." << std::endl; return; } //Debug and return if it failed to open
+
+		std::stringstream buffer; //create a temp buffer to hold the file.
+
+		buffer << file.rdbuf(); //load the file into the buffer
+
+		
+		std::string fileinfo = buffer.str(); //now we convert the buffer, into a string
+
 		{
-			t.title = title;
-			return;
+			std::lock_guard<std::mutex> lock(gTabsMutex); //lock to insure no corruption
+			auto& active = tabs[activeTab]; //create a temp var to hold our active tab
+
+			active.loadGen++; //increase the loadGen, stopping other threads
+
+			for (auto& item : active.layout) //destroy the old item, and clear the layout for text and images, to avoid issues
+			{
+				if (item.textTex) SDL_DestroyTexture(item.textTex); //destroy the text
+				if (item.imageTex) SDL_DestroyTexture(item.imageTex); //destroy the images
+			}
+			active.layout.clear(); //clear the layout
+
+			active.scrollpos = 40; //reset the scroll pos
+			lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
+
+			urlInput = ""; 	//clear the url input, as it is a new tab
 		}
-	}
-
-}
-
-
-
-
-
-
-void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool addToHistory = true) //handle links, as they can sometimes have /path. simmilar to Resolve url
-{
-	std::cout << "target-> " << target << std::endl;
-
-	if (target.empty()) return;
-
-	//if its good use as is
-	//check if its the new::tab
-	if (target.find("new::tab") == 0)
-	{
-		std::cout << "FOUND NEW TAB" << std::endl; //
-		std::ifstream file("main.html");
-
-		if (!file.is_open()) {
-			std::cout << "Could not open local file." << std::endl;
-			return;
-		}
-		//we dump the file into a buffer
-		LoadAnimation(render, font);
-		std::stringstream buffer;
-
-		//load it in 
-		buffer << file.rdbuf();
-
-		//now we load the full file into a temp var
-		//we use the buffer and convert it into a string
-		std::string fileinfo = buffer.str();
-
-		//now we do something diffrent, we just inject it right into the parser to have the same effect
-		Parser(fileinfo);
-
-		//lets clear the url input too
-		urlInput = "";
-		return;
-	}
+	
+		Parser(fileinfo); //now we inject it into the parser, to force it to load this html
 
 	
+		
 
-	//check if its a search or a website, because the old error was that somtimes we would search websites
-	std::string resolvedTarget = target; //make a string to change and modify as we flush out our link.
+		return; //return.
+	}
 
-	//its a url if any of these conditions are met, aswell as no spaces.
+
+
+	std::string resolvedTarget = target; //temp string that gets updated as we go along.
+
+	//its a url if any of these conditions are met, as well as no spaces
 	bool isUrl = (target.find("http://") == 0 || target.find("https://") == 0 || target[0] == '/' || target.find('.') != std::string::npos) && (target.find(' ') == std::string::npos);
 
-	std::lock_guard<std::mutex> lock(gTabsMutex);
-
-
-	if (!isUrl) //if it not a url
 	{
-		//its a search.
-		std::string query = target;
-		std::replace(query.begin(), query.end(), ' ', '+'); //replace all ' ' with +
-		resolvedTarget = "lite.duckduckgo.com/lite/?q=" + query; //combine it
-	}
-	else { //it is a url!
-		resolvedTarget = ResolveURL(target, tabs[activeTab].url);
-	}
 
-	
-
-	if (addToHistory) {
-
-
-		//if we went back and searched somthing new, deleate that multiverse
-		if (tabs[activeTab].historypos < (int)tabs[activeTab].history.size() - 1) {
-			tabs[activeTab].history.resize(tabs[activeTab].historypos + 1);
-		}
-		//prevent duplicates
-		if (tabs[activeTab].history.empty() || tabs[activeTab].history.back() != resolvedTarget)
+		std::lock_guard<std::mutex> lock(gTabsMutex); //create the lock to prevent other possesses from editing, and preventing a crash
+		if (!isUrl) //if it not a url, we handle it like a search
 		{
-			tabs[activeTab].history.push_back(resolvedTarget);
-			tabs[activeTab].historypos = tabs[activeTab].history.size() - 1; // Keep index at the end
+			std::string query = target; //set a temp var that holds the target (what we searched and pressed enter)
+			std::replace(query.begin(), query.end(), ' ', '+'); //replace all ' ' with +, as we need that for a valid search
+			resolvedTarget = SearchProvider + query; //combine it with a url to search, i use lite.duckduckgo.com/lite/?q=, as its the only one that does not flag me as a bot
+		}
+		else { //it is a url!
+			resolvedTarget = ResolveURL(target, tabs[activeTab].url); //if it is a url, send the value to ResolveURL to clean it up, and insure its valid
 		}
 
-	}
+
+
+		if (addToHistory) { //if it was flagged being able to be added to the history
+			auto& tab = tabs[activeTab]; //create a temp var, that calls the tabs[activeTab] once, to save performance
+
+			//if we went back and searched something new, delete that multiverse
+			if (tab.historypos < static_cast<int>(tab.history.size()) - 1) { //if the tab.historypos is less than the size, we resize the history, removing the old stuff
+				tab.history.resize(tab.historypos + 1); //rm all the old history items that were ahead of the current one
+			}
+
+			if (tab.history.empty() || tab.history.back() != resolvedTarget) //check if the history is empty, or if the last URL isnt the same as this one
+			{
+				tab.history.push_back(resolvedTarget); //if so, we add the new URL to the end of the history vector
+				tab.historypos = tab.history.size() - 1; //update the history index, so it maches the current url
+			}
+
+		}
+
+
+	} //Release the gTabMutex Lock
+
+
+	//LOADING UI ---
+	Layout loadingMSG{}; //create a new layout
+	loadingMSG.x = 10; //set the x size to 10
+	loadingMSG.y = 150; //set the y size to 150
+	loadingMSG.fontSize = 72; //set the font size to 72
+	loadingMSG.isImage = false; //set the isImage to false
 
 	
-	//make a temp layout that pretends to be a parsed thing
-	Layout loadingMSG;
-	loadingMSG.x = 10;
-	loadingMSG.y = 150;
-	loadingMSG.fontSize = 72;
-	loadingMSG.isImage = false;
-
-	//make the texture
-	SDL_Color loadColor;
-	if (darkmode)
+	SDL_Color loadColor; //create the texture color
+	if (darkmode) //if darkmode is on
 	{
-		loadColor = SDL_Color{ 255, 255, 255, 255 };
+		loadColor = SDL_Color{ 255, 255, 255, 255 }; //make the text color white
 	}
 	else {
-		loadColor = SDL_Color{ 0, 0, 0, 255 };
+		loadColor = SDL_Color{ 0, 0, 0, 255 }; //make the text color black
 	}
-	//make a surf
-	std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
 
-	int ogFontSize = TTF_GetFontSize(font);
-	TTF_SetFontSize(font, 72);
-	SDL_Surface* loadSurf = TTF_RenderText_Solid(font, "Loading...", 0, loadColor);
-
-	TTF_SetFontSize(font, ogFontSize);
-	if (loadSurf != nullptr)
 	{
-		loadingMSG.textTex = SDL_CreateTextureFromSurface(render, loadSurf);
-		loadingMSG.width = loadSurf->w;
-		loadingMSG.height = loadSurf->h;
-		SDL_DestroySurface(loadSurf);
-	}
+		std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create the lock to prevent any crashes
+
+		int ogFontSize = TTF_GetFontSize(font); //save the old font size
+		//because we are injecting the values in, we don't run by the fontsize part normally, so we do it manually
+		TTF_SetFontSize(font, loadingMSG.fontSize); //set the font size larger than normal
+		
+		SDL_Surface* loadSurf = TTF_RenderText_Solid(font, "Loading...", 0, loadColor); //create the surf holding our text loading...
+		TTF_SetFontSize(font, ogFontSize); //set it back.
+
+		if (loadSurf != nullptr) //if the loadSurf worked correctly
+		{
+			loadingMSG.textTex = SDL_CreateTextureFromSurface(render, loadSurf); //set the textTexture to our load serf.
+			loadingMSG.width = loadSurf->w; //set the width to the width of loadSurf
+			loadingMSG.height = loadSurf->h; //set the height to the height of loadSurf
+			SDL_DestroySurface(loadSurf); //we are done with the temp surf, we can destroy it
+		}
+
+	}//Release the ttfLock 
+
+
 	
-	tabs[activeTab].layout.clear();
+	std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
+	auto& active = tabs[activeTab]; //temp var for cleanness
+	active.layout.clear(); //clear the last layout
 
-	tabs[activeTab].layout.push_back(loadingMSG);
-	//update the active tab
-	tabs[activeTab].url = resolvedTarget;
-	urlInput = resolvedTarget;
-	std::wstring wUrl(resolvedTarget.begin(), resolvedTarget.end());
+	active.layout.push_back(loadingMSG); //push our loading message values into the active tab's layout
+	
+	active.url = resolvedTarget; //update the active tabs url, with the url
+	urlInput = resolvedTarget; //update the urlInput with the url
+	lastsearchedtabID = active.tabID; //set the tab id.
+	
 
-	lastsearchedtabID = tabs[activeTab].tabID;
-	gNavPool.enqueue([wUrl]() {
-		ConnectSocketHTTPS(wUrl);
+	std::wstring wUrl(resolvedTarget.begin(), resolvedTarget.end()); //create a temp wUrl string, for the connectSocketHTTPS.
+	gNavPool.enqueue([wUrl]() { //create the thread
+		ConnectSocketHTTPS(wUrl); //push it
 	});
-	
-}
+
+} //END OF NavigateTo
 
 
-
-
-
-
-
-
-
-
+//=======Fix URL REDIRECT=======\\
 
 
 //ok, this fixes duck duck go redirect strings!
@@ -958,19 +494,19 @@ std::string FixURLREDIRECT(const std::string& href)
 {
 	//first find our uddg=, we want to remove that
 	size_t uddgPos = href.find("uddg=");
-	//if we cant find that, stop
-	if (uddgPos == std::string::npos) return "";
 
-	size_t start = uddgPos + 5; // skip "uddg="
+	if (uddgPos == std::string::npos) return ""; //if we cant find that, stop, and return blank
+
+	size_t start = uddgPos + 5; // we found the uddg, but we want to skip it, so skip "uddg=" 
 
 
-	//hold our fixed value
-	std::string encoded = "";
+	
+	std::string encoded = ""; //create a temp string to hold our fixed value
 
 	//ok, starting at the start pos, we go till the end
 	for (int i = start; i < href.size(); i++)
 	{
-		//ok, we hit a new parram, we dont want to put that into our main loop, so we stop!
+		//ok we hit the &, so we stop, as its usually junk (example -> &other=1)
 		if (href[i] == '&')
 		{
 			break;
@@ -980,15 +516,272 @@ std::string FixURLREDIRECT(const std::string& href)
 		encoded += href[i];
 	}
 
-	return PercentDecode(encoded);
-}
+	
+	return PercentDecode(encoded); //send it through our PercentDecode, to convert it back to chars, then return
+} //END OF FixURLREDIRECT
+
+
+#pragma endregion
+
+#pragma region //Handle PreRender
+
+
+void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL render component, and a TTF Font component
+{
+	std::lock_guard<std::mutex> lock(gTabsMutex); //set a lock mutex to prevent the Tabs being edited from other threads
+
+	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size())  return; //if we have no active tabs, skip
+	if (lastsearchedtabID != tabs[activeTab].tabID) return; //if the last searched tab ID is not == to the active tab, skip
+
+
+	auto& tab = tabs[activeTab]; //to prevent calling this a lot, make a var to hold it
+
+	int xtrack = 20; //start the X pos at 20, on start
+	int ytrack = 120; //start the y pos at, 120 on start
+	int lasty = -1; //saves the y pos of the last item, we set it to -1, to insure we record the first element.
+	int maxLineHeight = 0; //saves the tallest element on the current line, to avoid clipping text.
+
+	for (int i = 0; i < (int)tab.layout.size(); i++) { //loop for each element in the vector
+
+	
+		
+		if (lasty != -1 && tab.layout[i].y > lasty) //if the last y not == 1 (prevents running on the first loop) and the layout[i].y > lasty
+		{
+			xtrack = 20; //it is, so now lets set the x track to 20;
+			ytrack += (maxLineHeight + 15); //update the y track, moving it down by the max line height + 15
+			maxLineHeight = 0; //set the new maxLineHeight to 0, for this new line
+		}
+
+		lasty = tab.layout[i].y; //update the last y with the current letters 'y'
+		
+
+		
+		if (tab.layout[i].x > 20) //check if this is a table with a column offset larger than 20
+		{
+			//pick whatever x cords is further to the right
+			int colX = (std::max)(xtrack, tab.layout[i].x);
+			tab.layout[i].x = colX; //apply the updated x pos
+			xtrack = colX; //update the x tracker
+		}
+		else //if its not
+		{
+			//if its normal text, assign our current x track pos
+			tab.layout[i].x = xtrack;
+		}
+
+		
+		tab.layout[i].y = ytrack; // update the element's actual y screen pos too our current row
+
+
+		//check if the node is text, and make sure it hasn't generated a texture yet, and hasnt been attempted yet
+		if (tab.layout[i].textTex == nullptr && !tab.layout[i].isImage && !tab.layout[i].textAttempted)
+		{
+			//grab the text string from our current mainlayout node and make sure this holds the text payload!
+			std::string text = tab.layout[i].node->tagValue; //create a temp string to hold the text 
+
+			
+			if (!text.empty()) // check to make sure the text contains something
+			{
+				tab.layout[i].textAttempted = true; //set the attempted to true, so we don't load it twice.
+
+				//grab everything the thread will need.
+				int fontsize = tab.layout[i].fontSize; //create an 'int' and set it to the fontsize.
+				SDL_Color color = tab.layout[i].textColor; //set the color to the text color
+				bool isLink = !tab.layout[i].href.empty(); //set the bool if its a link. if its true, its false, and if its false, its true
+
+
+				int currentTabID = activeTab; //grab the active tab index.
+				int myGen = tab.layout[i].loadGen; //grab the current loadGen id.
+				int currentIndex = i; //keep track of which index this is
+
+				gTextRenderPool.enqueue([text, fontsize, color, isLink, currentTabID, myGen, currentIndex]() { //start the thread, and import the vars into the thread
+					
+					std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //lock the gTTFMutex, so that only this can load it.
+
+					static std::unordered_map<int, TTF_Font*> fontCache; //create a map to hold the font.
+					if (fontCache.find(fontsize) == fontCache.end()) //make sure it only runs at the start, and does not run each loop
+					{
+						fontCache[fontsize] = TTF_OpenFont("./fonts/PixelifySans-edited.ttf", fontsize); //hold the font for the thread
+
+					}
+					TTF_Font* threadFont = fontCache[fontsize]; //assign it
+
+					if (threadFont == nullptr) return; //if the font failed, exit.
+
+					if (isLink) { TTF_SetFontStyle(threadFont, TTF_STYLE_UNDERLINE); } //if this text is a link, give it a underline
+
+					SDL_Surface* nodeSurf = TTF_RenderText_Solid(threadFont, text.c_str(), 0, color); //create a temp nodeSerf, to hold it
+
+					if (isLink) { TTF_SetFontStyle(threadFont, TTF_STYLE_NORMAL); } //reset the style after to prevent leaks
+
+					if (nodeSurf != nullptr) { //if the nodeSurf contains things
+
+						std::lock_guard<std::mutex> lock(gTabsMutex); ///lock so we can update the tabs, without other threads doing so
+
+						//check if the tab was closed, switched, or refreshed while the thread was working
+						if (currentTabID < 0 || currentTabID >= (int)tabs.size() || tabs[currentTabID].loadGen != myGen || currentIndex < 0 || currentIndex >= (int)tabs[currentTabID].layout.size())
+						{
+							SDL_DestroySurface(nodeSurf); //destroy the surface if the tab state changed
+						}
+						else { //else
+							//give the layout the nodesurf, so it can be indexed
+							tabs[currentTabID].layout[currentIndex].pendingTextSurface = nodeSurf;   
+						}
+
+					}		
+				}); //end 
+			}
+		}
+
+		//make sure that the thread is done, and the tab holds data.
+		if (tab.layout[i].pendingTextSurface != nullptr)
+		{
+			//create a temp SDL_Surface, where it swaps the surface pointer and clear's it
+			SDL_Surface* nodeSurf = tab.layout[i].pendingTextSurface.exchange(nullptr);
+
+			if (nodeSurf != nullptr) //make sure the node surf worked
+			{
+				//assign the properties
+				tab.layout[i].width = nodeSurf->w; //assign the width
+				tab.layout[i].height = nodeSurf->h; //assign the height
+				tab.layout[i].textTex = SDL_CreateTextureFromSurface(render, nodeSurf); //upload the rendering to the gpu
+				SDL_DestroySurface(nodeSurf); //we are done, now that its on gpu, to prevent meme leaks
+			}
+		}
+
+		//handle images
+		//check if this item is an image, and that it hasnt been downloaded or queued yet.
+		if (tab.layout[i].isImage && tab.layout[i].imageTex == nullptr && tab.layout[i].node->src != "" && !tabs[activeTab].layout[i].imageAttempted)
+		{
+
+			tab.layout[i].imageAttempted = true; //make sure that we flag we are attempting it, so we avoid attempting it multiple times.
+
+
+			//get the image path, and send it to ResolveURL to handle and fix any formatting like (\image.png)
+			std::string src = ResolveURL(tab.layout[i].node->src, tab.url);
+			std::cout << "[IMG] Resolved URL: " << src << std::endl; //DEBUG
+			//Layout* currentItem = &tabs[activeTab].layout[i];
+
+			int currentTabID = activeTab; //grab the currentTabID
+			int myGen = tab.layout[i].loadGen; //grab the loadGen
+			int currentIndex = i; //get the current index (for the thread)
+			std::string srcCopy = src; //create a temp to send to the thread, of the src
+
+			//make the thread
+			gImageDownloadPool.enqueue([srcCopy, currentTabID, myGen, currentIndex]() { //send the image to our threadpool
+
+				//download the bytes with our funct in ConnectSocket.cpp
+				std::vector<unsigned char> bytes = DownloadImages(srcCopy);
+				if (!bytes.empty()) //if we got something (did NOT fail)
+				{
+
+					//create a IO mem stream from the raw bytes
+												 //grab the bytes, and the size of it
+					SDL_IOStream* io = SDL_IOFromMem(bytes.data(), (int)bytes.size());
+					if (io != nullptr) //if the io contains something
+					{
+						//load the image surf from meme using SDL_image
+						SDL_Surface* imageSurf = IMG_Load_IO(io, 1); //one closes the io after
+						if (imageSurf != nullptr) //make sure its made correctly
+						{
+							std::lock_guard<std::mutex> lock(gTabsMutex); //make sure to lock, to prevent crashes with other threads editing gTabsMutex too.
+
+							//make sure the tab didnt change, (same as text)
+							if (currentTabID < 0 || currentTabID >= (int)tabs.size() || tabs[currentTabID].loadGen != myGen || currentIndex < 0 || currentIndex >= (int)tabs[currentTabID].layout.size())
+							{
+								SDL_DestroySurface(imageSurf); //destory the surf if the tab changes
+							}
+							
+							else { //it did NOT change
+								std::cout << "IMG Downloaded into RAM" << std::endl; //DEBUG
+								tabs[currentTabID].layout[currentIndex].pendingSurface = imageSurf; //set the surf to the imageSurf.
+							}
+							
+						}
+						else { //ERROR, the bytes were screwed up.
+							std::cout << "ERROR - Trying To Download IMG" << std::endl; //DEBUG
+
+							std::cout << "FROM THIS - " << urlInput << std::endl; //DEBUG
+						}
+					}
+				}
+				else { //could not find the image
+					std::cout << "ERROR - No image detected" << std::endl; //DEBUG
+				}
+			});
+		}
 
 
 
+		//--- GPU texture conversion for images ---
 
+		//check if a background thread is done, and it is an image
+		if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].pendingSurface != nullptr)
+		{
+			//swap to the gpu
+			SDL_Surface* surf = tabs[activeTab].layout[i].pendingSurface.exchange(nullptr); //load the surf
+
+			if (surf != nullptr) //if it worked
+			{
+				tabs[activeTab].layout[i].imageTex = SDL_CreateTextureFromSurface(render, surf); //upload the image to the gpu
+
+				tabs[activeTab].layout[i].width = surf->w; //hold the width 
+				tabs[activeTab].layout[i].height = surf->h; //hold the height 
+
+				SDL_DestroySurface(surf); //we no longer need the cpu version, so we destroy
+
+				std::cout << "IMG Downloaded" << std::endl; //DEBUG
+
+			}
+		}
+			
+		//update the max line height, if its taller than its previous element
+		if (tabs[activeTab].layout[i].height > maxLineHeight)
+		{
+			maxLineHeight = tabs[activeTab].layout[i].height;
+		}
+
+
+		//move the x by the width of the text + 12 for padding.
+		xtrack += (tabs[activeTab].layout[i].width + 12);
+
+
+	}
+
+
+
+} // END OF PreRender
+
+
+
+#pragma endregion
+
+#pragma region //Handle Tab Title
+
+//======SetTabTitle======\\
+
+//SET THE TAB TITLE
+void SetTabTitle(std::string title) //SetTabTitle takes in a single string, and returns nothing.
+{
+	std::lock_guard<std::mutex> lock(gTabsMutex); //first lock, to make sure that other threads changing data like this won't cause a crash
+	for (auto& t : tabs) //for each tab
+	{
+		if (t.tabID == lastsearchedtabID) //if the tabID maches the current tab
+		{
+			t.title = title; //set the title
+			return; //end
+		}
+	}
+
+} //END OF SetTabTitle
+
+#pragma endregion
 
 int GUIRENDER()
 {
+
+	
+
 	//to render to a texture, we need to make a texture for the font
 	//we make a font to hold it
 	static TTF_Font* font = nullptr;
@@ -1284,37 +1077,11 @@ int GUIRENDER()
 					}
 
 
-					//handle the new home buttn
+					//handle the new home button
 					if (mouseX >= homeBtnRect.x && mouseX <= (homeBtnRect.x + homeBtnRect.w) &&
 						mouseY >= homeBtnRect.y && mouseY <= (homeBtnRect.y + homeBtnRect.h)) {
 
-						std::ifstream file("main.html");
-
-						if (!file.is_open()) {
-							std::cout << "Could not open local file." << std::endl;
-							return -1;
-						}
-						//we dump the file into a buffer
-						LoadAnimation(render, font);
-						std::stringstream buffer;
-
-						//load it in 
-						buffer << file.rdbuf();
-
-						//now we load the full file into a temp var
-						//we use the buffer and convert it into a string
-						std::string fileinfo = buffer.str();
-
-						{
-							std::lock_guard<std::mutex> lockk(gTabsMutex);
-							lastsearchedtabID = tabs[activeTab].tabID;//set the tab when i click.
-						}
-
-						//now we do something diffrent, we just inject it right into the parser to have the same effect
-						Parser(fileinfo);
-
-						//lets clear the url input too
-						urlInput = "";
+						NavigateTo("new::tab", render, font, false);
 					}
 
 

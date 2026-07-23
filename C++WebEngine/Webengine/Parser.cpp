@@ -4,10 +4,29 @@
 
 #include "Parser.h" 
 
+#include "DOMTree.h"
 
-#include "DOMTree.h" //included for the DOM in the dom tree
 #include "GUI.h"
+
 #include <string_view>
+
+
+//======DELETE TREE======\\
+
+void DeleteTree(Node* node) //this takes in our custom node tree, and returns nothing.
+{
+	//insure that our node is not null
+	if (node == nullptr) return; //error case, just return
+
+	for (Node* child : node->children) //loop through every child in this node
+	{
+		DeleteTree(child); //for each child we call this, to destroy its child's.
+	}
+	node->children.clear();
+
+	delete node; //we have made it to the bottom, destroy ourselves.
+}
+
 
 
 //=======CHECK FOR WHITESPACE=======\\
