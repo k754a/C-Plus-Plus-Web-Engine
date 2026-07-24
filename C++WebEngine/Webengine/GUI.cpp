@@ -625,55 +625,52 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 
 	for (int i = 0; i < (int)tabs[activeTab].layout.size(); i++) { //loop for each element in the vector
 
-		auto& tab = tabs[activeTab]; //to prevent calling this a lot, make a var to hold it
-
-
-		if (lasty != -1 && tab.layout[i].y > lasty) //if the last y not == 1 (prevents running on the first loop) and the layout[i].y > lasty
+		if (lasty != -1 && tabs[activeTab].layout[i].y > lasty) //if the last y not == 1 (prevents running on the first loop) and the layout[i].y > lasty
 		{
 			xtrack = 20; //it is, so now lets set the x track to 20;
 			ytrack += (maxLineHeight + 15); //update the y track, moving it down by the max line height + 15
 			maxLineHeight = 0; //set the new maxLineHeight to 0, for this new line
 		}
 
-		lasty = tab.layout[i].y; //update the last y with the current letters 'y'
+		lasty = tabs[activeTab].layout[i].y; //update the last y with the current letters 'y'
 		
 
 		
-		if (tab.layout[i].x > 20) //check if this is a table with a column offset larger than 20
+		if (tabs[activeTab].layout[i].x > 20) //check if this is a table with a column offset larger than 20
 		{
 			//pick whatever x cords is further to the right
-			int colX = (std::max)(xtrack, tab.layout[i].x);
-			tab.layout[i].x = colX; //apply the updated x pos
+			int colX = (std::max)(xtrack, tabs[activeTab].layout[i].x);
+			tabs[activeTab].layout[i].x = colX; //apply the updated x pos
 		}
 		else //if its not
 		{
 			//if its normal text, assign our current x track pos
-			tab.layout[i].x = xtrack;
+			tabs[activeTab].layout[i].x = xtrack;
 		}
 
 		
-		tab.layout[i].y = ytrack; // update the element's actual y screen pos too our current row
+		tabs[activeTab].layout[i].y = ytrack; // update the element's actual y screen pos too our current row
 
 
 		//check if the node is text, and make sure it hasn't generated a texture yet, and hasnt been attempted yet
-		if (tab.layout[i].textTex == nullptr && !tab.layout[i].isImage && !tab.layout[i].textAttempted && tab.layout[i].node != nullptr)
+		if (tabs[activeTab].layout[i].textTex == nullptr && !tabs[activeTab].layout[i].isImage && !tabs[activeTab].layout[i].textAttempted && tabs[activeTab].layout[i].node != nullptr)
 		{
 			//grab the text string from our current mainlayout node and make sure this holds the text payload!
-			std::string text = tab.layout[i].node->tagValue; //create a temp string to hold the text 
+			std::string text = tabs[activeTab].layout[i].node->tagValue; //create a temp string to hold the text 
 
 			
 			if (!text.empty()) // check to make sure the text contains something
 			{
-				tab.layout[i].textAttempted = true; //set the attempted to true, so we don't load it twice.
+				tabs[activeTab].layout[i].textAttempted = true; //set the attempted to true, so we don't load it twice.
 
 				//grab everything the thread will need.
-				int fontsize = tab.layout[i].fontSize; //create an 'int' and set it to the fontsize.
-				SDL_Color color = tab.layout[i].textColor; //set the color to the text color
-				bool isLink = !tab.layout[i].href.empty(); //set the bool if its a link. if its true, its false, and if its false, its true
+				int fontsize = tabs[activeTab].layout[i].fontSize; //create an 'int' and set it to the fontsize.
+				SDL_Color color = tabs[activeTab].layout[i].textColor; //set the color to the text color
+				bool isLink = !tabs[activeTab].layout[i].href.empty(); //set the bool if its a link. if its true, its false, and if its false, its true
 
 
 				int currentTabID = activeTab; //grab the active tab index.
-				int myGen = tab.loadGen; //grab the current loadGen id.
+				int myGen = tabs[activeTab].loadGen; //grab the current loadGen id.
 				int currentIndex = i; //keep track of which index this is
 
 				lock.unlock(); //unlock before the thread to prevent a crash in release mode
@@ -730,10 +727,10 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 		}
 
 		//make sure that the thread is done, and the tab holds data.
-		if (tab.layout[i].pendingTextSurface.load() != nullptr)
+		if (tabs[activeTab].layout[i].pendingTextSurface.load() != nullptr)
 		{
 			//create a temp SDL_Surface, where it swaps the surface pointer and clear's it
-			SDL_Surface* nodeSurf = tab.layout[i].pendingTextSurface.exchange(nullptr);
+			SDL_Surface* nodeSurf = tabs[activeTab].layout[i].pendingTextSurface.exchange(nullptr);
 
 			if (nodeSurf != nullptr) //make sure the node surf worked
 			{
@@ -768,20 +765,20 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 
 		//handle images
 		//check if this item is an image, and that it has'nt been downloaded or queued yet.
-		if (tab.layout[i].isImage && tab.layout[i].imageTex == nullptr && tab.layout[i].node != nullptr && !tab.layout[i].node->src.empty() && !tab.layout[i].imageAttempted)
+		if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex == nullptr && tabs[activeTab].layout[i].node != nullptr && !tabs[activeTab].layout[i].node->src.empty() && !tabs[activeTab].layout[i].imageAttempted)
 		{
-			tab.layout[i].imageAttempted = true; //make sure that we flag we are attempting it, so we avoid attempting it multiple times.
+			tabs[activeTab].layout[i].imageAttempted = true; //make sure that we flag we are attempting it, so we avoid attempting it multiple times.
 
 			//get the image path, and send it to ResolveURL to handle and fix any formatting like (\image.png)
-			std::string src = ResolveURL(tab.layout[i].node->src, tab.url);
+			std::string src = ResolveURL(tabs[activeTab].layout[i].node->src, tabs[activeTab].url);
 			std::cout << "[IMG] Resolved URL: " << src << std::endl; //DEBUG
 			//Layout* currentItem = &tabs[activeTab].layout[i];
 
 			int currentTabID = activeTab; //grab the currentTabID
-			int myGen = tab.loadGen; //grab the loadGen
+			int myGen = tabs[activeTab].loadGen; //grab the loadGen
 			int currentIndex = i; //get the current index (for the thread)
 			std::string srcCopy = src; //create a temp to send to the thread, of the src
-			std::string tabUrl = tab.url; //grab the tab url
+			std::string tabUrl = tabs[activeTab].url; //grab the tab url
 
 			lock.unlock(); //unlock before the thread
 			//make the thread
@@ -820,7 +817,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 							
 							else { //it did NOT change
 								std::cout << "IMG Downloaded into RAM" << std::endl; //DEBUG
-								tabs[currentTabID].layout[currentIndex].pendingSurface = imageSurf; //set the surf to the imageSurf.
+								tabs[currentTabID].layout[currentIndex].pendingSurface.store(imageSurf); //set the surf to the imageSurf.
 							}
 							
 						}
@@ -843,10 +840,10 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 		//--- GPU texture conversion for images ---\\
 
 	//check if a background thread is done, and it is an image
-		if (tab.layout[i].isImage && tab.layout[i].pendingSurface.load() != nullptr)
+		if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].pendingSurface.load() != nullptr)
 		{
 			//swap to the gpu
-			SDL_Surface* surf = tab.layout[i].pendingSurface.exchange(nullptr); //load the surf
+			SDL_Surface* surf = tabs[activeTab].layout[i].pendingSurface.exchange(nullptr); //load the surf
 
 			if (surf != nullptr) //if it worked
 			{
@@ -882,14 +879,14 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 		}
 
 		//update the max line height, if its taller than its previous element
-		if (tab.layout[i].height > maxLineHeight)
+		if (tabs[activeTab].layout[i].height > maxLineHeight)
 		{
-			maxLineHeight = tab.layout[i].height;
+			maxLineHeight = tabs[activeTab].layout[i].height;
 		}
 
 
 		//move the x by the width of the text + 12 for padding.
-		xtrack += (tab.layout[i].width + 12);
+		xtrack += (tabs[activeTab].layout[i].width + 12);
 
 
 	}

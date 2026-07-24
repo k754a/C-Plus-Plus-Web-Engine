@@ -10,16 +10,6 @@
 #pragma comment(lib, "wininet.lib")
 
 
-
-//=======VARS=======\\
-
-std::string URLPath; //This holds our path for the URL and is used for simplicity for our cleanup function and our other functions (as it's cleaned and updated across functions).
-
-
-
-
-
-
 //DEPRECATED.
 //=======HANDLE WINSOCK FUNCTS=======\\
 
@@ -110,9 +100,9 @@ std::string GetWinINetERRORS(DWORD errorCode) //this returns a string, and takes
 
 //this function cleans up the url, and splits it, it takes the path and sanitizes it.
 
-std::string SplitURL(std::string OGlink) //this returns a string, and takes in the original url
+std::string SplitURL(std::string OGlink, std::string& outPath) //this returns a string, and takes in the original url and a string that returns and gives the var provided the outPath
 {
-	URLPath = "/"; //resets our var that holds the url path (the "https:\\example.com") part
+	outPath = "/"; //resets our var that holds the url path (the "https:\\example.com") part
 	
 	
 	std::string host = OGlink; //create a separate hos var (contains the "\" and anything past that) we set it to our original url
@@ -141,13 +131,13 @@ std::string SplitURL(std::string OGlink) //this returns a string, and takes in t
 	{
 		//if it does
 
-		URLPath = host.substr(PathPos); //set the url path to before the "\" (example.com)
+        outPath = host.substr(PathPos); //set the url path to before the "\" (example.com)
 
 		host = host.substr(0, PathPos); //set the host to the "\" and after
 	}
 
 
-	//now, we have saved our URLPath, so we need to save the other part, so because this is a string
+	//now, we have saved our outPath, so we need to save the other part, so because this is a string
 
 	return host; //we return host.
 
@@ -171,7 +161,8 @@ std::vector<unsigned char> DownloadImages(std::string url, bool usingLocal) //we
         std::ifstream file(url, std::ios::binary); //open the file, setting it to binary (as that's what we want it as)
         return { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() }; //return the file's bytes, in the correct format
     }
-    std::string path = SplitURL(url); //grab the "path" of the url.
+    std::string localpath; //to hold our path
+    std::string path = SplitURL(url, localpath); //grab the "path" of the url.
 
     //we do a char, as imageData[0] = 0x89; is something we would get, a string would have troubles.
     std::vector<unsigned char> result; //we want to store the result, so we can return it in the correct format
@@ -179,7 +170,7 @@ std::vector<unsigned char> DownloadImages(std::string url, bool usingLocal) //we
 
     std::wstring host_name(path.begin(), path.end()); //convert our "path" string, to a wstring
 
-    std::wstring urlPath(URLPath.begin(), URLPath.end()); //convert our "url" string, to a wstring
+    std::wstring urlPath(localpath.begin(), localpath.end()); //convert our "url" string, to a wstring
 
 
 
@@ -278,7 +269,8 @@ int ConnectSocketHTTPS(std::wstring input)
     //first lets create a temp var, as its currently a w string
     //we use this to convert into a string where we split the url
     std::string temp(input.begin(), input.end());
-    std::string Path = SplitURL(temp);
+    std::string localpath; //create a temp localvar to hold the localpath
+    std::string Path = SplitURL(temp, localpath);
 
 
     //convert from the string of "path" to a Wstring.
@@ -318,7 +310,7 @@ int ConnectSocketHTTPS(std::wstring input)
         //we send like our std::string request = std::string("GET ") + URLPath + std::string(" HTTP/1.1\r\n") + "Host: " + host_name + "\r\n" + "Connection: close\r\n\r\n"; 
         //connection handle, http method, url path (convert to wstring), version, referrer, and account types (we dont care), how we get https, is we use INTERNET FLAG SECURE
 
-        std::wstring temp1(URLPath.begin(), URLPath.end());
+        std::wstring temp1(localpath.begin(), localpath.end());
 
         //got this through a google search too, apparently it will help with avoiding bot detections.
         //list of flags
