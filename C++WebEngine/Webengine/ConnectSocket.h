@@ -9,9 +9,9 @@
 #include <ws2tcpip.h> //for pton
 #include <vector> //For using std::vector classes
 #include <wininet.h> //for all connections to https servers.
-
+#include <fstream> //for loading images localy
 //pull the validate string
 int ConnectSocketHTTPS(std::wstring input); //DEFINE OUR HTTPS FUNCT (USES A WSTRING)
-std::vector<unsigned char> DownloadImages(std::string url); //DEFINE OUR DOWNLOADING IMAGES FUNCT (A VECTOR CONTATING THE BYTES)
+std::vector<unsigned char> DownloadImages(std::string url, bool usingLocal); //DEFINE OUR DOWNLOADING IMAGES FUNCT (A VECTOR CONTATING THE BYTES)
 
 #endif // ! GET_CONNECTSOCKET

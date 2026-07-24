@@ -164,8 +164,13 @@ std::string SplitURL(std::string OGlink) //this returns a string, and takes in t
 
 
 //DownloadImages handles our image downloads 
-std::vector<unsigned char> DownloadImages(std::string url) //we create a vector that can hold chars, and pass our URL input in.
+std::vector<unsigned char> DownloadImages(std::string url, bool usingLocal) //we create a vector that can hold chars, and pass our URL input in.
 {
+    if (usingLocal) //if it is a local file
+    {
+        std::ifstream file(url, std::ios::binary); //open the file, setting it to binary (as that's what we want it as)
+        return { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() }; //return the file's bytes, in the correct format
+    }
     std::string path = SplitURL(url); //grab the "path" of the url.
 
     //we do a char, as imageData[0] = 0x89; is something we would get, a string would have troubles.
