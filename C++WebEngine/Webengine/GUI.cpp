@@ -920,6 +920,10 @@ void SetTabTitle(std::string title) //SetTabTitle takes in a single string, and 
 
 #pragma endregion
 
+//Icon Guide! Home, Reload, Back+Forth+Arrows, search, star, printer
+//             љ	  њ				ђ		     ы		ж	    ξ
+
+
 int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 {
 	SDL_Texture* fontText = nullptr; //create a SDL_Texture holds the font texture overall.
@@ -995,24 +999,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				}
 			}
 
-			//handle zoom - TODO (as it causes a crash)
-			//if (event.key.mod & SDL_KMOD_CTRL) //detect if the ctrl is pressed
-			//{
-			//	if (event.key.scancode == SDL_SCANCODE_EQUALS)
-			//	{
-			//		std::lock_guard<std::mutex> lock(gTabsMutex); 
-			//		std::cout << "ZOOM IN" << std::endl;
-			//		zoomAmount = (std::min)(zoomAmount + 0.1f, 3.0f);
-			//		LayoutTree(tabs[activeTab].domRoot);
-			//	}
-			//	if (event.key.scancode == SDL_SCANCODE_MINUS)
-			//	{
-			//		std::lock_guard<std::mutex> lock(gTabsMutex); 
-			//		std::cout << "ZOOM OUT" << std::endl;
-			//		zoomAmount = (std::max)(zoomAmount - 0.1f, 0.5f);
-			//		LayoutTree(tabs[activeTab].domRoot);
-			//	}
-			//}
 
 			if (event.type == SDL_EVENT_TEXT_INPUT) { //detect any text inputs, and add them to our input str
 				urlInput += event.text.text; //append to whatever they typed, to our urlInput var
@@ -1021,7 +1007,48 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			
 			if (event.type == SDL_EVENT_KEY_DOWN) //check for any event key down
 			{
-		
+
+				if (event.key.mod & SDL_KMOD_CTRL)
+				{
+					std::cout << "CTRL - Pressed" << std::endl; //DEBUG
+
+					if (event.key.key == SDLK_T) //ctr + T -> NEW TAB
+					{
+						Tab newTab; //create a temp Tab handler to hold the newTab.
+						newTab.title = "New Tab"; //give it a title
+						//push it back
+						{
+							std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+							tabs.push_back(newTab); //send a new tab to the list
+							//update the active tab
+							activeTab = tabs.size() - 1; //set the activetab to the size of the tabs, -1 to fit the 0 = element 1
+							lastsearchedtabID = tabs[activeTab].tabID;//set the tab when i click.
+						}
+						NavigateTo("new::tab", render, font, true); //go to the new tab, using the id
+					}
+					if (event.key.key == SDLK_W && tabs.size() > 1) //ctr + W -> CLOSE TAB
+					{
+						std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+						if (!tabs.empty()) //if the tabs contain something
+						{
+							if (tabs[activeTab].domRoot != nullptr) //make sure that the current tab has a dom
+							{
+								DeleteTree(tabs[activeTab].domRoot); //destroy it
+							}
+							tabs.erase(tabs.begin() + activeTab); //erase the old tab
+
+							activeTab = (int)tabs.size() - 1; //update the active tab, to another one
+
+							currentURL = tabs[activeTab].url; //update the current url
+							urlInput = tabs[activeTab].url; //update the urlInput
+						}
+					}
+					if (event.key.key == SDLK_R) //ctr + R -> RELOAD TAB
+					{
+						if (currentURL != "") { NavigateTo(urlInput, render, font, false); } //don't reload for the mainpage, but just index the same url	
+					}
+				}
+
 				if (event.key.scancode == SDL_SCANCODE_BACKSPACE && !urlInput.empty()) { //if we detect backspace, and the urlInput contains something
 					urlInput.pop_back(); //we remove the last character
 				}
@@ -1041,13 +1068,15 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				}
 			}
 
+			int WinW, WinH; //create a temp int to save the WinW, and WinH, that get's assigned in SDL_GetWindowSize
+			float mouseX = event.button.x; //save the pos of the mouseX
+			float mouseY = event.button.y; //save the pos of the mouseY
+
 			if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) //handle if the mouse is clicked
 			{
 				if (event.button.button == SDL_BUTTON_LEFT) { //check if our left mouse pressed
 
-					int WinW, WinH; //create a temp int to save the WinW, and WinH, that get's assigned in SDL_GetWindowSize
-					float mouseX = event.button.x; //save the pos of the mouseX
-					float mouseY = event.button.y; //save the pos of the mouseY
+					
 
 					SDL_GetWindowSize(window, &WinW, &WinH); //grab the window, and assign the WinW, and the WinH.
 
@@ -1255,6 +1284,39 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 						}
 					}
 				}
+
+				if (event.button.button == SDL_BUTTON_MIDDLE && tabs.size() > 1) //if we detect the middle button down, and we have more than 1 tab
+				{
+					std::cout << "Middle Button Pressed" << std::endl;
+					int tabX = 0; //pos of the first tab (X) (as we always have at least 1 tab)
+					int tabW = 180; //pos of the first tab (Y) (as we always have at least 1 tab)
+					for (int t = 0; t < tabs.size(); t++) //loop through each tab
+					{
+
+						if (mouseY < 30) //instead of checking tabs every time (that's super slow lol) we just first check if its in the right spot
+						{
+							if (mouseX >= tabX && mouseX <= tabX + tabW)
+							{
+								std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+
+								if (tabs[t].domRoot != nullptr) { DeleteTree(tabs[t].domRoot); } // if the domRoot contains something, we destory the tree, for cleanup
+								tabs.erase(tabs.begin() + t); //remove the tab
+
+								//make sure that that we cannot let the tabs go negative, if that were possible.
+								if (activeTab >= (int)tabs.size()) { activeTab = tabs.size() - 1; }//if we don't meet the condition, we can close it.
+
+								//if we end up closing, and have no active tabs, create a new one, to prevent a softlock
+								if (tabs.empty()) { tabs.push_back(Tab()); activeTab = 0; }
+
+								//update the url's to the tab, and fills in the info
+								currentURL = tabs[activeTab].url;
+								urlInput = tabs[activeTab].url;
+								break; //we are done.
+							}
+						}
+						tabX += tabW + 2;
+					}
+				}
 			}
 		}
 
@@ -1264,49 +1326,39 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 		PreRender(render, font); //load the textures, images, and fonts, and the style for them.
 
-		//Clear the screen
-		//set it to the darkmode/lightmode
-		if (darkmode) //inverse
+		#pragma region //Render Text and Images from websites
+		if (darkmode) //if the darkmode tag is flagged
 		{
-			SDL_SetRenderDrawColor(render, (255 - backgroundColor.r), (255 - backgroundColor.g), (255 - backgroundColor.b), 255); // auto choses based on the site!
+			SDL_SetRenderDrawColor(render, (255 - backgroundColor.r), (255 - backgroundColor.g), (255 - backgroundColor.b), 255); // reverse the colors of the site, as darkmode is a flipped colored version, or on starting, black
 		}
 		else{
-			SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255); // auto choses based on the site!
+			SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255); // keep the colors normal, and set them to the colors of the site, or on starting, white
 		}
-		SDL_RenderClear(render);
+		SDL_RenderClear(render); //send it to the render, as our base color
 
-		//Loop through the layout list
-
-		//draw the page by looping through the layout list
-		{
-			std::lock_guard<std::mutex> lock(gTabsMutex);
-			for (int i = 0; i < tabs[activeTab].layout.size(); i++)
+		
+		{ //create the lock area
+			std::lock_guard<std::mutex> lock(gTabsMutex); //Lock the gTabsMutex to prevent any other threads from changing the values
+			for (int i = 0; i < tabs[activeTab].layout.size(); i++) //loop through each tab''s layout and values in the list.
 			{
-				//render our text, we make a rectangle and assign our text to that!
-				SDL_FRect textrec;
-				textrec.x = tabs[activeTab].layout[i].x;
-				textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;
-				textrec.w = tabs[activeTab].layout[i].width;
-				textrec.h = tabs[activeTab].layout[i].height;
+				
+				SDL_FRect textrec; //create a temp rect, to hold our text
+				textrec.x = tabs[activeTab].layout[i].x; //give our textrec the layout.x part
+				textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;//give our textrec the layout.y part - the scroll offset
+				textrec.w = tabs[activeTab].layout[i].width; //give our textrec the layout.width part
+				textrec.h = tabs[activeTab].layout[i].height; //give our textrec the layout.height part
 
 				//draw the bg color
 				if (tabs[activeTab].layout[i].hasBg)
 				{
-					if (darkmode) //inverse
-					{
-						SDL_SetRenderDrawColor(render, (255 - tabs[activeTab].layout[i].bgColor.r), (255 - tabs[activeTab].layout[i].bgColor.g), (255 - tabs[activeTab].layout[i].bgColor.b), 255); //255 cause we dont want it transparent
-					}
-					else {
-						SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); //255 cause we dont want it transparent
-					}
+					if (darkmode) { SDL_SetRenderDrawColor(render, (255 - tabs[activeTab].layout[i].bgColor.r), (255 - tabs[activeTab].layout[i].bgColor.g), (255 - tabs[activeTab].layout[i].bgColor.b), 255); } //Dark mode, inverting the text bg (if its colored)
+					else { SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); } //Not dark mode, rendering the text bg color normaly
 
-					//fill the rec
-					SDL_RenderFillRect(render, &textrec);
+					SDL_RenderFillRect(render, &textrec); //draw the BackGround of the text, and draw it over the rect of the text, but under the text, creating a bg
 				}
 
-				//draw image or text now
-				//check if we got an image, and if the texture has somthing
-				if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex != nullptr)
+			
+				if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex != nullptr) //check if the element is a image, and the activeTab.imageTex contains something
 				{
 					//for now, we are gonna clamp images
 					//if (textrec.w > 300)
@@ -1316,222 +1368,145 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					//	textrec.h = (int)(textrec.h * scale); //so that the scale is accurate
 					//}
 
-					SDL_RenderTexture(render, tabs[activeTab].layout[i].imageTex, nullptr, &textrec);
+					SDL_RenderTexture(render, tabs[activeTab].layout[i].imageTex, nullptr, &textrec); //send the image texture to be rendered
 				}
-				//if our text contains something
-				else if (tabs[activeTab].layout[i].textTex != nullptr)
+				
+				else if (tabs[activeTab].layout[i].textTex != nullptr) //check if the element has text
 				{
-					SDL_RenderTexture(render, tabs[activeTab].layout[i].textTex, nullptr, &textrec);
+					SDL_RenderTexture(render, tabs[activeTab].layout[i].textTex, nullptr, &textrec); //send the text to be rendered
 				}
-
-
-
-
-
-
-
-
-
 			}
 		}
+		#pragma endregion
 
-		//icons! Home, Reload, Back+Forth arrows, search, star, printer
-		//љ њ ђ ы ж ξ
 
-		int WinW, WinH;
-		SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH);
+		int WinW, WinH; //create 2 ints to hold the window's width, and the window's height
+		SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); // grab the output size, and assign the WinW and WinH
 	
 
-		float scaleX = 1.0f, scaleY = 1.0f;
-		SDL_GetRenderScale(render, &scaleX, &scaleY);
-
-		if (darkmode) //serach scroll bar color bg
-		{
-			SDL_SetRenderDrawColor(render, 10, 10, 10, 255);
-		}
-		else {
-			SDL_SetRenderDrawColor(render, 245, 245, 245, 255);
-		}
-	
-		SDL_FRect searchBarBg = { 0, 30, (float)WinW, 39 };
-		SDL_RenderFillRect(render, &searchBarBg);
-
-
-
-		//fist draw the scroll bar!
-		//my plan is to draw the track, and then the bar, the bar shoudl adjust size based on len of the document
-		//the track is easy, it never moves
-
-		//fist lets make the max scroll, as we should limit it with a bar (however, we should prob get this working from the layout in the future) (its stored in the gui tab folder)
-		float scrollBarWidth = 20.0f;
-		float uiTopBarHeight = 70.0f; 
-		float trackHeight = WinH - uiTopBarHeight;
-
-		//draw the scroll bar
-		if (darkmode)
-		{
-			SDL_SetRenderDrawColor(render, 31, 31, 31, 255);
-		}
-		else {
-			SDL_SetRenderDrawColor(render, 224, 224, 224, 255);
-		}
+		float scaleX, scaleY; //create 2 floats to hold the windows's scaleX and scaleY
+		SDL_GetRenderScale(render, &scaleX, &scaleY); //assign the scaleX, scaleY using SDL_GetRenderScale
 		
-		SDL_FRect scrollTrack = { WinW - scrollBarWidth, uiTopBarHeight, scrollBarWidth, trackHeight };
-		SDL_RenderFillRect(render, &scrollTrack);
 
+		// --- SCROLL BAR BG --- \\
+
+		float scrollBarWidth = 20.0f; //float to hold the width of the scroll bar
+		float uiTopBarHeight = 70.0f;  //float to hold the start of the bar
+		float trackHeight = WinH - uiTopBarHeight; //trackheight holds how long the bar should be, subtracting so that it ends on that start pos
+
+		
+		if (darkmode) { SDL_SetRenderDrawColor(render, 31, 31, 31, 255); }//if C is on, make the scroll bar BG a dark gray
+		else { SDL_SetRenderDrawColor(render, 224, 224, 224, 255); } //if darkmode is off, make the scroll bar BG a light gray
+			
+		SDL_FRect scrollTrack = { WinW - scrollBarWidth, uiTopBarHeight, scrollBarWidth, trackHeight }; //create a rect, holding the pos and size of the bar, on screen
+		SDL_RenderFillRect(render, &scrollTrack); //send it to be uploaded to the render.
+
+
+
+		// --- SCROLL BAR --- \\
+		
 		//now we handle the size of the bar
 		float barHeight = (trackHeight / (float)(tabs[activeTab].maxscroll + WinH)) * trackHeight; //the height of the bar, we take teh winH, the trackHight, and the max scroll!
-		if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might dissapear!
+		if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might disappear!
 
 		//we calculate its pos out of 100, with the size and stuff, so that we get an accurate bar!
-		float scrollPercentage = (float)tabs[activeTab].scrollpos / (float)tabs[activeTab].maxscroll;
-		float barY = uiTopBarHeight + (scrollPercentage * (trackHeight - barHeight));
+		float scrollPercentage = (float)tabs[activeTab].scrollpos / (float)tabs[activeTab].maxscroll; //calculate its pos out of the len of the bar, based on how far we are down the page
+		float barY = uiTopBarHeight + (scrollPercentage * (trackHeight - barHeight)); //then using the scrollPercentage float, we use it to draw the bar accurately
 
-		//draw it
-		if (darkmode) //darkmode - inverted
+		//color it
+		if (darkmode) { SDL_SetRenderDrawColor(render, 63, 63, 63, 255); } //if darkmode is on, set the render color for the scrollbar to a dark gray
+		else { SDL_SetRenderDrawColor(render, 192, 192, 192, 255); } //if darkmode is off,  set the render color for the scrollbar to a light gray
+		
+		SDL_FRect scrollbar = { WinW - scrollBarWidth, barY, scrollBarWidth, barHeight }; //create the rect, with our calculated pos.
+		SDL_RenderFillRect(render, &scrollbar); //fill in the rect with our color
+
+		//SCROLL BAR HIGHLIGHTS
+		SDL_SetRenderDrawColor(render, 255, 255, 255, 180); //set to draw a white highlight
+		SDL_RenderLine(render, scrollbar.x, scrollbar.y, scrollbar.x + scrollbar.w, scrollbar.y); //draw a horizontal line across the top edge of the bar, using the color
+		SDL_RenderLine(render, scrollbar.x, scrollbar.y, scrollbar.x, scrollbar.y + scrollbar.h);//draw a vertical line down the left edge of the bar, using the color
+
+		//SCROLL BAR HIGHLIGHTS
+		SDL_SetRenderDrawColor(render, 100, 100, 100, 255); //set to draw a dark gray highlight
+		SDL_RenderLine(render, scrollbar.x, scrollbar.y + scrollbar.h, scrollbar.x + scrollbar.w, scrollbar.y + scrollbar.h);  //draw a horizontal line across the bottom edge of the bar, using the color
+		SDL_RenderLine(render, scrollbar.x + scrollbar.w, scrollbar.y, scrollbar.x + scrollbar.w, scrollbar.y + scrollbar.h);  //draw a horizontal line across the right edge of the bar, using the color
+
+
+		// --- OVERSCROLL PREVENTION --- \\
+		
+		int totalPageHeight = 0; //temp int to hold the total height of the page
+
+		for (const auto& item : tabs[activeTab].layout) {  //loop through each layout item in the current active tab
+		
+			totalPageHeight = (std::max)(totalPageHeight, item.y + item.height); //we set our totalPageHeight to calculate the bottom edge of the current item, and store the larger value, to track the tallest overall content height
+
+		}
+		int viewableHeight = WinH - uiTopBarHeight; //now calculate the visable part of the page
+		tabs[activeTab].maxscroll = (std::max)(0, totalPageHeight - viewableHeight + 100); //lock so we cant go over 0, and below the totalPageHeight - viewableHeight + 100px of padding
+
+		// --- NAV BAR BG --- \\
+
+		if (darkmode) { SDL_SetRenderDrawColor(render, 10, 10, 10, 255); } //if darkmode, we make it a gray almost black
+		else { SDL_SetRenderDrawColor(render, 245, 245, 245, 255); } //if not darkmode we make it a very light gray, almost white
+		SDL_FRect navBarBg = { 0, 30, (float)WinW, 39 }; //create a rect bg.
+		SDL_RenderFillRect(render, &navBarBg); //render it with our bg
+
+
+		// --- BUTTON TEXT COLOR --- \\
+
+		SDL_Color textColor; //create a sdl color to hold the color of the text
+		if (darkmode) { textColor = { 255, 255, 255, 255 }; } //if dark mode, we set the color to white
+		else { textColor = { 0, 0, 0, 255 }; } //if not dark mode, we set the color to black
+
+
+		// --- BACK+FORWARD BUTTON'S --- \\
+	
+		SDL_FRect backBtn; //create a rect to hold the backBtn
+
+		if (tabs[activeTab].historypos > 0) //if we have the ability to go back...
 		{
-			SDL_SetRenderDrawColor(render, 63, 63, 63, 255);
+			backBtn.x = SDL_floorf(padding * scaleX) / scaleX; //set the x of the button
+			backBtn.y = SDL_floorf(topMargin * scaleY) / scaleY; //set the y of the button
+			backBtn.w = SDL_floorf(btnSize * scaleX) / scaleX; //set the w of the button
+			backBtn.h = SDL_floorf(btnSize * scaleY) / scaleY; //set the h of the button
+			if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); } //if darkmode is on, draw it as a dark gray
+			else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); }//if darkmode is off, draw it as a light gray
+				
+			SDL_RenderFillRect(render, &backBtn); //draw the backBtn, using the colors, and the rect, 
 		}
-		else {
-			SDL_SetRenderDrawColor(render, 192, 192, 192, 255);
-		}
-		
-		SDL_FRect scrollbar = { WinW - scrollBarWidth, barY, scrollBarWidth, barHeight };
-		SDL_RenderFillRect(render, &scrollbar);
-
-	
-		SDL_SetRenderDrawColor(render, 255, 255, 255, 180); // White top/left highlight
-		SDL_RenderLine(render, scrollbar.x, scrollbar.y, scrollbar.x + scrollbar.w, scrollbar.y);
-		SDL_RenderLine(render, scrollbar.x, scrollbar.y, scrollbar.x, scrollbar.y + scrollbar.h);
-
-	
-		SDL_SetRenderDrawColor(render, 100, 100, 100, 255);
-		SDL_RenderLine(render, scrollbar.x, scrollbar.y + scrollbar.h, scrollbar.x + scrollbar.w, scrollbar.y + scrollbar.h);
-		SDL_RenderLine(render, scrollbar.x + scrollbar.w, scrollbar.y, scrollbar.x + scrollbar.w, scrollbar.y + scrollbar.h);
-
-
-
-		//find the lowest point
-		int totalPageHeight = 0;
-
-		//go through each node, and find its pos
-		for (int i = 0; i < tabs[activeTab].layout.size(); i++) {
-		
-			int nodeBottom = tabs[activeTab].layout[i].y + tabs[activeTab].layout[i].height;
-
-			//if this node is > than the last, update it!
-			if (nodeBottom > totalPageHeight) {
-				totalPageHeight = nodeBottom;
-			}
-		}
-
-	
-		tabs[activeTab].maxscroll = totalPageHeight - (WinH - uiTopBarHeight) + 100;
-
-		
-		if (tabs[activeTab].maxscroll < 0) {
-			tabs[activeTab].maxscroll = 0;
-		}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		//render the 2 buttons
-		SDL_FRect backBtn;
-
-		if (tabs[activeTab].currentSearchPos > 0) //we do > than 0, as we dont want to have an error
-		{
-			backBtn.x = SDL_floorf(padding * scaleX) / scaleX;
-			backBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
-			backBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
-			backBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
-			if (darkmode) //darkmode
-			{
-				SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
-			}
-			else {
-				SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-			}
+		else { //if we don't have the ability to go back...
+			backBtn.x = SDL_floorf(padding * scaleX) / scaleX; //set the x of the button
+			backBtn.y = SDL_floorf(topMargin * scaleY) / scaleY; //set the y of the button
+			backBtn.w = SDL_floorf(btnSize * scaleX) / scaleX; //set the w of the button
+			backBtn.h = SDL_floorf(btnSize * scaleY) / scaleY; //set the h of the button
+			if (darkmode) { SDL_SetRenderDrawColor(render, 20, 20, 20, 255); } //if darkmode is on, draw it as a darker gray
+			else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); }//if darkmode is off, draw it as a lighter gray
 			
-			SDL_RenderFillRect(render, &backBtn);
+			SDL_RenderFillRect(render, &backBtn); //draw the backBtn, using the colors, and the rect, 
 		}
-		else {
-			backBtn.x = SDL_floorf(padding * scaleX) / scaleX;
-			backBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
-			backBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
-			backBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
-			if (darkmode)
-			{
-				SDL_SetRenderDrawColor(render, 20, 20, 20, 255);
-			}
-			else {
-				SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
-			}
-			
-			SDL_RenderFillRect(render, &backBtn);
+		SDL_Surface* backSurficon; //create a surf to hold the icon
+		{ //guard
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a guard to prevent other threads editing the TTF list, and causing a crash.
+			backSurficon = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor); //set the icon to the 'ђ' that has been manipulated to be a arrow
 		}
-
-
-		SDL_Color textColor; //do not affect this, as we want the buttons to be this color no matter what.
-		if (darkmode)
+		if (backSurficon != nullptr) //if the backSurficon worked
 		{
-			 textColor = { 255, 255, 255, 255 };
-		}
-		else {
-			 textColor = { 0, 0, 0, 255 };
-		}
-		
+			SDL_Texture* backTex = SDL_CreateTextureFromSurface(render, backSurficon); //create a texture to hold the BackSurfIcon
 
-		//handle my monitor
-	
+			SDL_SetTextureScaleMode(backTex, SDL_SCALEMODE_NEAREST); //change the scale of the SDL_Texture, to prevent blur
 
-		//BACK ARROW
-		SDL_Surface* backSurf; 
-		{
-			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-			backSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);
-		}
-		if (backSurf != nullptr)
-		{
-			SDL_Texture* backTex = SDL_CreateTextureFromSurface(render, backSurf);
+			float backX = SDL_floorf((backBtn.x + (backBtn.w - (float)backSurficon->w) / 2.0f) * scaleX) / scaleX; //adjust them to the size of the screen, x
+			float backY = SDL_floorf((backBtn.y + (backBtn.h - (float)backSurficon->h) / 2.0f) * scaleY) / scaleY; //adjust them to the size of the screen, y
 
+			SDL_FRect backTexRect = { backX, backY, (float)backSurficon->w, (float)backSurficon->h }; //create a rectangle that sets the size of the ' ђ '
+			SDL_RenderTexture(render, backTex, nullptr, &backTexRect); //send the texture to the render to be rendered
 
-			SDL_SetTextureScaleMode(backTex, SDL_SCALEMODE_NEAREST);
-
-			//before i had them hardcoded, not anymore!
-			//we snap to the screen
-			float backX = SDL_floorf((backBtn.x + (backBtn.w - (float)backSurf->w) / 2.0f) * scaleX) / scaleX;
-			float backY = SDL_floorf((backBtn.y + (backBtn.h - (float)backSurf->h) / 2.0f) * scaleY) / scaleY;
-
-			
-			SDL_FRect backTexRect = { backX, backY, (float)backSurf->w, (float)backSurf->h };
-			SDL_RenderTexture(render, backTex, nullptr, &backTexRect);
-
-			//prevent mem leaks
-			SDL_DestroyTexture(backTex);
-			SDL_DestroySurface(backSurf);
+			SDL_DestroyTexture(backTex); //we are done, destroy the texture
+			SDL_DestroySurface(backSurficon); //we are done, destroy the surface
 		}
 
-		SDL_FRect fwdBtn;
-		if (!tabs[activeTab].SearchHistory.empty() && tabs[activeTab].currentSearchPos < (int)tabs[activeTab].SearchHistory.size() - 1) //we do > than 0, as we dont want to have an error
+		SDL_FRect fwdBtn; //create a rect to hold the fwdBtn
+
+		if (tabs[activeTab].historypos < (int)tabs[activeTab].history.size() - 1) //we do > than 0, as we don't want to have an error
 		{
 			//changed to snap the <> correctly!
 			fwdBtn.x = SDL_floorf((backBtn.x + backBtn.w + padding) * scaleX) / scaleX;
@@ -1539,13 +1514,8 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
 			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
 
-			if (darkmode) //darkmode
-			{
-				SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
-			}
-			else {
-				SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-			}
+			if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); }
+			else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); }
 			SDL_RenderFillRect(render, &fwdBtn);
 		}
 		else {
@@ -1565,7 +1535,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			}
 			SDL_RenderFillRect(render, &fwdBtn);
 		}
-
 
 		//FORWARD ARROW
 		SDL_Surface* forwardSurf; 
@@ -1753,8 +1722,8 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 
 			//draw the cursor
-			//doing SDL_GETTICKS() returns miliseconds since hte app started
-			//dividing this by 500 gives us incrmetns every half a tick, that flip between t or f
+			//doing SDL_GETTICKS() returns milliseconds since the app started
+			//dividing this by 500 gives us increments every half a tick, that flip between t or f
 			//this gives a blinking effect without a timer
 			bool showcursor = (SDL_GetTicks() / 500) % 2 == 0;
 			if (!urlInput.empty() && showcursor)
@@ -1792,25 +1761,23 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		starBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
 
 		bool isStarred = (std::find(starredPages.begin(), starredPages.end(), currentURL) != starredPages.end());
+	
 		
-		if (isStarred)
+
+		
+		if (isStarred) //if the webpage has been starred
 		{
-			if (darkmode)//darkmode
-			{
-				SDL_SetRenderDrawColor(render, 0, 0, 255, 255);
-			}
-			else {
-				SDL_SetRenderDrawColor(render, 255, 255, 0, 255); 
-			}
-			
+			if (darkmode){ SDL_SetRenderDrawColor(render, 0, 0, 255, 255); } //If darkmode is on, set the color to blue, as its an invert of what it is for lightmode
+			else { SDL_SetRenderDrawColor(render, 255, 255, 0, 255); } //If darkmode is off, set the color to yellow, as its an invert of what it is for darkmode
 		}
-		else {
-			if (darkmode) //darkmode
-			{
-				SDL_SetRenderDrawColor(render, 55, 55, 55, 255); 
+		else { //if it has not
+			if (tabs[activeTab].title != "New Tab") { //if its NOT a new tab, we want to show the user that its clickable
+				if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); } //set it to a lighter shade of black, if darkmode
+				else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); }  //set it to a darker shade of white, if lightmode
 			}
-			else {
-				SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
+			else { //if its IS a new tab, we want to show the user its NOT clickable
+				if (darkmode) { SDL_SetRenderDrawColor(render, 20, 20, 20, 255); } //set it to a darker shade of black, if darkmode
+				else { SDL_SetRenderDrawColor(render, 235, 235, 235, 255); } //set it to a lighter shade of white, if lightmode
 			}
 			
 		}
@@ -1893,21 +1860,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			SDL_DestroyTexture(printerTex);
 			SDL_DestroySurface(printerSurf);
 		}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2020,7 +1972,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			//make sure we have made it
 			if (xSurf != nullptr)
 			{
-				//create the Tex from the serface of our text
+				//create the Tex from the surface of our text
 				SDL_Texture* xTex = SDL_CreateTextureFromSurface(render, xSurf);
 
 				//make a rec, and position it right
@@ -2038,12 +1990,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 
 		}
-
-
-
-
-
-
 
 		//draw the + for the tabs
 		if (darkmode) //darkmode
@@ -2088,26 +2034,15 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			SDL_DestroySurface(plusSurf);
 		}
 
-
-
-
-
-
-		//this is like our pygame render thing
-		SDL_RenderPresent(render);
+		SDL_RenderPresent(render); //Send our final render, with all the data, to the screen
 
 	}
-
-
 	//we need to quit to clean up all the subsystems
 	SDL_DestroyWindow(window); //kill the window, cleanly 
-	SDL_Quit();
+	SDL_Quit(); //Destory SDL
 
-	//Kill TTF
-	TTF_Quit();
+	TTF_Quit(); //Kill TTF
+	std::quick_exit(1); //clean up other threads, and stop
 
-	std::quick_exit(1);
-
-	return 0;
-}
-
+	return 0; //return, stop
+} //END OF GUI.cpp
