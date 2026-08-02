@@ -22,13 +22,10 @@ struct Node {
 	std::string href = ""; //If we contain a link
 	std::string src = ""; //If we contain an image
 
-
-   
-
     int measuredWidth = 0; //hold the measured Width
     int measuredHeight = 0; //hold the measured Height
     bool measured = false;  //so we don't measure more than once!
-    bool isFlexContainer = false; //determin if we are in a div
+    bool isFlexContainer = false; //determine if we are in a div
 
 };
 

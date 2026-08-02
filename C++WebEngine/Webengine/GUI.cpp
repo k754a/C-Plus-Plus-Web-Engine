@@ -1459,7 +1459,9 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 
 		// --- BACK+FORWARD BUTTON'S --- \\
-	
+		
+				//BACK-BUTTON\\
+
 		SDL_FRect backBtn; //create a rect to hold the backBtn
 
 		if (tabs[activeTab].historypos > 0) //if we have the ability to go back...
@@ -1504,266 +1506,201 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			SDL_DestroySurface(backSurficon); //we are done, destroy the surface
 		}
 
+				//FORWARD-BUTTON\\
+
 		SDL_FRect fwdBtn; //create a rect to hold the fwdBtn
 
-		if (tabs[activeTab].historypos < (int)tabs[activeTab].history.size() - 1) //we do > than 0, as we don't want to have an error
+		if (tabs[activeTab].historypos < (int)tabs[activeTab].history.size() - 1) //insure the active pos, is less than the entire history - 1
 		{
-			//changed to snap the <> correctly!
-			fwdBtn.x = SDL_floorf((backBtn.x + backBtn.w + padding) * scaleX) / scaleX;
-			fwdBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
-			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
-			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
+			fwdBtn.x = SDL_floorf((backBtn.x + backBtn.w + padding) * scaleX) / scaleX; //make the x of the button, using the backbuttn for offset
+			fwdBtn.y = SDL_floorf(topMargin * scaleY) / scaleY; //set the y of the button
+			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX; //set the w of the button
+			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY; //set the h of the button
 
-			if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); }
-			else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); }
-			SDL_RenderFillRect(render, &fwdBtn);
+			if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); } //if darkmode is on, draw it as a darker gray
+			else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); } //if darkmode is off, draw it as a grayish white
+			SDL_RenderFillRect(render, &fwdBtn); //send the colors and bounds to the renderer to be queued for rendering
 		}
-		else {
-			//not enabled
-			//changed to snap the <> correctly!
-			fwdBtn.x = SDL_floorf((backBtn.x + backBtn.w + padding) * scaleX) / scaleX;
-			fwdBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
-			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
-			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
+		else { //if the forward button does NOT meet the conditions to be pressed
+			fwdBtn.x = SDL_floorf((backBtn.x + backBtn.w + padding) * scaleX) / scaleX; //make the x of the button, using the backbuttn for offset
+			fwdBtn.y = SDL_floorf(topMargin * scaleY) / scaleY; //set the y of the button
+			fwdBtn.w = SDL_floorf(btnSize * scaleX) / scaleX; //set the w of the button
+			fwdBtn.h = SDL_floorf(btnSize * scaleY) / scaleY; //set the h of the button
 
-			if (darkmode)
-			{
-				SDL_SetRenderDrawColor(render, 20, 20, 20, 255);
-			}
-			else {
-				SDL_SetRenderDrawColor(render, 235, 235, 235, 255);
-			}
-			SDL_RenderFillRect(render, &fwdBtn);
+			if (darkmode) { SDL_SetRenderDrawColor(render, 20, 20, 20, 255); } //if darkmode is on, draw it as a almost black
+			else { SDL_SetRenderDrawColor(render, 235, 235, 235, 255); } //if darkmode is off, draw it as a almost white
+			SDL_RenderFillRect(render, &fwdBtn); //send the colors and bounds to the renderer to be queued for rendering
 		}
 
 		//FORWARD ARROW
-		SDL_Surface* forwardSurf; 
+		SDL_Surface* forwardSurf;   //create a surf to hold the icon
 		{
-			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-			forwardSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);  //create a guard to prevent other threads editing the TTF list, and causing a crash.
+			forwardSurf = TTF_RenderText_Solid(iconFont, "ђ", 0, textColor);  //set the icon to the 'ђ' that has been manipulated to be a arrow
 		}
-		if (forwardSurf != nullptr)
+		if (forwardSurf != nullptr) //if the backSurficon worked
 		{
-			//flip the sprite, as currently its ugly lol
-			SDL_FlipSurface(forwardSurf, SDL_FLIP_HORIZONTAL);
+			SDL_FlipSurface(forwardSurf, SDL_FLIP_HORIZONTAL); //to prevent pixel issues, we flip the arrow, and this allows us to have the same pixel look, but only use one sprite on the sheet
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, forwardSurf); //create a temp texture, to hold the arrow, passing in our font, and the flip
 
-			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, forwardSurf);
+			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST); //force it to pixel art to prevent blur
 
-			//force it to fix the pixel art! (found this with a bit of searching!)
-			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST);
+			float fwdX = SDL_floorf((fwdBtn.x + (fwdBtn.w - (float)forwardSurf->w) / 2.0f) * scaleX) / scaleX; //adjust them to the size of the screen, x
+			float fwdY = SDL_floorf((fwdBtn.y + (fwdBtn.h - (float)forwardSurf->h) / 2.0f) * scaleY) / scaleY; //adjust them to the size of the screen, y
 
-			float fwdX = SDL_floorf((fwdBtn.x + (fwdBtn.w - (float)forwardSurf->w) / 2.0f) * scaleX) / scaleX;
-			float fwdY = SDL_floorf((fwdBtn.y + (fwdBtn.h - (float)forwardSurf->h) / 2.0f) * scaleY) / scaleY;
-
-			SDL_FRect fwdTexRect = { fwdX, fwdY, (float)forwardSurf->w, (float)forwardSurf->h };
-
-			//flip the sprite, as currently its ugly lol
-			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect);
+			SDL_FRect fwdTexRect = { fwdX, fwdY, (float)forwardSurf->w, (float)forwardSurf->h }; //create a rectangle that sets the size of the ' ђ '
+			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect); //send the texture to the render to be rendered
 
 			//prevent mem leaks
-			SDL_DestroyTexture(forwardTex);
-			SDL_DestroySurface(forwardSurf);
+			SDL_DestroyTexture(forwardTex); //we are done, destroy the texture
+			SDL_DestroySurface(forwardSurf); //we are done, destroy the surface
 		}
 
+		// --- RELOAD BUTTON --- \\
 
+		SDL_FRect reloadButton; //create a rect to hold the reload button
 
-		SDL_FRect reloadButton;
+		reloadButton.x = fwdBtn.x + fwdBtn.w + padding; //set the X pos of the reload button offsetting off the fwdBtn.x
+		reloadButton.y = topMargin; //set the pos of the y
+		reloadButton.w = btnSize; //set the pos of the w
+		reloadButton.h = btnSize; //set the pos of the h
+		if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); } //if darkmode is on, draw it as a darker gray
+		else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); } //if darkmode is off, draw it as a grayish white
 
-		//reload button
-		reloadButton.x = fwdBtn.x + fwdBtn.w + padding;
-		reloadButton.y = topMargin;
-		reloadButton.w = btnSize;
-		reloadButton.h = btnSize;
-		if (darkmode) //darkmode
+		SDL_RenderFillRect(render, &reloadButton); //send the rect to the render to be queued for rendering
+
+		SDL_Surface* reloadSurf; //create a serf to hold the text icon
 		{
-			SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);  //create a guard to prevent other threads editing the TTF list, and causing a crash.
+			reloadSurf = TTF_RenderText_Solid(iconFont, "њ", 0, textColor);  //set the icon to the 'њ' that has been manipulated to be a reload arrow
 		}
-		else {
-			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-		}
-		SDL_RenderFillRect(render, &reloadButton);
 
-		SDL_Surface* reloadSurf;
+		if (reloadSurf != nullptr) //if the reloadSurf worked
 		{
-			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-			reloadSurf = TTF_RenderText_Solid(iconFont, "њ", 0, textColor);
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, reloadSurf); //create a temp texture, to hold the reload arrow, passing in our font
+
+			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST); //force it to pixel art to prevent blur
+
+			SDL_FRect reloadTexRect = { reloadButton.x + 3, reloadButton.y - 4, (float)reloadSurf->w, (float)reloadSurf->h }; //create a rectangle that sets the size of the ' њ '
+			SDL_RenderTexture(render, forwardTex, nullptr, &reloadTexRect); //send the texture to the render to be rendered
+
+			SDL_DestroyTexture(forwardTex); //we are done, destroy the texture
+			SDL_DestroySurface(reloadSurf); //we are done, destroy the surface
 		}
 
-		if (reloadSurf != nullptr)
+		// --- HOME BUTTON --- \\
+
+		SDL_FRect homeBtn; //create a rect to hold the home button
+		
+		homeBtn.x = reloadButton.x + reloadButton.w + padding; //set the X pos of the reload button offsetting off the reloadButton.x
+		homeBtn.y = topMargin; //set the pos of the y
+		homeBtn.w = btnSize; //set the pos of the w
+		homeBtn.h = btnSize; //set the pos of the h
+		if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); } //if darkmode is on, draw it as a darker gray
+		else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); } //if darkmode is off, draw it as a grayish white
+
+		SDL_RenderFillRect(render, &homeBtn); //send the rect to the render to be queued for rendering
+		
+		SDL_Surface* homeSurf; //create a serf to hold the home icon
 		{
-			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, reloadSurf);
-
-			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST);
-
-			SDL_FRect reloadTexRect = { reloadButton.x + 3, reloadButton.y - 4, (float)reloadSurf->w, (float)reloadSurf->h };
-			SDL_RenderTexture(render, forwardTex, nullptr, &reloadTexRect);
-
-			//prevent mem leaks
-			SDL_DestroyTexture(forwardTex);
-			SDL_DestroySurface(reloadSurf);
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a guard to prevent other threads editing the TTF list, and causing a crash.
+			homeSurf = TTF_RenderText_Blended(iconFont, "љ", 0, textColor); //set the icon to the 'љ' that has been manipulated to be a home icon
 		}
 
-
-
-
-
-
-		SDL_FRect homeBtn;
-		
-			homeBtn.x = reloadButton.x + reloadButton.w + padding;
-			homeBtn.y = topMargin;
-			homeBtn.w = btnSize;
-			homeBtn.h = btnSize;
-			if (darkmode) //darkmode
-			{
-				SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
-			}
-			else {
-				SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-			}
-			SDL_RenderFillRect(render, &homeBtn);
-		
-
-		
-		
-		SDL_Surface* homeSurf; 
+		if (homeSurf != nullptr) //if the homeSurf worked
 		{
-			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-			homeSurf = TTF_RenderText_Blended(iconFont, "љ", 0, textColor);
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, homeSurf); //create a temp texture, to hold the home icon , passing in our font
+
+			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST); //force it to pixel art to prevent blur
+
+			SDL_FRect fwdTexRect = { homeBtn.x + 2, homeBtn.y - 2, (float)homeSurf->w, (float)homeSurf->h }; //create a rectangle that sets the size of the ' љ '
+			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect); //send the texture to the render to be rendered
+
+			SDL_DestroyTexture(forwardTex); //we are done, destroy the texture
+			SDL_DestroySurface(homeSurf); //we are done, destroy the surface
 		}
 
-		if (homeSurf != nullptr)
-		{
-			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, homeSurf);
-
-			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST);
-
-			SDL_FRect fwdTexRect = { homeBtn.x + 2, homeBtn.y - 2, (float)homeSurf->w, (float)homeSurf->h };
-			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect);
-
-			//prevent mem leaks
-			SDL_DestroyTexture(forwardTex);
-			SDL_DestroySurface(homeSurf);
-		}
-
-
-
-
+		// --- INPUT BOX --- \\
 		
-		//INPUT BOX
-		float searchX = homeBtn.x + homeBtn.w + padding;
-		float searchW = (float)WinW - btnSize - padding - padding - searchX - ((btnSize) * 2); //for 2 buttons
+		float searchX = homeBtn.x + homeBtn.w + padding; //create the start x, taking in the homeBtn for offset
+		float searchW = (float)WinW - btnSize -  searchX - ((btnSize) * 2) - ((padding)*2); //create the width, the window - padding*2 for 2 buttons - the starting x, and - the 2 buttons
 
-		
-
-		SDL_FRect bar = {
-			SDL_floorf(searchX * scaleX) / scaleX,
-			SDL_floorf(topMargin * scaleY) / scaleY,
-			SDL_floorf(searchW * scaleX) / scaleX,
-			SDL_floorf(btnSize * scaleY) / scaleY
+		SDL_FRect bar = { //hold the dimensions of the input bar
+			SDL_floorf(searchX * scaleX) / scaleX, //set the x of the bar
+			SDL_floorf(topMargin * scaleY) / scaleY, //set the y of the bar
+			SDL_floorf(searchW * scaleX) / scaleX, //set the w of the bar
+			SDL_floorf(btnSize * scaleY) / scaleY //set the h of the bar
 		};
-		if (darkmode) //handle dark mode
-		{
-			SDL_SetRenderDrawColor(render, 15, 15, 15, 255); //draw a grayish color
-		}
-		else {
-			SDL_SetRenderDrawColor(render, 240, 240, 240, 255); //draw a grayish color
-		}
+		if (darkmode) { SDL_SetRenderDrawColor(render, 15, 15, 15, 255); } //if darkmode is on, draw it as a almost black
+		else { SDL_SetRenderDrawColor(render, 240, 240, 240, 255);} //if darkmode is off, draw it as a almost white
+		
 		
 		//fill the rec with this
-		SDL_RenderFillRect(render, &bar);
+		SDL_RenderFillRect(render, &bar); //send the rect to the render to be queued for rendering
 
-		std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-		//draw the text typed
-		TTF_SetFontSize(font, 17); //define the font size
-		std::string displayText = urlInput;
-		//set the txt color
-
-		SDL_Color color;
-		if (darkmode) //handle dark mode
-		{
-			color = { 255,255,255,255 };
-		}
-		else {
-			color = { 0,0,0,255 };
-		}
+		
+		TTF_SetFontSize(font, 17); //set text size
+		std::string displayText = urlInput; //hold the display text, need a second string, to display the ы Enter a url...
+		SDL_Color color; //holds the color of the input text
+		SDL_Surface* urlSurf; //holds the surf of the text
 		
 
-		if (urlInput.empty()) //check if its empty
+		//display ghost text, with a different color, if nothing typed
+		if (urlInput.empty()) //do a check if i've typed anything, if not..
 		{
-			displayText = "ы Enter a url...";
-			if (darkmode) //handle dark mode
-			{
-				color = { 75, 75, 75, 255 }; //just a dark gray
-			}
-			else{
-				color = { 180, 180, 180, 255 }; //just a dark gray
-			}
+			displayText = "ы Enter a url..."; //display some ghost text
+			if (darkmode) { color = { 75, 75, 75, 255 }; } //if darkmode is off, set it to a dark gray	
+			else{ color = { 180, 180, 180, 255 }; } //if darkmode is off, set it to a light-ish gray
 			
 		}
+		else { //if i've typed anything...
+			if (darkmode) { color = { 255,255,255,255 }; } //if darkmode is on, set the color to white
+			else { color = { 0,0,0,255 }; } //if darkmode is off, set the color to black
+		}
 
-		//render it!
-		SDL_Surface* urlSurf = TTF_RenderText_Solid(font, displayText.c_str(), 0, color);
+		{ //LOCK
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a guard to prevent other threads editing the TTF list, and causing a crash.
+			urlSurf = TTF_RenderText_Solid(font, displayText.c_str(), 0, color); //create a surf, to hold the text, and that renders it.
+		}
+		
+		// --- INPUT CURSOR --- \\
 
-	
-		if (urlSurf != nullptr) //check to make sure we arnt trying to render somthing that is null
+		if (urlSurf != nullptr) //make sure the urlSurf is created correctly
 		{
-			//upload it to the gpu for drawing
-			SDL_Texture* urlTexture = SDL_CreateTextureFromSurface(render, urlSurf);
+			SDL_Texture* urlTexture = SDL_CreateTextureFromSurface(render, urlSurf); //create a temp texture, to hold the url link.
 
-			SDL_SetTextureScaleMode(urlTexture, SDL_SCALEMODE_NEAREST);
-			//make a rectangle that is going to render our text
-			//give the text a bit of padding and stuff
-			SDL_FRect urlTextureRect = { bar.x + 8, bar.y + 6, (float)urlSurf->w, (float)urlSurf->h };
-			SDL_RenderTexture(render, urlTexture, nullptr, &urlTextureRect);
+			SDL_SetTextureScaleMode(urlTexture, SDL_SCALEMODE_NEAREST); //force it to pixel art to prevent blur
+			SDL_FRect urlTextureRect = { bar.x + 8, bar.y + 6, (float)urlSurf->w, (float)urlSurf->h }; //create a temp rect to hold our bar
+			SDL_RenderTexture(render, urlTexture, nullptr, &urlTextureRect); //send the bar to the render to be rendered
 
-			//we are done with it, destory!
-			SDL_DestroyTexture(urlTexture);
+			SDL_DestroyTexture(urlTexture); //we are done with it, destroy!
 
 
 			//draw the cursor
 			//doing SDL_GETTICKS() returns milliseconds since the app started
 			//dividing this by 500 gives us increments every half a tick, that flip between t or f
 			//this gives a blinking effect without a timer
-			bool showcursor = (SDL_GetTicks() / 500) % 2 == 0;
-			if (!urlInput.empty() && showcursor)
+			bool ShowCursor = (SDL_GetTicks() / 500) % 2 == 0;
+			if (!urlInput.empty() && ShowCursor) //if the url contains something, and the cursor should be shown
 			{
-				//draw it now
-				//urlSurf-w is the total pixel width of the string
-				float cursorX = bar.x + 8 + urlSurf->w + 1 + adjusted;
-				if (darkmode) //handle dark mode
-				{
-					SDL_SetRenderDrawColor(render, 255, 255, 255, 255);
-				}
-				else {
-					SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
-				}
+				float cursorX = bar.x + 8 + urlSurf->w + 1 + adjusted; //set the x of the cursor to the last line in the text, with the adjusted
+				if (darkmode) { SDL_SetRenderDrawColor(render, 255, 255, 255, 255); } //if darkmode, set it to white
+				else { SDL_SetRenderDrawColor(render, 0, 0, 0, 255); } //if not darkmode, set it to black
 
-				
-				SDL_RenderLine(render, cursorX, bar.y + 5, cursorX, bar.y + 23);
-
+				SDL_RenderLine(render, cursorX, bar.y + 5, cursorX, bar.y + 23); //render the line with the x, and colors
 			}
-
-			//cleanup
-			SDL_DestroySurface(urlSurf);
-
-
+			SDL_DestroySurface(urlSurf); //now destroy the surf
 		}
 
+		// --- STAR BUTTON --- \\
 
+		SDL_FRect starBtn; //create a rect to hold the star button
+		starBtn.x = SDL_floorf((bar.x + bar.w + padding) * scaleX) / scaleX; //set the end X pos of the bar offsetting off the starBtn.x
+		starBtn.y = SDL_floorf(topMargin * scaleY) / scaleY; //set the y of the bar
+		starBtn.w = SDL_floorf(btnSize * scaleX) / scaleX; //set the w of the bar
+		starBtn.h = SDL_floorf(btnSize * scaleY) / scaleY; //set the h of the bar
 
-		
-		//new button, star
-		SDL_FRect starBtn;
-		starBtn.x = SDL_floorf((bar.x + bar.w + padding) * scaleX) / scaleX;
-		starBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
-		starBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
-		starBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
-
-		bool isStarred = (std::find(starredPages.begin(), starredPages.end(), currentURL) != starredPages.end());
-	
-		
-
+		bool isStarred = (std::find(starredPages.begin(), starredPages.end(), currentURL) != starredPages.end()); //loop through the starredPages list, and check if it = the currentURL
 		
 		if (isStarred) //if the webpage has been starred
 		{
@@ -1779,270 +1716,171 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				if (darkmode) { SDL_SetRenderDrawColor(render, 20, 20, 20, 255); } //set it to a darker shade of black, if darkmode
 				else { SDL_SetRenderDrawColor(render, 235, 235, 235, 255); } //set it to a lighter shade of white, if lightmode
 			}
-			
+		}
+		SDL_RenderFillRect(render, &starBtn); //send the rect to the render to be queued for rendering
+
+		SDL_Surface* starSurf; //create a serf to hold the home icon
+		{ //LOCK
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a guard to prevent other threads editing the TTF list, and causing a crash.
+			starSurf = TTF_RenderText_Solid(iconFont, "ж", 0, textColor); //set the icon to the 'ж' that has been manipulated to be a star icon
 		}
 
-
-
-
-	
-		SDL_RenderFillRect(render, &starBtn);
-
-		//RENDER STAR
-		SDL_Surface* starSurf;
+		if (starSurf != nullptr) //if the icon was created successfully
 		{
-			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-			starSurf = TTF_RenderText_Solid(iconFont, "ж", 0, textColor);
+			SDL_Texture* starTex = SDL_CreateTextureFromSurface(render, starSurf); //create a temp texture, to hold the star icon.
+			SDL_SetTextureScaleMode(starTex, SDL_SCALEMODE_NEAREST); //force it to pixel art to prevent blur
+			float starX = SDL_floorf((starBtn.x + (starBtn.w - (float)starSurf->w) / 2.0f) * scaleX) / scaleX; //adjust them to the size of the screen, x
+			float starY = SDL_floorf((starBtn.y + (starBtn.h - (float)starSurf->h) / 2.0f) * scaleY) / scaleY; //adjust them to the size of the screen, y
+
+			SDL_FRect backTexRect = { starX, starY, (float)starSurf->w, (float)starSurf->h }; //create a rect to make the button
+			SDL_RenderTexture(render, starTex, nullptr, &backTexRect); //send the texture to the render to be rendered
+
+			SDL_DestroyTexture(starTex); //we are done, destroy the texture
+			SDL_DestroySurface(starSurf); //we are done, destroy the surface
 		}
 
-		if (starSurf != nullptr)
-		{
-			SDL_Texture* starTex = SDL_CreateTextureFromSurface(render, starSurf);
+		// --- PRINTER BUTTON --- \\
 
+		SDL_FRect printerBtn; //create a rect to hold the printer button
+		printerBtn.x = SDL_floorf((bar.x + bar.w + padding + btnSize + padding) * scaleX) / scaleX; //set the end X pos of the bar offsetting off the printerBtn.x
+		printerBtn.y = SDL_floorf(topMargin * scaleY) / scaleY; //set the y of the bar
+		printerBtn.w = SDL_floorf(btnSize * scaleX) / scaleX; //set the w of the bar
+		printerBtn.h = SDL_floorf(btnSize * scaleY) / scaleY; //set the h of the bar
 
-			SDL_SetTextureScaleMode(starTex, SDL_SCALEMODE_NEAREST);
+		if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); } //set it to a lighter shade of black, if darkmode
+		else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); }  //set it to a darker shade of white, if lightmode
 
-			//before i had them hardcoded, not anymore!
-			//we snap to the screen
-			float starX = SDL_floorf((starBtn.x + (starBtn.w - (float)starSurf->w) / 2.0f) * scaleX) / scaleX;
-			float starY = SDL_floorf((starBtn.y + (starBtn.h - (float)starSurf->h) / 2.0f) * scaleY) / scaleY;
+		SDL_RenderFillRect(render, &printerBtn); //send the rect to the render to be queued for rendering
 
-
-			SDL_FRect backTexRect = { starX, starY, (float)starSurf->w, (float)starSurf->h };
-			SDL_RenderTexture(render, starTex, nullptr, &backTexRect);
-
-			//prevent mem leaks
-			SDL_DestroyTexture(starTex);
-			SDL_DestroySurface(starSurf);
-		}
-
-
-		//new button, printer
-		SDL_FRect printerBtn;
-		printerBtn.x = SDL_floorf((bar.x + bar.w + padding + btnSize + padding) * scaleX) / scaleX;
-		printerBtn.y = SDL_floorf(topMargin * scaleY) / scaleY;
-		printerBtn.w = SDL_floorf(btnSize * scaleX) / scaleX;
-		printerBtn.h = SDL_floorf(btnSize * scaleY) / scaleY;
-
-		if (darkmode) //darkmode
-		{
-			SDL_SetRenderDrawColor(render, 55, 55, 55, 255);
-		}
-		else {
-			SDL_SetRenderDrawColor(render, 200, 200, 200, 255);
-		}
-		SDL_RenderFillRect(render, &printerBtn);
-
-		//RENDER PRINTER
-		SDL_Surface* printerSurf;
-		{
-			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-			printerSurf = TTF_RenderText_Solid(iconFont, "ξ", 0, textColor);
-		}
-
-		if (printerSurf != nullptr)
-		{
-			SDL_Texture* printerTex = SDL_CreateTextureFromSurface(render, printerSurf);
-
-
-			SDL_SetTextureScaleMode(printerTex, SDL_SCALEMODE_NEAREST);
-
-			//before i had them hardcoded, not anymore!
-			//we snap to the screen
-			float printerX = SDL_floorf((printerBtn.x + (printerBtn.w - (float)printerSurf->w) / 2.0f) * scaleX) / scaleX;
-			float printerY = SDL_floorf((printerBtn.y + (printerBtn.h - (float)printerSurf->h) / 2.0f) * scaleY) / scaleY;
-
-
-			SDL_FRect backTexRect = { printerX, printerY, (float)printerSurf->w, (float)printerSurf->h };
-			SDL_RenderTexture(render, printerTex, nullptr, &backTexRect);
-
-			//prevent mem leaks
-			SDL_DestroyTexture(printerTex);
-			SDL_DestroySurface(printerSurf);
-		}
-
-
-
-
-		//draw the background of the taskbar.
-		if (darkmode) //darkmode
-		{
-			SDL_SetRenderDrawColor(render, 45, 45, 45, 255); //make the taskbar bg inverted.
-		}
-		else {
-			SDL_SetRenderDrawColor(render, 210, 210, 210, 255);
+		SDL_Surface* printerSurf; //create a serf to hold the printer icon
+		{ //LOCK
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a guard to prevent other threads editing the TTF list, and causing a crash.
+			printerSurf = TTF_RenderText_Solid(iconFont, "ξ", 0, textColor); //set the icon to the 'ξ' that has been manipulated to be a printer icon
 		}
 		
-		SDL_FRect tabBarBg = { 0, 0, (float)WinW, 30 };
-		SDL_RenderFillRect(render, &tabBarBg);
+		if (printerSurf != nullptr) //if the icon was created successfully
+		{
+			SDL_Texture* printerTex = SDL_CreateTextureFromSurface(render, printerSurf);
+			SDL_SetTextureScaleMode(printerTex, SDL_SCALEMODE_NEAREST);
+			float printerX = SDL_floorf((printerBtn.x + (printerBtn.w - (float)printerSurf->w) / 2.0f) * scaleX) / scaleX; //adjust them to the size of the screen, x
+			float printerY = SDL_floorf((printerBtn.y + (printerBtn.h - (float)printerSurf->h) / 2.0f) * scaleY) / scaleY; //adjust them to the size of the screen, y
 
+			SDL_FRect backTexRect = { printerX, printerY, (float)printerSurf->w, (float)printerSurf->h }; //create a rect to make the button
+			SDL_RenderTexture(render, printerTex, nullptr, &backTexRect); //send the texture to the render to be rendered
 
-		//ok, lets draw each tab
-		int tabX = 0; //stores the X of each tab
+			SDL_DestroyTexture(printerTex); //we are done, destroy the texture
+			SDL_DestroySurface(printerSurf); //we are done, destroy the surface
+		}
+
+		// --- TABS --- \\
+
+		if (darkmode) { SDL_SetRenderDrawColor(render, 45, 45, 45, 255); } //if darkmode is enabled, set the tab bg color to a dark gray
+		else { SDL_SetRenderDrawColor(render, 210, 210, 210, 255); } //if darkmode is disabled, set the tab bg color to a light gray
+		
+		SDL_FRect tabBarBg = { 0, 0, (float)WinW, 30 }; //create a rect to hold the color, of the bg of the tabs
+		SDL_RenderFillRect(render, &tabBarBg);  //send the rect to the render to be queued for rendering
+
+		//DRAW EACH TAB
+		int tabX = 0; //temp var to hold the X of each tab
 		for (int t = 0; t < tabs.size(); t++)
 		{
-			//ok lets do a tab width, and lets make it fixed for now
-
-			int tabW = 180;
+			int tabW = 180; //set the width of each tab
 
 			//change the color based on the tab (if its active or not)
 			if (t == activeTab)
 			{
-				if (darkmode) //darkmode
-				{
-					SDL_SetRenderDrawColor(render, 10, 10, 10, 255); //make the taskbar img inverted, active)
-				}
-				else {
-					SDL_SetRenderDrawColor(render, 245, 245, 245, 255);
-				}
+				if (darkmode) { SDL_SetRenderDrawColor(render, 10, 10, 10, 255); } //set it to a almost black, if darkmode
+				else { SDL_SetRenderDrawColor(render, 245, 245, 245, 255); } //set it to a almost white, if lightmode
 			}
 				
-			else
+			else //if its not active
 			{
-				if (darkmode)
-				{
-					SDL_SetRenderDrawColor(render, 65, 65, 65, 255);  //make the taskbar img inverted, unactive.
-				}
-				else {
-					SDL_SetRenderDrawColor(render, 190, 190, 190, 255);
-				}
-				
-				
+				if (darkmode) { SDL_SetRenderDrawColor(render, 65, 65, 65, 255); } //set the taskbar color to a grayish black, if darkmode
+				else { SDL_SetRenderDrawColor(render, 190, 190, 190, 255); }  //set the taskbar color to a light gray, if lightmode
 			}
 				
+			SDL_FRect TabRect = { (float)tabX, 0, (float)tabW, 30 }; //make one tab rect, with a height of 30
+		
+			SDL_RenderFillRect(render, &TabRect); //send the rect to the render to be queued for rendering
 
-			//make our tab rec, putting in our tab width and pos
-			SDL_FRect tabrect = { (float)tabX, 0, (float)tabW, 30 }; //with a height of 30
-			//render it
-			SDL_RenderFillRect(render, &tabrect);
-
-
-			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-			//ok now lets draw the tab text (gonna be the <title> text)
-			TTF_SetFontSize(font, 13);
-			//set the color to black, and the title to the title
-			SDL_Color tabTextColor;
-			if (darkmode) //darkmode
-			{
-				tabTextColor = { 255,255,255,255 };
-			}
-			else {
-				tabTextColor = { 0,0,0,255 };
-			}
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a lock for the tab, this prevents crashes by preventing other functions with this lock, from changing the data preventing 2 things writing 1 data
+		
+			TTF_SetFontSize(font, 13); 	//ok now lets draw the tab text (gonna be the <title> text)
 			
+			SDL_Color tabTextColor; //create a var to hold the RGB color
+			if (darkmode) { tabTextColor = { 255,255,255,255 }; } //if darkmode is enabled, set the text color to white
+			else { tabTextColor = { 0,0,0,255 }; } //if darkmode is disabled, set the text color to black 
+				
 			
-			std::string tabTitle = tabs[t].title;
-
+			std::string tabTitle = tabs[t].title; //temp string to hold the title
 
 			//ok, now lets trim the long titles, as they are gonna overspill
-			if (tabTitle.size() > 20) tabTitle = tabTitle.substr(0, 17) + "..."; //replace the overspill (greater than 17 chars) with ...
+			if (tabTitle.size() > 20) tabTitle = tabTitle.substr(0, 17) + "..."; //replace the overspill (greater than 17 chars) with '...'
 
-			//render it
-			SDL_Surface* tabSurf = TTF_RenderText_Solid(font, tabTitle.c_str(), 0, tabTextColor);
-			if (tabSurf != nullptr) //make sure its not null
-			{
-				//create a texture for the text
-				SDL_Texture* tabTex = SDL_CreateTextureFromSurface(render, tabSurf);
-				//move it to fit in the tab
-				SDL_FRect tabTextRect = { (float)tabX + 8, 6, (float)tabSurf->w, (float)tabSurf->h };
-
-				//render it
-				SDL_RenderTexture(render, tabTex, nullptr, &tabTextRect);
-				//clear to prevent mem leaks
-
-				SDL_DestroyTexture(tabTex);
-				SDL_DestroySurface(tabSurf);
-			}
-
-
-
-			//we also want the ability to close the tabs with an x, like a normal browser.
-
-			//make the serf for it
-			SDL_Surface* xSurf;
-			if (tabs.size() > 1)
-			{
-				xSurf = TTF_RenderText_Solid(font, "x", 0, tabTextColor);
-			}
-			else {
-				xSurf = TTF_RenderText_Solid(font, "", 0, tabTextColor);
-			}
 			
-
-			//make sure we have made it
-			if (xSurf != nullptr)
+			SDL_Surface* tabSurf = TTF_RenderText_Solid(font, tabTitle.c_str(), 0, tabTextColor); //create a serf to hold the text, and send it to be rendered
+			if (tabSurf != nullptr) //if our tabSurf has been created 
 			{
-				//create the Tex from the surface of our text
-				SDL_Texture* xTex = SDL_CreateTextureFromSurface(render, xSurf);
-
-				//make a rec, and position it right
-				SDL_FRect xRect = { (float)(tabX + tabW - 20), 7, (float)xSurf->w, (float)xSurf->h };
-				SDL_RenderTexture(render, xTex, nullptr, &xRect); //render it
-
-				//destory both
-				SDL_DestroyTexture(xTex);
-				SDL_DestroySurface(xSurf);
+				SDL_Texture* tabTex = SDL_CreateTextureFromSurface(render, tabSurf); //create a temp texture to hold the tab text
+				SDL_FRect tabTextRect = { (float)tabX + 8, 6, (float)tabSurf->w, (float)tabSurf->h }; //move the rect to fit in the tab
+				SDL_RenderTexture(render, tabTex, nullptr, &tabTextRect); //send the texture to the render to be rendered
+				
+				SDL_DestroyTexture(tabTex); //we are done, destroy the texture
+				SDL_DestroySurface(tabSurf); //we are done, destroy the surface
 			}
 
-			//increase the gap between the next tab
-			tabX += tabW + 2;  
-
-
-
-		}
-
-		//draw the + for the tabs
-		if (darkmode) //darkmode
-		{
-			SDL_SetRenderDrawColor(render, 75, 75, 75, 255); //inverted
-		}
-		else {
-			SDL_SetRenderDrawColor(render, 180, 180, 180, 255);
-		}
-		//make the button for it
-		SDL_FRect newTabBtn = { (float)tabX, 2, 26, 26 };
-
-		//fill it
-		SDL_RenderFillRect(render, &newTabBtn);
-
-		SDL_Surface* plusSurf;
-
-		//just a copy and paste atp
-		{
-			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
-			if (darkmode) //darkmode
+			
+			SDL_Surface* xSurf; //build a surf to hold the 'x' for closing a tab
+			if (tabs.size() > 1) { xSurf = TTF_RenderText_Solid(font, "x", 0, tabTextColor); } //if we have more than one tab, we show the x
+			else {xSurf = TTF_RenderText_Solid(font, "", 0, tabTextColor); } //if we do not have more than one tab (just have one), we hide the x
+			
+			if (xSurf != nullptr) //if our xSurf has been created 
 			{
-				plusSurf = TTF_RenderText_Solid(font, "+", 0, { 255,255,255,255 });
+				SDL_Texture* xTex = SDL_CreateTextureFromSurface(render, xSurf); //create a temp texture to hold the 'x' text
+				SDL_FRect xRect = { (float)(tabX + tabW - 20), 7, (float)xSurf->w, (float)xSurf->h }; //move the rect to fit in the tab
+				SDL_RenderTexture(render, xTex, nullptr, &xRect); //send the texture to the render to be rendered
+
+				SDL_DestroyTexture(xTex); //we are done, destroy the texture
+				SDL_DestroySurface(xSurf); //we are done, destroy the surface
 			}
-			else {
-				plusSurf = TTF_RenderText_Solid(font, "+", 0, { 0,0,0,255 });
-			}
+
+			
+			tabX += tabW + 2; //increase the gap between the next tab, and start the next tab
 		}
 
-		//make sure we have made it
-		if (plusSurf != nullptr)
+		//draw the + button for creating new tabs
+		if (darkmode) { SDL_SetRenderDrawColor(render, 75, 75, 75, 255); } //if darkmode is on, draw the color as a dark gray
+		else { SDL_SetRenderDrawColor(render, 180, 180, 180, 255); } //if darkmode is off, draw the color as a light gray
+		
+		SDL_FRect newTabBtn = { (float)tabX, 2, 26, 26 }; //make rect to hold the image of the button
+
+		SDL_RenderFillRect(render, &newTabBtn); //send it to be rendered
+
+		SDL_Surface* plusSurf; //create a surf to hold the '+' of the + button
+
+		{ //LOCK
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a lock for the tab, this prevents crashes by preventing other functions with this lock, from changing the data preventing 2 things writing 1 data
+			if (darkmode) { plusSurf = TTF_RenderText_Solid(font, "+", 0, { 255,255,255,255 }); } //if darkmode, render the '+' white
+			else { plusSurf = TTF_RenderText_Solid(font, "+", 0, { 0,0,0,255 }); } //if NOT darkmode, render the '+' black
+		}
+
+		if (plusSurf != nullptr) //if our plusSurf has been created 
 		{
-			//create the Tex from the serface of our text
-			SDL_Texture* plusTex = SDL_CreateTextureFromSurface(render, plusSurf);
+			SDL_Texture* plusTex = SDL_CreateTextureFromSurface(render, plusSurf); //create a temp texture to hold the '+' text
+			SDL_FRect xRect = { (float)(tabX + 8),  7, (float)plusSurf->w, (float)plusSurf->h }; //move the rect to fit in the tab
+			SDL_RenderTexture(render, plusTex, nullptr, &xRect); //send the texture to the render to be rendered
 
-			//make a rec, and position it right
-			SDL_FRect xRect = { (float)(tabX + 8),  7, (float)plusSurf->w, (float)plusSurf->h };
-			SDL_RenderTexture(render, plusTex, nullptr, &xRect); //render it
-
-			//destory both
-			SDL_DestroyTexture(plusTex);
-			SDL_DestroySurface(plusSurf);
+			SDL_DestroyTexture(plusTex); //we are done, destroy the texture
+			SDL_DestroySurface(plusSurf); //we are done, destroy the surface
 		}
-
 		SDL_RenderPresent(render); //Send our final render, with all the data, to the screen
-
 	}
 	//we need to quit to clean up all the subsystems
 	SDL_DestroyWindow(window); //kill the window, cleanly 
-	SDL_Quit(); //Destory SDL
+	SDL_Quit(); //Destroy SDL
 
 	TTF_Quit(); //Kill TTF
-	std::quick_exit(1); //clean up other threads, and stop
+	//std::quick_exit(1); //clean up other threads, and stop
 
 	return 0; //return, stop
 } //END OF GUI.cpp

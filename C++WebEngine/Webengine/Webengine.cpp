@@ -52,9 +52,11 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
 
     GUIRENDER(); //Run the GUI loop, this again, is a loops, so we wont continue until we close it
 
- 
+    //======DEBUG======\\
 
-  
+    std::cout << "Press enter to exit...";
+    std::cin.get();
+
     
     return(0); //end
 
