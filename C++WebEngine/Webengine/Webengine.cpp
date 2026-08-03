@@ -54,8 +54,8 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
 
     //======DEBUG======\\
 
-    std::cout << "Press enter to exit...";
-    std::cin.get();
+    //std::cout << "Press enter to exit...";
+    //std::cin.get();
 
     
     return(0); //end

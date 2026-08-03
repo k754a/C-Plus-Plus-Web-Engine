@@ -782,7 +782,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 
 			lock.unlock(); //unlock before the thread
 			//make the thread
-			gImageDownloadPool.enqueue([srcCopy, currentTabID, myGen, currentIndex, tabUrl]() { //send the image to our threadpool
+			gImageDownloadPool.enqueue([srcCopy, currentTabID, myGen, currentIndex, tabUrl]() { //send the image to our thread pool
 
 				//download the bytes with our funct in ConnectSocket.cpp
 				std::vector<unsigned char> bytes; //keep it out to prevent error
@@ -909,7 +909,7 @@ void SetTabTitle(std::string title) //SetTabTitle takes in a single string, and 
 	std::lock_guard<std::mutex> lock(gTabsMutex); //first lock, to make sure that other threads changing data like this won't cause a crash
 	for (auto& t : tabs) //for each tab
 	{
-		if (t.tabID == lastsearchedtabID) //if the tabID maches the current tab
+		if (t.tabID == lastsearchedtabID) //if the tabID matches the current tab
 		{
 			t.title = title; //set the title
 			return; //end
@@ -920,8 +920,8 @@ void SetTabTitle(std::string title) //SetTabTitle takes in a single string, and 
 
 #pragma endregion
 
-//Icon Guide! Home, Reload, Back+Forth+Arrows, search, star, printer
-//             љ	  њ				ђ		     ы		ж	    ξ
+//Icon Guide! Home, Reload, Back+Forth+Arrows, search, star, printer, settings
+//             љ	  њ				ђ		     ы		ж	    ξ        Ħ
 
 
 int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
@@ -1086,11 +1086,11 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					SDL_FRect reloadBtnRect = { fwdBtnRect.x + fwdBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the reloadBtnRect, using the fwdBtnRect for offset
 					SDL_FRect homeBtnRect = { reloadBtnRect.x + reloadBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the homeBtnRect, using the reloadBtnRect for offset
 					float searchX = homeBtnRect.x + homeBtnRect.w + padding; //get the x size of the search bar
-					float searchW = (float)WinW - btnSize - padding - padding - searchX - (btnSize * 2); //get the width of the search bar
+					float searchW = (float)WinW - btnSize - padding - padding - padding - searchX - (btnSize * 3); //get the width of the search bar
 					SDL_FRect searchBarRect = { searchX, topMargin, searchW, btnSize }; //get the rect of the search bar, using the searchX and searchW
 					SDL_FRect starBtnRect = { searchBarRect.x + searchBarRect.w + padding, topMargin, btnSize, btnSize };  //set a rect for the starBtnRect, using the searchBarRect for offset
 					SDL_FRect printerBtnRect = { starBtnRect.x + starBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the printerBtnRect, using the starBtnRect for offset
-					
+					SDL_FRect settingsBtnRect = { printerBtnRect.x + printerBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the printerBtnRect, using the printerBtnRect for offset
 
 
 					//test if the backBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
@@ -1623,7 +1623,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		// --- INPUT BOX --- \\
 		
 		float searchX = homeBtn.x + homeBtn.w + padding; //create the start x, taking in the homeBtn for offset
-		float searchW = (float)WinW - btnSize -  searchX - ((btnSize) * 2) - ((padding)*2); //create the width, the window - padding*2 for 2 buttons - the starting x, and - the 2 buttons
+		float searchW = (float)WinW - btnSize -  searchX - ((btnSize) * 3) - ((padding)*3); //create the width, the window - padding*2 for 2 buttons - the starting x, and - the 2 buttons
 
 		SDL_FRect bar = { //hold the dimensions of the input bar
 			SDL_floorf(searchX * scaleX) / scaleX, //set the x of the bar
@@ -1691,6 +1691,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			}
 			SDL_DestroySurface(urlSurf); //now destroy the surf
 		}
+
 
 		// --- STAR BUTTON --- \\
 
@@ -1771,6 +1772,45 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			SDL_DestroyTexture(printerTex); //we are done, destroy the texture
 			SDL_DestroySurface(printerSurf); //we are done, destroy the surface
 		}
+
+		// --- SETTINGS BUTTON --- \\
+
+		SDL_FRect settingsBtn; //create a rect to hold the settings button
+
+		settingsBtn.x = printerBtn.x + printerBtn.w + padding; //set the X pos of the reload button offsetting off the printerBtn.x
+		settingsBtn.y = topMargin; //set the pos of the y
+		settingsBtn.w = btnSize; //set the pos of the w
+		settingsBtn.h = btnSize; //set the pos of the h
+		if (darkmode) { SDL_SetRenderDrawColor(render, 55, 55, 55, 255); } //if darkmode is on, draw it as a darker gray
+		else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); } //if darkmode is off, draw it as a grayish white
+
+		SDL_RenderFillRect(render, &settingsBtn); //send the rect to the render to be queued for rendering
+
+		static float oldSizeTemp = TTF_GetFontSize(iconFont); TTF_SetFontSize(iconFont, 24); //change the font size to adjust the settings icon
+
+		TTF_SetFontHinting(iconFont, TTF_HINTING_LIGHT_SUBPIXEL); //force an update to prevent blur, that resizes the font
+		SDL_Surface* settingsSurf; //create a serf to hold the settings icon
+		{
+			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a guard to prevent other threads editing the TTF list, and causing a crash.
+			settingsSurf = TTF_RenderText_Blended(iconFont, "Ħ", 0, textColor); //set the icon to the 'Ħ' that has been manipulated to be a settings icon
+		}
+
+		TTF_SetFontSize(iconFont, oldSizeTemp); //change it back to before
+		TTF_SetFontHinting(iconFont, TTF_HINTING_LIGHT_SUBPIXEL); //force an update to prevent blur, that resizes the font
+
+		if (settingsSurf != nullptr) //if the settingsSurf worked
+		{
+			SDL_Texture* forwardTex = SDL_CreateTextureFromSurface(render, settingsSurf); //create a temp texture, to hold the settings icon , passing in our font
+
+			SDL_SetTextureScaleMode(forwardTex, SDL_SCALEMODE_NEAREST); //force it to pixel art to prevent blur
+			SDL_FRect fwdTexRect = { settingsBtn.x + 3, settingsBtn.y - 1, (float)settingsSurf->w, (float)settingsSurf->h }; //create a rectangle that sets the size of the ' љ '
+			SDL_RenderTexture(render, forwardTex, nullptr, &fwdTexRect); //send the texture to the render to be rendered
+
+			SDL_DestroyTexture(forwardTex); //we are done, destroy the texture
+			SDL_DestroySurface(homeSurf); //we are done, destroy the surface
+		}
+
+
 
 		// --- TABS --- \\
 
