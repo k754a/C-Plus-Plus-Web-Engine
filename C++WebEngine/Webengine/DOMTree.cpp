@@ -120,11 +120,29 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 				size_t EndPos = rawToken.find("\"", StartPos); //find the end part
 				if (EndPos != std::string::npos)
 				{
-
-
 					TempNode->src = rawToken.substr(StartPos, EndPos - StartPos); //grab only the inside part, like image.png.
+				}
+			}
 
-			
+			size_t classPos = rawToken.find("class=\""); //attempt to find the classPos
+			if (classPos != std::string::npos) //if it exists
+			{
+				size_t StartPos = classPos + 7; //set the StartPos to start PAST, the class=\.
+				size_t EndPos = rawToken.find("\"", StartPos); //find the end part
+				if (EndPos != std::string::npos)
+				{
+					TempNode->className = rawToken.substr(StartPos, EndPos - StartPos); //grab only the inside part, like image.png.
+				}
+			}
+
+			size_t idPos = rawToken.find("id=\""); //attempt to find the classPos
+			if (idPos != std::string::npos) //if it exists
+			{
+				size_t StartPos = idPos + 4; //set the StartPos to start PAST, the class=\.
+				size_t EndPos = rawToken.find("\"", StartPos); //find the end part
+				if (EndPos != std::string::npos)
+				{
+					TempNode->idName = rawToken.substr(StartPos, EndPos - StartPos); //grab only the inside part, like image.png.
 				}
 			}
 

@@ -3,15 +3,15 @@
 #define GET_LAYOUT
 
 #include <string> 
-#include <iostream>
 #include <vector>
 #include <SDL3/SDL.h> //include the SDL3 lib
 #include <SDL3_ttf/SDL_ttf.h>
-namespace {
-    bool darkmode = true; //setting to handle "dark mode" -> we take the rgb for example 0, 0, 0, and subtract 255 by each one, so then it becomes -> 255, 255, 255, we do this for everything.     
-}
+
+namespace { bool darkmode = true; }//setting to handle "dark mode" -> we take the rgb for example 0, 0, 0, and subtract 255 by each one, so then it becomes -> 255, 255, 255, we do this for everything.     
+
 
 enum class NODETYPE { START, TEXT, END }; //NODETYPE holds 1 value out of 3 types (a fancy bool)
+
 struct Node {
 	NODETYPE tag; //our tag (START, TEXT, END)
 	std::string tagValue; //the value of the tag, like <'a'>
@@ -26,23 +26,24 @@ struct Node {
     int measuredHeight = 0; //hold the measured Height
     bool measured = false;  //so we don't measure more than once!
     bool isFlexContainer = false; //determine if we are in a div
-
+	std::string className = ""; //holds css class names, like class="example-class"
+	std::string idName = ""; //holds the id name, like id="example-id"
 };
 
 
 struct Layout
 {
-	Node* node;
+	Node* node = nullptr;
 
-	int x; int y; //the x and y pos
+	int x = 0 ; int y = 0; //the x and y pos
 
-	int width; int height; //handle the width and height of the text
+	int width = 0; int height = 0; //handle the width and height of the text
 
-	int fontSize; 
+	int fontSize = 0; 
 
 	SDL_Texture* textTex = nullptr; //we are gonna prerender the text, so we dont gotta do it on the fly.
 
-	SDL_Color textColor; // txt colors
+	SDL_Color textColor = { 0, 0, 0, 255 }; // txt colors
 
 	//we set the 0,0,0,0 to keep it transparent
 
@@ -50,7 +51,7 @@ struct Layout
 
 	bool hasBg = false; //start off false
 
-	std::string href = ""; //we have non links "" clickable ones are filled in!
+	std::string href; //we have non links "" clickable ones are filled in!
 
 
 
@@ -61,73 +62,19 @@ struct Layout
 	bool isImage = false;
 
     int loadGen = 0; //set when the layout is created.
-	//because we attempt to pull multiple times, we gotta make sure we dont get stuck in a loop
+	//because we attempt to pull multiple times, we gotta make sure we don't get stuck in a loop
 	bool imageAttempted = false;
 
 
 	//we add our loaded surfaces to this, to save time
-    std::atomic<SDL_Surface*> pendingSurface{ nullptr };
+    SDL_Surface* pendingSurface = nullptr ;
 
     //for text
-    std::atomic<SDL_Surface*> pendingTextSurface{ nullptr };
+    SDL_Surface* pendingTextSurface = nullptr ;
 
     bool textAttempted = false;
 
-    //we make copies so that SDL_Surface can use this lol
-    Layout() = default;
-
-    Layout(const Layout& other)
-    {
-        node = other.node;
-        x = other.x;
-        y = other.y;
-        width = other.width;
-        height = other.height;
-        fontSize = other.fontSize;
-        textTex = other.textTex;
-        textColor = other.textColor;
-        bgColor = other.bgColor;
-    
-         href = other.href; 
-         hasBg = other.hasBg;
-        isImage = other.isImage;
-        imageTex = other.imageTex;
-        imageAttempted = other.imageAttempted;
-
-        pendingSurface.store(other.pendingSurface.load());
-
-        loadGen = other.loadGen;
-    }
-
-    Layout& operator=(const Layout& other)
-    {
-        if (this != &other)
-        {
-            node = other.node;
-            x = other.x;
-            y = other.y;
-            width = other.width;
-            height = other.height;
-            fontSize = other.fontSize;
-            textTex = other.textTex;
-            textColor = other.textColor;
-            bgColor = other.bgColor;
-             href = other.href;
-             hasBg = other.hasBg;
-            isImage = other.isImage;
-            imageTex = other.imageTex;
-            imageAttempted = other.imageAttempted;
-
-            loadGen = other.loadGen;
-          
-            pendingSurface.store(other.pendingSurface.load());
-        }
-        return *this;
-    }
 };
-
-
-
 
 //pull the tokendata
 int LayoutTree(Node* node);

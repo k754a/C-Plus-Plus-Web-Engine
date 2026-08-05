@@ -53,14 +53,17 @@ ThreadPool gImageDownloadPool(6);  //A ThreadPool, that handles Image downloads 
 
 SDL_Color backgroundColor = { 245, 245, 245, 255 }; //handles the bg color of the page, does change (is white on start)
 
-float adjusted = 0; //this holds a value so that i can ajust the pos of the cursor with the arrow keys TODO
+float adjusted = 0; //this holds a value so that i can adjust the pos of the cursor with the arrow keys TODO
 
-
+static bool DraggingScrollBar = false; //bool to hold if we are Dragging the Scroll Bar
+static bool ContextMenu = false; //bool to hold if the context menu is open
+bool SaveXYContextMenuPos = false; // checks if it should lock the X + Y of the thing
 std::vector<std::string> starredPages; //create a string vector list to hold our starred, saved pages!
-
+float ContextMenuXPos, ContextMenuYPos;
 
 float zoomAmount = 1.0f; //global float to handle the zoom amount
-
+float mouseX; //save the pos of the mouseX
+float mouseY; //save the pos of the mouseY
 
 std::string urlInput = "";    // holds the url we type in the input box
 std::string currentURL = ""; //hold the url, but does not save till we press search.
@@ -253,9 +256,15 @@ std::string PercentDecode(const std::string& src) //Percent Decode returns a std
 		if (src[i] == '%' && i + 2 < src.size()) //if src contains a % and i + 2 is not greater than the size.
 		{
 			std::string hex = src.substr(i + 1, 2); //create a temp hex, where we grab the 2 hex chars after the %
-			char decoded = (char)std::stoul(hex, nullptr, 16); //convert the hex string from base 16 to a normal char
-			out += decoded; //add it to our output string
-			i += 2; //now we skip, as we just finished handling the 2 before.
+			try { //if it goes right
+				char decoded = (char)std::stoul(hex, nullptr, 16); //convert the hex string from base 16 to a normal char
+				out += decoded; //add it to our output string
+				i += 2; //now we skip, as we just finished handling the 2 before.
+			}
+			catch (...)
+			{
+				//not valid, so just treat it like normal
+			}
 		}
 		else if (src[i] == '+') //if src contains a +
 		{
@@ -605,11 +614,13 @@ std::string FixURLREDIRECT(const std::string& href)
 
 #pragma endregion
 
-#pragma region //Handle PreRender
+#pragma region //Handle PRERENDER
 
 
 void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL render component, and a TTF Font component
 {
+	//PROFILE("PRERENDER"); //Send the recording to the PRERENDER funct, to measure its speed.
+
 	std::unique_lock<std::mutex> lock(gTabsMutex); //set a lock mutex to prevent the Tabs being edited from other threads
 
 	if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size())  return; //if we have no active tabs, skip
@@ -633,9 +644,9 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 		}
 
 		lasty = tabs[activeTab].layout[i].y; //update the last y with the current letters 'y'
-		
 
-		
+
+
 		if (tabs[activeTab].layout[i].x > 20) //check if this is a table with a column offset larger than 20
 		{
 			//pick whatever x cords is further to the right
@@ -648,7 +659,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 			tabs[activeTab].layout[i].x = xtrack;
 		}
 
-		
+
 		tabs[activeTab].layout[i].y = ytrack; // update the element's actual y screen pos too our current row
 
 
@@ -716,7 +727,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 						}
 						else { //else
 							//give the layout the nodesurf, so it can be indexed
-							tabs[currentTabID].layout[currentIndex].pendingTextSurface.store(nodeSurf);
+							tabs[currentTabID].layout[currentIndex].pendingTextSurface = nodeSurf;
 						}
 
 					}		
@@ -727,10 +738,11 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 		}
 
 		//make sure that the thread is done, and the tab holds data.
-		if (tabs[activeTab].layout[i].pendingTextSurface.load() != nullptr)
+		if (tabs[activeTab].layout[i].pendingTextSurface != nullptr)
 		{
 			//create a temp SDL_Surface, where it swaps the surface pointer and clear's it
-			SDL_Surface* nodeSurf = tabs[activeTab].layout[i].pendingTextSurface.exchange(nullptr);
+			SDL_Surface* nodeSurf = tabs[activeTab].layout[i].pendingTextSurface;
+			tabs[activeTab].layout[i].pendingTextSurface = nullptr; //reset
 
 			if (nodeSurf != nullptr) //make sure the node surf worked
 			{
@@ -817,7 +829,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 							
 							else { //it did NOT change
 								std::cout << "IMG Downloaded into RAM" << std::endl; //DEBUG
-								tabs[currentTabID].layout[currentIndex].pendingSurface.store(imageSurf); //set the surf to the imageSurf.
+								tabs[currentTabID].layout[currentIndex].pendingSurface = imageSurf; //set the surf to the imageSurf.
 							}
 							
 						}
@@ -840,10 +852,11 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 		//--- GPU texture conversion for images ---\\
 
 	//check if a background thread is done, and it is an image
-		if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].pendingSurface.load() != nullptr)
+		if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].pendingSurface != nullptr)
 		{
 			//swap to the gpu
-			SDL_Surface* surf = tabs[activeTab].layout[i].pendingSurface.exchange(nullptr); //load the surf
+			SDL_Surface* surf = tabs[activeTab].layout[i].pendingSurface; //load the surf
+			tabs[activeTab].layout[i].pendingSurface = nullptr; //clear it in the swap
 
 			if (surf != nullptr) //if it worked
 			{
@@ -877,7 +890,6 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 				}
 			}
 		}
-
 		//update the max line height, if its taller than its previous element
 		if (tabs[activeTab].layout[i].height > maxLineHeight)
 		{
@@ -889,9 +901,8 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 		xtrack += (tabs[activeTab].layout[i].width + 12);
 
 
+
 	}
-
-
 
 } // END OF PreRender
 
@@ -975,10 +986,38 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		#pragma region //SDL event's
 		while (SDL_PollEvent(&event)) //poll the SDL event's
 		{
-			
 			if (event.type == SDL_EVENT_QUIT) { running = false; } //if the window 'x' close button is pressed, we end the loop
 
-	
+			if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT) { DraggingScrollBar = false; } //if we stop clicking, and this works anywhere, we set the dragging to false
+			if (event.type == SDL_EVENT_MOUSE_MOTION && DraggingScrollBar && !tabs.empty()) // update the pos if the mouse is moving, mouse is down, and tabs contain something
+			{
+				int WinW, WinH; //create a int to hold the W and H
+				SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); // grab the output size, and assign the WinW and WinH
+				float uiTopBarHeight = 70.0f;  //float to hold the start of the bar
+				float trackHeight = WinH - uiTopBarHeight; //trackheight holds how long the bar should be, subtracting so that it ends on that start pos
+				if (trackHeight > 0) //if you can scroll on the page
+				{
+					float barHeight = (trackHeight / (float)(tabs[activeTab].maxscroll + WinH)) * trackHeight; //the height of the bar, we take teh winH, the trackHight, and the max scroll!
+					if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might disappear!
+
+					//figure out where the bar should be based on the mouse pos
+					float mouseY = event.motion.y; //save the .y
+					float newBarY = mouseY - (barHeight / 2.0f); //subtract the height so that the middle of the bar is the by my mouse
+					float minBarY = uiTopBarHeight; //hold the current height
+					float maxBarY = uiTopBarHeight + trackHeight - barHeight; //hold the max height of the bar
+
+					if (maxBarY > minBarY) //if we still can scroll, and havent gon past the max bar height
+					{
+						newBarY = std::clamp(newBarY, minBarY, maxBarY); //clamp so it cannot be dragged outside
+
+						float scrollPercentage = (newBarY - minBarY) / (maxBarY - minBarY); //convert the Y to the %
+
+						std::lock_guard<std::mutex> lock(gTabsMutex); //make sure no other threads can change this while this changes it, to prevent a crash
+						tabs[activeTab].scrollpos = scrollPercentage * tabs[activeTab].maxscroll; //update the pos
+					}
+				}
+			}
+
 			if (event.type == SDL_EVENT_MOUSE_WHEEL) {//if we detect the wheel scrolled
 				float wheelY = event.wheel.y; //hold the wheel 'y'
 				if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED) //if the mouse is inverted
@@ -999,12 +1038,10 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				}
 			}
 
-
 			if (event.type == SDL_EVENT_TEXT_INPUT) { //detect any text inputs, and add them to our input str
 				urlInput += event.text.text; //append to whatever they typed, to our urlInput var
 			}
 
-			
 			if (event.type == SDL_EVENT_KEY_DOWN) //check for any event key down
 			{
 
@@ -1059,7 +1096,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					NavigateTo(urlInput, render, font, true); //Send the url we want to go to, the render, font, and we want to save it to history
 				}
 
-			
 				if (event.key.scancode == SDL_SCANCODE_V && (event.key.mod & SDL_KMOD_CTRL)) { //if control+V is pressed
 			
 					const char* clipboard = SDL_GetClipboardText(); //grab the clipboard from the device.
@@ -1069,14 +1105,48 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			}
 
 			int WinW, WinH; //create a temp int to save the WinW, and WinH, that get's assigned in SDL_GetWindowSize
-			float mouseX = event.button.x; //save the pos of the mouseX
-			float mouseY = event.button.y; //save the pos of the mouseY
+			mouseX = event.button.x; //save the pos of the mouseX
+		    mouseY = event.button.y; //save the pos of the mouseY
+			SDL_FRect ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 400 }; //set a rect for the ContextMenuRect
+			bool clickingContextMenu = (mouseX >= ContextMenuRect.x && mouseX <= (ContextMenuRect.x + ContextMenuRect.w) && mouseY >= ContextMenuRect.y && mouseY <= (ContextMenuRect.y + ContextMenuRect.h)); //handle to see if its being clicked (clean wraper)
 
 			if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) //handle if the mouse is clicked
 			{
-				if (event.button.button == SDL_BUTTON_LEFT) { //check if our left mouse pressed
 
-					
+				if (event.button.button == SDL_BUTTON_RIGHT) //check if our right mouse pressed
+				{
+					ContextMenu = true, SaveXYContextMenuPos = true; //set that we want to render the context menu
+					std::cout << "Context Menu ON - POS: " << mouseX << ", " << mouseY << "X-Y Lock state: " << SaveXYContextMenuPos << std::endl; //DEBUG
+				}
+
+				if (!clickingContextMenu && !(event.button.button == SDL_BUTTON_RIGHT)) { //if we DONT click on the rect, and its not the sdlRightButton
+
+					ContextMenu = false, SaveXYContextMenuPos = false; //set that we want to hide the context menu, as we clicked nothing else
+					std::cout << "Context Menu OFF, " << "X-Y Lock state: " << SaveXYContextMenuPos << std::endl; //DEBUG
+				}
+				if (event.button.button == SDL_BUTTON_LEFT && !clickingContextMenu) //check to see if SDL button left is pressed, and we are NOT clicking that context menu
+				{
+					int WinW, WinH; //create a int to hold the W and H
+					SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); // grab the output size, and assign the WinW and WinH
+					float uiTopBarHeight = 70.0f;  //float to hold the start of the bar
+					float trackHeight = WinH - uiTopBarHeight; //trackheight holds how long the bar should be, subtracting so that it ends on that start pos
+					if (trackHeight > 0) //if you can scroll on the page
+					{
+						float scrollBarWidth = 20.0f;
+						float barHeight = (trackHeight / (float)(tabs[activeTab].maxscroll + WinH)) * trackHeight; //the height of the bar, we take teh winH, the trackHight, and the max scroll!
+						if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might disappear!
+
+						float scrollPercentage = (float)tabs[activeTab].scrollpos / (float)tabs[activeTab].maxscroll; //calculate its pos out of the len of the bar, based on how far we are down the page
+						float barY = uiTopBarHeight + (scrollPercentage * (trackHeight - barHeight)); //then using the scrollPercentage float, we use it to draw the bar accurately
+
+						SDL_FRect scrollbarRect = { WinW - scrollBarWidth, barY, scrollBarWidth, barHeight }; //create a rect to hold the scroll bar, like backBtnRect
+
+						//check if the bar is pressed
+						if (mouseX >= scrollbarRect.x && mouseX <= (scrollbarRect.x + scrollbarRect.w) &&
+							mouseY >= scrollbarRect.y && mouseY <= (scrollbarRect.y + scrollbarRect.h)) {
+							DraggingScrollBar = true; //set the drag to true
+						}
+					}
 
 					SDL_GetWindowSize(window, &WinW, &WinH); //grab the window, and assign the WinW, and the WinH.
 
@@ -1091,7 +1161,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					SDL_FRect starBtnRect = { searchBarRect.x + searchBarRect.w + padding, topMargin, btnSize, btnSize };  //set a rect for the starBtnRect, using the searchBarRect for offset
 					SDL_FRect printerBtnRect = { starBtnRect.x + starBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the printerBtnRect, using the starBtnRect for offset
 					SDL_FRect settingsBtnRect = { printerBtnRect.x + printerBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the printerBtnRect, using the printerBtnRect for offset
-
 
 					//test if the backBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
 					if (mouseX >= backBtnRect.x && mouseX <= (backBtnRect.x + backBtnRect.w) &&
@@ -1400,7 +1469,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			
 		SDL_FRect scrollTrack = { WinW - scrollBarWidth, uiTopBarHeight, scrollBarWidth, trackHeight }; //create a rect, holding the pos and size of the bar, on screen
 		SDL_RenderFillRect(render, &scrollTrack); //send it to be uploaded to the render.
-
 
 
 		// --- SCROLL BAR --- \\
@@ -1869,7 +1937,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				SDL_DestroySurface(tabSurf); //we are done, destroy the surface
 			}
 
-			
 			SDL_Surface* xSurf; //build a surf to hold the 'x' for closing a tab
 			if (tabs.size() > 1) { xSurf = TTF_RenderText_Solid(font, "x", 0, tabTextColor); } //if we have more than one tab, we show the x
 			else {xSurf = TTF_RenderText_Solid(font, "", 0, tabTextColor); } //if we do not have more than one tab (just have one), we hide the x
@@ -1882,9 +1949,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 				SDL_DestroyTexture(xTex); //we are done, destroy the texture
 				SDL_DestroySurface(xSurf); //we are done, destroy the surface
-			}
-
-			
+			}	
 			tabX += tabW + 2; //increase the gap between the next tab, and start the next tab
 		}
 
@@ -1913,6 +1978,25 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			SDL_DestroyTexture(plusTex); //we are done, destroy the texture
 			SDL_DestroySurface(plusSurf); //we are done, destroy the surface
 		}
+
+		//render the Context menu
+		if (ContextMenu)
+		{
+			if (darkmode) { SDL_SetRenderDrawColor(render, 31, 31, 31, 255); }//if darkmode is on, make the ContextMenu a dark gray
+			else { SDL_SetRenderDrawColor(render, 224, 224, 224, 255); } //if darkmode is off, make the ContextMenu a light gray
+			SDL_FRect ContextMenuRect;
+			if (SaveXYContextMenuPos) {
+				ContextMenuXPos = mouseX; ContextMenuYPos = mouseY; //set the temp x and y
+				SaveXYContextMenuPos = false; //set it to false, to not update again
+			}
+			else { //RENDER IT
+				ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 400 }; //create a rect, holding the pos and size of the bar, on screen
+				SDL_RenderFillRect(render, &ContextMenuRect); //send it to be uploaded to the render.
+
+			}
+		}
+
+
 		SDL_RenderPresent(render); //Send our final render, with all the data, to the screen
 	}
 	//we need to quit to clean up all the subsystems

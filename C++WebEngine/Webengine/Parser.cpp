@@ -279,7 +279,7 @@ std::vector<HTMLToken> StripTags(std::string HtmlData)
 				tagName = tagName.substr(0, spacePos); //we just remove it rn, TODO - SAVE THE VALUE.
 			}
 
-			std::transform(tagName.begin(), tagName.end(), tagName.begin(), ::tolower); //force everything to be lowercase
+			std::transform(tagName.begin(), tagName.end(), tagName.begin(), [](unsigned char c) { return std::tolower(c); }); //force lowercase safely
 
 			
 			if ((voidTags.contains(tagName))) //before we throw in the towel, lets check to see if its one of our void tags
@@ -494,11 +494,20 @@ int StripCSS(std::string input) { //this returns an int, and takes in a string.
 		//first search for our '{', starting from the pos of our cursor
 		size_t start_pos = input.find("{", cursor);
 		if (start_pos == std::string::npos){break;} //if we cannot find our '{', we break.
-
-	
 		//get the start id, "like h1", we get the raw len, and + cursor, then the startpos of the { - the cursor, this lets us find our 'h1'
 		std::string_view id(input.data() + cursor, start_pos - cursor);
 
+		std::string idName(id); //convert the id to a string, and save it
+		//remove the spaces
+		while (!idName.empty() && std::isspace((unsigned char)idName.front())) //same thing we do for fixing colors, we remove the front and back spaces
+		{
+			idName.erase(idName.begin());
+		}
+		while (!idName.empty() && std::isspace((unsigned char)idName.back())) //same thing we do for fixing colors, we remove the front and back spaces
+		{
+			idName.pop_back();
+		}
+		temp.id = idName; //upload the id
 
 		//find the closing brace, but use StartPos so we don't grab a } from before
 		size_t end_pos = input.find("}", start_pos);
@@ -541,12 +550,12 @@ int StripCSS(std::string input) { //this returns an int, and takes in a string.
 			//remove all the whitespace, but not the spaces, as we need those
 			
 			//trim the whitespace at the start, without having to copy
-			while (!GetSemi.empty() && isspace(GetSemi.front()))
+			while (!GetSemi.empty() && isspace((unsigned char)GetSemi.front()))
 			{
 				GetSemi.remove_prefix(1);
 			}
 			//trim the whitespace at the end, without having to copy
-			while (!GetSemi.empty() && isspace(GetSemi.back()))
+			while (!GetSemi.empty() && isspace((unsigned char)GetSemi.back()))
 			{
 				GetSemi.remove_suffix(1);
 			}

@@ -288,7 +288,6 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 	
 	if (node->measured) return; //first we pull the 'measured' val from our 'node' struct we import, if it's true, we don't want to handle it again (to save performance), so we end it early.
 
-
 	//I first want to look through the nodes tag, to see if it has a tag value tagValue
 	//we check that it has a tagValue, if not, we return false
 
@@ -299,8 +298,6 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 	if (id != nullptr) //insure that the id we have attempted to find, exists, and is NOT null.
 	{
 		std::string fs = FindProperty(id, "font-size"); //now we create a temp string, using our 'FindProperty', ({const static CSSToken* rule, const static std::string propertyName}), we put in our 'id', and what we want to find, the result is added to 'fs'
-
-	  
 		if (!fs.empty() && std::isdigit(fs[0])) //check that the font size property is NOT blank, and contains a number.
 		{
 			fontsize = std::stoi(fs) * 2; //we convert the number from a string "32" -> 32, then * by 2, to make sure its big enough.
@@ -308,21 +305,12 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 	}
 	else if (node->tag == NODETYPE::START && !node->tagValue.empty()) //If we cannot find our "id" of the text, but it is a START node, and the tagValue is NOT null
 	{
-		
+
 		//we use predetermined points, using the nodes tag value.
-		if (node->tagValue == "h1")
-		{
-			fontsize = 96;
-		}
-		else if (node->tagValue == "p") {
-			fontsize = 48;
-		}
-		else if (node->tagValue == "a") {
-			fontsize = 36;
-		}
-		else if (node->tagValue == "span") {
-			fontsize = 36;
-		}
+		if (node->tagValue == "h1") { fontsize = 96; }
+		else if (node->tagValue == "p") { fontsize = 48; }
+		else if (node->tagValue == "a") { fontsize = 36; }
+		else if (node->tagValue == "span") { fontsize = 36; }
 	}
 	
 
@@ -335,7 +323,6 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 		node->measured = true; //set the measured flag to 'true" to insure we do NOT measure it again.
 		return; //done.
 	}
-
 
 
 
