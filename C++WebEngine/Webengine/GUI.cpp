@@ -988,9 +988,12 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		{
 			if (event.type == SDL_EVENT_QUIT) { running = false; } //if the window 'x' close button is pressed, we end the loop
 
+	 
+
 			if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT) { DraggingScrollBar = false; } //if we stop clicking, and this works anywhere, we set the dragging to false
 			if (event.type == SDL_EVENT_MOUSE_MOTION && DraggingScrollBar && !tabs.empty()) // update the pos if the mouse is moving, mouse is down, and tabs contain something
 			{
+				
 				int WinW, WinH; //create a int to hold the W and H
 				SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); // grab the output size, and assign the WinW and WinH
 				float uiTopBarHeight = 70.0f;  //float to hold the start of the bar
@@ -999,6 +1002,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				{
 					float barHeight = (trackHeight / (float)(tabs[activeTab].maxscroll + WinH)) * trackHeight; //the height of the bar, we take teh winH, the trackHight, and the max scroll!
 					if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might disappear!
+					if (barHeight > 50.0f) barHeight = 50.0f;
 
 					//figure out where the bar should be based on the mouse pos
 					float mouseY = event.motion.y; //save the .y
@@ -1006,7 +1010,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					float minBarY = uiTopBarHeight; //hold the current height
 					float maxBarY = uiTopBarHeight + trackHeight - barHeight; //hold the max height of the bar
 
-					if (maxBarY > minBarY) //if we still can scroll, and havent gon past the max bar height
+					if (maxBarY > minBarY) //if we still can scroll, and have'nt gon past the max bar height
 					{
 						newBarY = std::clamp(newBarY, minBarY, maxBarY); //clamp so it cannot be dragged outside
 
@@ -1019,6 +1023,9 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			}
 
 			if (event.type == SDL_EVENT_MOUSE_WHEEL) {//if we detect the wheel scrolled
+
+				ContextMenu = false, SaveXYContextMenuPos = false; //set that we want to hide the context menu, as thats how most browsers work
+
 				float wheelY = event.wheel.y; //hold the wheel 'y'
 				if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED) //if the mouse is inverted
 				{
@@ -1039,6 +1046,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			}
 
 			if (event.type == SDL_EVENT_TEXT_INPUT) { //detect any text inputs, and add them to our input str
+				ContextMenu = false, SaveXYContextMenuPos = false; //set that we want to hide the context menu, as the context menu is all mouse clicks
 				urlInput += event.text.text; //append to whatever they typed, to our urlInput var
 			}
 
@@ -1104,30 +1112,59 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				}
 			}
 
-			int WinW, WinH; //create a temp int to save the WinW, and WinH, that get's assigned in SDL_GetWindowSize
-			mouseX = event.button.x; //save the pos of the mouseX
-		    mouseY = event.button.y; //save the pos of the mouseY
-			SDL_FRect ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 400 }; //set a rect for the ContextMenuRect
-			bool clickingContextMenu = (mouseX >= ContextMenuRect.x && mouseX <= (ContextMenuRect.x + ContextMenuRect.w) && mouseY >= ContextMenuRect.y && mouseY <= (ContextMenuRect.y + ContextMenuRect.h)); //handle to see if its being clicked (clean wraper)
+			int WinW, WinH; //create a int to hold the W and H
+			SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); // grab the output size, and assign the WinW and WinH
+		
 
 			if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) //handle if the mouse is clicked
 			{
+				mouseX = event.button.x; //save the pos of the mouseX
+				mouseY = event.button.y; //save the pos of the mouseY
 
-				if (event.button.button == SDL_BUTTON_RIGHT) //check if our right mouse pressed
-				{
+
+				if (event.button.button == SDL_BUTTON_RIGHT) {//check if our right mouse pressed
+					ContextMenuXPos = mouseX, ContextMenuYPos = mouseY;
 					ContextMenu = true, SaveXYContextMenuPos = true; //set that we want to render the context menu
-					std::cout << "Context Menu ON - POS: " << mouseX << ", " << mouseY << "X-Y Lock state: " << SaveXYContextMenuPos << std::endl; //DEBUG
+					//std::cout << "Context Menu ON - POS: " << mouseX << ", " << mouseY << "X-Y Lock state: " << SaveXYContextMenuPos << std::endl; //DEBUG
 				}
+
+				SDL_FRect ContextMenuRect;  //set a rect for the ContextMenuRect
+
+				if (ContextMenuYPos < WinH / 2) //if you click on the top half
+				{
+					if ( ContextMenuYPos < WinW / 2 ) //that means we are on the left side
+					{
+						ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 400 }; //down
+					}
+					else {
+						ContextMenuRect = { ContextMenuXPos - 200, ContextMenuYPos, 200, 400 }; //down
+					}
+
+				}
+				else { //if you click on the bottom half
+					if (ContextMenuXPos < WinW / 2 ) //that means we are on the right side
+					{
+						ContextMenuRect = { ContextMenuXPos, ContextMenuYPos - 400, 200, 400 }; //up
+					}
+					else {
+						ContextMenuRect = { ContextMenuXPos - 200, ContextMenuYPos - 400, 200, 400 }; //up
+					}
+				}
+
+
+				bool clickingContextMenu = (mouseX >= ContextMenuRect.x && mouseX <= (ContextMenuRect.x + ContextMenuRect.w) && mouseY >= ContextMenuRect.y && mouseY <= (ContextMenuRect.y + ContextMenuRect.h)); //handle to see if its being clicked (clean wrapper)
+
 
 				if (!clickingContextMenu && !(event.button.button == SDL_BUTTON_RIGHT)) { //if we DONT click on the rect, and its not the sdlRightButton
-
 					ContextMenu = false, SaveXYContextMenuPos = false; //set that we want to hide the context menu, as we clicked nothing else
-					std::cout << "Context Menu OFF, " << "X-Y Lock state: " << SaveXYContextMenuPos << std::endl; //DEBUG
+					//std::cout << "Context Menu OFF, " << "X-Y Lock state: " << SaveXYContextMenuPos << std::endl; //DEBUG
 				}
-				if (event.button.button == SDL_BUTTON_LEFT && !clickingContextMenu) //check to see if SDL button left is pressed, and we are NOT clicking that context menu
+				if (event.button.button == SDL_BUTTON_LEFT) //check to see if SDL button left is pressed
 				{
-					int WinW, WinH; //create a int to hold the W and H
-					SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); // grab the output size, and assign the WinW and WinH
+					if (clickingContextMenu) //if we click the context menu, we want to see what button we have clicked on it, then we want to skip the stack
+					{
+						continue; //skip the stack
+					}
 					float uiTopBarHeight = 70.0f;  //float to hold the start of the bar
 					float trackHeight = WinH - uiTopBarHeight; //trackheight holds how long the bar should be, subtracting so that it ends on that start pos
 					if (trackHeight > 0) //if you can scroll on the page
@@ -1135,6 +1172,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 						float scrollBarWidth = 20.0f;
 						float barHeight = (trackHeight / (float)(tabs[activeTab].maxscroll + WinH)) * trackHeight; //the height of the bar, we take teh winH, the trackHight, and the max scroll!
 						if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might disappear!
+						if (barHeight > 50.0f) barHeight = 50.0f;
 
 						float scrollPercentage = (float)tabs[activeTab].scrollpos / (float)tabs[activeTab].maxscroll; //calculate its pos out of the len of the bar, based on how far we are down the page
 						float barY = uiTopBarHeight + (scrollPercentage * (trackHeight - barHeight)); //then using the scrollPercentage float, we use it to draw the bar accurately
@@ -1476,6 +1514,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		//now we handle the size of the bar
 		float barHeight = (trackHeight / (float)(tabs[activeTab].maxscroll + WinH)) * trackHeight; //the height of the bar, we take teh winH, the trackHight, and the max scroll!
 		if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might disappear!
+		if (barHeight > 50.0f) barHeight = 50.0f; //we also make sure it cant get bigger than this, or it looks dumb!
 
 		//we calculate its pos out of 100, with the size and stuff, so that we get an accurate bar!
 		float scrollPercentage = (float)tabs[activeTab].scrollpos / (float)tabs[activeTab].maxscroll; //calculate its pos out of the len of the bar, based on how far we are down the page
@@ -1986,17 +2025,72 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			else { SDL_SetRenderDrawColor(render, 224, 224, 224, 255); } //if darkmode is off, make the ContextMenu a light gray
 			SDL_FRect ContextMenuRect;
 			if (SaveXYContextMenuPos) {
-				ContextMenuXPos = mouseX; ContextMenuYPos = mouseY; //set the temp x and y
+				if (WinH / 2 > mouseY) //if you click on the lower half
+				{
+					if (WinW / 2 > mouseX) //that means we are on the right side
+					{
+						ContextMenuXPos = mouseX; ContextMenuYPos = mouseY; //set the temp x and y
+					}
+					else {
+						ContextMenuXPos = mouseX - 200; ContextMenuYPos = mouseY; //set the temp x and y with an offset to the X
+					}
+				}
+				else { //if you click on the upper half
+					if (WinW / 2 > mouseX) //that means we are on the right side
+					{
+						ContextMenuXPos = mouseX; ContextMenuYPos = mouseY - 400; //set the temp x and y with an offset to the Y
+					}
+					else { //check if we are on the left side
+						ContextMenuXPos = mouseX - 200; ContextMenuYPos = mouseY - 400; //set the temp x and y with an offset to the Y and X
+					}
+				}
 				SaveXYContextMenuPos = false; //set it to false, to not update again
 			}
 			else { //RENDER IT
-				ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 400 }; //create a rect, holding the pos and size of the bar, on screen
+				ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 400 }; //render the context menu
+
 				SDL_RenderFillRect(render, &ContextMenuRect); //send it to be uploaded to the render.
+
+
+				//-- RENDER EACH BUTTON --\\
+				
+				float buttonHeight = 45.0;
+				if (darkmode) { SDL_SetRenderDrawColor(render, 0, 0, 0, 255); }//if darkmode is on, make the ContextMenu a dark gray
+				else { SDL_SetRenderDrawColor(render, 224, 224, 224, 255); } //if darkmode is off, make the ContextMenu a light gray
+
+				SDL_FRect CurrentButtnRect;
+				//ContextMenuRect.w for our button width, maybe with some padding
+				std::vector<std::string> ContextMenuButtons = {"example1", "example2", "example3"}; //Holds the names of the buttons, and the engine will fit them.
+				for (int i = 0; i < ContextMenuButtons.size(); i++)
+				{
+					
+					//now we want to render each button, like how we render tabs.
+					float buttnX = ContextMenuRect.x; //hold the x of it
+					float buttnY = ContextMenuRect.y + (i * (buttonHeight + 2)); //change the x, based on the size of the button * the i, with some sort of padding
+					CurrentButtnRect = { buttnX, buttnY, ContextMenuRect.w, buttonHeight };
+					
+					SDL_RenderFillRect(render, &CurrentButtnRect); //send it to be uploaded to the render.
+
+				
+					
+				}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 			}
 		}
-
-
 		SDL_RenderPresent(render); //Send our final render, with all the data, to the screen
 	}
 	//we need to quit to clean up all the subsystems
