@@ -169,11 +169,6 @@ https://k754a.hackclub.app/
 
 
 
-- Be faster
-
-
-
-
 - better formatting
 
 
