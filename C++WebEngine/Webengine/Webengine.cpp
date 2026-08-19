@@ -1,5 +1,3 @@
-#define SDL_MAIN_HANDLED //prevents errors with the starting input inside the string
-
 
 #include <SDL3/SDL_main.h> //NEEDED FOR RELEASE BUILD
 
@@ -17,7 +15,6 @@
 
 int main(int argc, char* argv[]) //we give the start of main, a starting int and char 
 {
-    SDL_SetMainReady();//settup this as main
     
     std::ios_base::sync_with_stdio(false);  std::cin.tie(NULL); //these lines allow the terminal to run a bit faster in debug, saves some time
  

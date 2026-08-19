@@ -1676,8 +1676,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					}
 
 					//test if the starBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
-					if (mouseX >= starBtnRect.x && mouseX <= (starBtnRect.x + starBtnRect.w) &&
-						mouseY >= starBtnRect.y && mouseY <= (starBtnRect.y + starBtnRect.h) && currentURL != "") { //we also make sure we have something in the currentURL, as we don't want to star newtab
+					if (isHoverd(starBtnRect) && currentURL != "") { //we also make sure we have something in the currentURL, as we don't want to star newtab
 
 						std::string currentSite = currentURL;	//first we get the current url
 						auto it = std::find(starredPages.begin(), starredPages.end(), currentSite); //first, we should check our database to see if its alr starred
