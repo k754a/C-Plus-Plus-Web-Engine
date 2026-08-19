@@ -7,7 +7,7 @@
 #include <SDL3/SDL.h> //include the SDL3 lib
 #include <SDL3_ttf/SDL_ttf.h>
 
-namespace { bool darkmode = true; }//setting to handle "dark mode" -> we take the rgb for example 0, 0, 0, and subtract 255 by each one, so then it becomes -> 255, 255, 255, we do this for everything.     
+inline bool darkmode = true; //setting to handle "dark mode" -> we take the rgb for example 0, 0, 0, and subtract 255 by each one, so then it becomes -> 255, 255, 255, we do this for everything.     
 
 
 enum class NODETYPE { START, TEXT, END }; //NODETYPE holds 1 value out of 3 types (a fancy bool)
@@ -41,7 +41,7 @@ struct Layout
 
 	int fontSize = 0; 
 
-	SDL_Texture* textTex = nullptr; //we are gonna prerender the text, so we dont gotta do it on the fly.
+	SDL_Texture* textTex = nullptr; //we are gonna prerender the text, so we don't gotta do it on the fly.
 
 	SDL_Color textColor = { 0, 0, 0, 255 }; // txt colors
 

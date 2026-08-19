@@ -458,7 +458,9 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			if (!tc.empty())
 			{
 				RGB parsed = ParseHexColor(tc);
+
 				textColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we * by 2, cause it would be super small
+				//std::cout << "DEBUG" << " TEXT COLOR IS " << textColor.r << " " << textColor.g << " " << textColor.b << " " << std::endl; //DEBUG
 			}
 
 
@@ -698,6 +700,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 		//when i code css, this will get replaced merging the data.
 
+		
 
 		layouttree.textColor = textColor;
 
@@ -763,6 +766,8 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 int LayoutTree(Node* node)
 {
+
+	std::cout << "darkmode -> " << darkmode << std::endl; //DEBUG
 	PROFILE("LAYOUTTREE"); //PROFILE THE LAYOUTTREE
 
 	layoutList.clear(); //we need to do this, or we will have errors

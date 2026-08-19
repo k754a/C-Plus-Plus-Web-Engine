@@ -1,3 +1,6 @@
+#define SDL_MAIN_HANDLED //prevents errors with the starting input inside the string
+
+
 #include <SDL3/SDL_main.h> //NEEDED FOR RELEASE BUILD
 
 
@@ -14,6 +17,7 @@
 
 int main(int argc, char* argv[]) //we give the start of main, a starting int and char 
 {
+    SDL_SetMainReady();//settup this as main
     
     std::ios_base::sync_with_stdio(false);  std::cin.tie(NULL); //these lines allow the terminal to run a bit faster in debug, saves some time
  
@@ -29,24 +33,29 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
 
 
     //======LOAD-MAIN-MENU======\\
+    
+    if (argc <= 1) //if we start WITHOUT a link
+    {
+        std::ifstream file("main.html"); //open on start, in read mode
 
-    std::ifstream file("main.html"); //open on start, in read mode
+        if (!file.is_open()) { //if we cannot open the file
+            std::cout << "Could not open main file." << std::endl; //send an error, as we need this for new tab
 
-    if (!file.is_open()) { //if we cannot open the file
-        std::cout << "Could not open main file." << std::endl; //send an error, as we need this for new tab
+            return -1; //return an error code
+        }
 
-        return -1; //return an error code
+        std::stringstream buffer;  buffer << file.rdbuf(); //create the buffer, and write the main.html file data to it
+
+        std::string fileinfo = buffer.str(); //convert that buffer, into a string for the parser
+
+        Parser(fileinfo); //send the new tab to the parser for rendering
+    }
+    else { //if we start WITH a link
+        std::string tempString = argv[1];
+        std::wstring temp(tempString.begin(), tempString.end()); //hold our temp string
+        ConnectSocketHTTPS(temp);
     }
     
-
-   
-    std::stringstream buffer;  buffer << file.rdbuf(); //create the buffer, and write the main.html file data to it
-
-    std::string fileinfo = buffer.str(); //convert that buffer, into a string for the parser
-
-    Parser(fileinfo); //send the new tab to the parser for rendering
-        
-
    
     //======RENDER-GUI======\\
 

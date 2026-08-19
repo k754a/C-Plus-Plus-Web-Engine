@@ -40,20 +40,6 @@ struct Tab //tab struct
 
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 extern float zoomAmount;
 
 

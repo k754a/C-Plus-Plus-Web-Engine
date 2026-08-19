@@ -150,7 +150,6 @@
   <ItemGroup>
     <ClCompile Include="ConnectSocket.cpp" />
     <ClCompile Include="DOMTree.cpp" />
-    <ClCompile Include="GUI-OLD.cpp" />
     <ClCompile Include="GUI.cpp" />
     <ClCompile Include="Layout.cpp" />
     <ClCompile Include="Parser.cpp" />

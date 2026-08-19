@@ -10,6 +10,7 @@
 #include "Parser.h" //used for sending some parts stright to the parser (like for the tab::new)
 #include "Profiler.h" //used for handling the performace analization of some functs.
 #include "ConnectSocket.h" //allows to send a request to connect socket.cpp -> parser.cpp -> Domtree -> Layout -> GUI.cpp tab render!
+#include "Layout.h"
 
 #pragma endregion
 
@@ -21,7 +22,7 @@
 #include <SDL3/SDL.h> //include the SDL3 lib - For all the box and screen rendering.
 #include <SDL3_ttf/SDL_ttf.h> //fonts lib - For all the fonts, and loading and handling the font.
 #include <SDL3_image/SDL_image.h> //images lib - For all the Image rendering, and handling it.
-
+#include <SDL3/SDL_dialog.h> //for the save menu
 #include <filesystem> //for just the print window button, just that.
 
 
@@ -59,7 +60,12 @@ static bool DraggingScrollBar = false; //bool to hold if we are Dragging the Scr
 static bool ContextMenu = false; //bool to hold if the context menu is open
 bool SaveXYContextMenuPos = false; // checks if it should lock the X + Y of the thing
 std::vector<std::string> starredPages; //create a string vector list to hold our starred, saved pages!
+
+//CONTEXT MENU STUFF
 float ContextMenuXPos, ContextMenuYPos;
+std::vector<std::string> ContextMenuButtons; //Holds the names of the buttons, and the engine will fit them.
+std::string clickedURL; //create a temp string to hold the url
+int clickedTab;
 
 float zoomAmount = 1.0f; //global float to handle the zoom amount
 float mouseX; //save the pos of the mouseX
@@ -357,7 +363,54 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 		if (!file.is_open()) { std::cout << "Could not open local file." << std::endl; return; } //Debug and return if it failed to open
 
 		//before we do anything, first check that its valid
-		if (path.ends_with(".txt") || path.ends_with(".html") || path.ends_with(".htm")) //if it contains the valid .prefix at the end
+
+		if (path.ends_with(".txt"))
+		{
+			std::cout << "Valid Local File Format" << std::endl; //DEBUG
+			std::stringstream buffer; //create a temp buffer to hold the file.
+
+			buffer << file.rdbuf(); //load the file into the buffer
+
+			std::string fileinfo = buffer.str(); //now we convert the buffer, into a string
+			{
+				std::lock_guard<std::mutex> lock(gTabsMutex); //lock to insure no corruption
+				auto& active = tabs[activeTab]; //create a temp var to hold our active tab
+
+				active.loadGen++; //increase the loadGen, stopping other threads
+
+				for (auto& item : active.layout) //destroy the old item, and clear the layout for text and images, to avoid issues
+				{
+					if (item.textTex) SDL_DestroyTexture(item.textTex); //destroy the text
+					if (item.imageTex) SDL_DestroyTexture(item.imageTex); //destroy the images
+				}
+				active.layout.clear(); //clear the layout
+
+				active.scrollpos = 40; //reset the scroll pos
+				lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
+
+				urlInput = path; 	//clear the url input, as it is a new tab
+			}
+			std::stringstream lines(fileinfo); //load each line
+			std::string line; //to hold each line
+			std::string html = "<html><title> " + path + "</title><body>"; //start the html, and set the title
+			
+			while (std::getline(lines, line)) //for each line in lines
+			{
+				if (line.empty()) //keep empty lines empty
+				{
+					html += "<div>&nbsp;</div>"; //make a blank line
+				}
+				else {
+					html += "<div>" + line +"</div>"; //make a new line
+				}
+			}
+				
+			html += "</html>""</body>"; //end the html
+
+			Parser(html);
+			return; //return.
+		}
+		if (path.ends_with(".html") || path.ends_with(".htm")) //if it contains the valid .prefix at the end
 		{
 			std::cout << "Valid Local File Format" << std::endl; //DEBUG
 			std::stringstream buffer; //create a temp buffer to hold the file.
@@ -387,10 +440,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 			}
 
 			Parser(fileinfo); //now we inject it into the parser, to force it to load this html
-
-
-
-
 			return; //return.
 		}
 		else if (path.ends_with(".png") || path.ends_with(".jpg")) //or if it contains something like a .jpg, or .png (an image)
@@ -470,14 +519,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 		}
 	
 		Parser(fileinfo); //now we inject it into the parser, to force it to load this html
-
-	
-		
-
 		return; //return.
 	}
-
-
 
 	std::string resolvedTarget = target; //temp string that gets updated as we go along.
 
@@ -535,7 +578,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 	else {
 		loadColor = SDL_Color{ 0, 0, 0, 255 }; //make the text color black
 	}
-
 	{
 		std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create the lock to prevent any crashes
 
@@ -557,7 +599,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 	}//Release the ttfLock 
 
 
-	
 	std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
 	auto& active = tabs[activeTab]; //temp var for cleanness
 	active.layout.clear(); //clear the last layout
@@ -568,7 +609,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 	urlInput = resolvedTarget; //update the urlInput with the url
 	lastsearchedtabID = active.tabID; //set the tab id.
 	
-
 	std::wstring wUrl(resolvedTarget.begin(), resolvedTarget.end()); //create a temp wUrl string, for the connectSocketHTTPS.
 	gNavPool.enqueue([wUrl]() { //create the thread
 		ConnectSocketHTTPS(wUrl); //push it
@@ -590,8 +630,6 @@ std::string FixURLREDIRECT(const std::string& href)
 
 	size_t start = uddgPos + 5; // we found the uddg, but we want to skip it, so skip "uddg=" 
 
-
-	
 	std::string encoded = ""; //create a temp string to hold our fixed value
 
 	//ok, starting at the start pos, we go till the end
@@ -607,7 +645,6 @@ std::string FixURLREDIRECT(const std::string& href)
 		encoded += href[i];
 	}
 
-	
 	return PercentDecode(encoded); //send it through our PercentDecode, to convert it back to chars, then return
 } //END OF FixURLREDIRECT
 
@@ -934,6 +971,63 @@ void SetTabTitle(std::string title) //SetTabTitle takes in a single string, and 
 //Icon Guide! Home, Reload, Back+Forth+Arrows, search, star, printer, settings
 //             љ	  њ				ђ		     ы		ж	    ξ        Ħ
 
+bool isLinkClicked(std::string &clickedURL, bool RightClicked)
+{
+	{
+		std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent other threads to change the tabs
+		for (int i = 0; i < tabs[activeTab].layout.size(); i++) //loop through each tab in the tabs list
+		{
+			if (tabs[activeTab].layout[i].textTex == nullptr) continue; //check if its text, if it is, skip
+			if (tabs[activeTab].layout[i].href.empty()) continue; //check if its a herf, if it does'nt contain anything, skip
+
+			float screeny = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos; //ok we have a link, now lets adjust the activator block to be over it
+
+			//test if the tabs activator button is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
+
+			if (RightClicked) //RightClicked
+			{
+				if (ContextMenuXPos >= tabs[activeTab].layout[i].x && ContextMenuXPos <= (tabs[activeTab].layout[i].x + tabs[activeTab].layout[i].width) &&
+					ContextMenuYPos >= screeny && ContextMenuYPos <= (screeny + tabs[activeTab].layout[i].height))
+				{
+					std::string finalUrl = tabs[activeTab].layout[i].href; //grab the URL of the link, of what I just pressed
+
+					std::string realDest = FixURLREDIRECT(finalUrl); //fixes issues with the link, and saves it to the string
+					if (!realDest.empty()) { finalUrl = realDest; } //if it's not empty, update the finalURL to the realDest;
+
+					clickedURL = finalUrl; //set the clicked url to the final url
+					return true;
+					break; //exit
+				}
+			}
+			else {
+				if (mouseX >= tabs[activeTab].layout[i].x && mouseX <= (tabs[activeTab].layout[i].x + tabs[activeTab].layout[i].width) &&
+					mouseY >= screeny && mouseY <= (screeny + tabs[activeTab].layout[i].height))
+				{
+					std::cout << "link pressed" << std::endl; //DEBUG
+					std::string finalUrl = tabs[activeTab].layout[i].href; //grab the URL of the link, of what I just pressed
+
+					std::string realDest = FixURLREDIRECT(finalUrl); //fixes issues with the link, and saves it to the string
+					if (!realDest.empty()) { finalUrl = realDest; } //if it's not empty, update the finalURL to the realDest;
+
+					clickedURL = finalUrl; //set the clicked url to the final url
+					return true;
+					break; //exit
+				}
+			}	
+		}
+		return false;
+	}
+}
+//FUNCTION TO RENDER THE File open
+static void SaveCallback(void* str, const char* const* files, int filter) //SaveCallback loads a file, and takes in an int (though its unused)
+{
+	if (files && files[0]) //Check if the user closes the tab, if so, return NULL. The files[0] makes sure its valid.
+	{
+		SDL_SaveFile(files[0], (const char*)str, SDL_strlen((const char*)str)); //Save the file to the file path, using the string, and setting the size. 
+	}
+}
+
+bool isHoverd(SDL_FRect rect) { return (mouseX >= rect.x && mouseX <= (rect.x + rect.w) && mouseY >= rect.y && mouseY <= (rect.y + rect.h)); }
 
 int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 {
@@ -988,7 +1082,8 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		{
 			if (event.type == SDL_EVENT_QUIT) { running = false; } //if the window 'x' close button is pressed, we end the loop
 
-	 
+			mouseX = event.button.x; //save the pos of the mouseX
+			mouseY = event.button.y; //save the pos of the mouseY
 
 			if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT) { DraggingScrollBar = false; } //if we stop clicking, and this works anywhere, we set the dragging to false
 			if (event.type == SDL_EVENT_MOUSE_MOTION && DraggingScrollBar && !tabs.empty()) // update the pos if the mouse is moving, mouse is down, and tabs contain something
@@ -1118,14 +1213,37 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 			if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) //handle if the mouse is clicked
 			{
-				mouseX = event.button.x; //save the pos of the mouseX
-				mouseY = event.button.y; //save the pos of the mouseY
-
-
+				
 				if (event.button.button == SDL_BUTTON_RIGHT) {//check if our right mouse pressed
 					ContextMenuXPos = mouseX, ContextMenuYPos = mouseY;
 					ContextMenu = true, SaveXYContextMenuPos = true; //set that we want to render the context menu
-					//std::cout << "Context Menu ON - POS: " << mouseX << ", " << mouseY << "X-Y Lock state: " << SaveXYContextMenuPos << std::endl; //DEBUG
+
+
+					//CHECK IF A TAB IS PRESSED
+					if (mouseY < 30)
+					{
+						int tabX = 0; //pos of the first tab (X) (as we always have at least 1 tab)
+						int tabW = 180; //pos of the first tab (Y) (as we always have at least 1 tab)
+
+						for (int t = 0; t < tabs.size(); t++) //loop through each tab
+						{
+							//check if the tab itself was clicked
+							if (mouseX >= tabX && mouseX <= tabX + tabW)
+							{
+								std::cout << "Clicked top bar, TAB: " << t << std::endl; //DEBUG
+
+								clickedTab = t; //store the clicked tab.
+								break; //exit, we are done
+							}
+							else {
+								clickedTab = -1; //we did not press a tab, so just return a blank
+							}
+							tabX += tabW + 2; //move the collider box to the next tab
+						}
+					}
+					else {
+						clickedTab = -1; //we did not even click the top bar, so return -1
+					}
 				}
 
 				SDL_FRect ContextMenuRect;  //set a rect for the ContextMenuRect
@@ -1134,35 +1252,328 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				{
 					if ( ContextMenuYPos < WinW / 2 ) //that means we are on the left side
 					{
-						ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 400 }; //down
+						ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 315 }; //down
 					}
 					else {
-						ContextMenuRect = { ContextMenuXPos - 200, ContextMenuYPos, 200, 400 }; //down
+						ContextMenuRect = { ContextMenuXPos - 200, ContextMenuYPos, 200, 315 }; //down
 					}
 
 				}
 				else { //if you click on the bottom half
 					if (ContextMenuXPos < WinW / 2 ) //that means we are on the right side
 					{
-						ContextMenuRect = { ContextMenuXPos, ContextMenuYPos - 400, 200, 400 }; //up
+						ContextMenuRect = { ContextMenuXPos, ContextMenuYPos - 315, 200, 315 }; //up
 					}
 					else {
-						ContextMenuRect = { ContextMenuXPos - 200, ContextMenuYPos - 400, 200, 400 }; //up
+						ContextMenuRect = { ContextMenuXPos - 200, ContextMenuYPos - 315, 200, 315 }; //up
 					}
 				}
 
 
-				bool clickingContextMenu = (mouseX >= ContextMenuRect.x && mouseX <= (ContextMenuRect.x + ContextMenuRect.w) && mouseY >= ContextMenuRect.y && mouseY <= (ContextMenuRect.y + ContextMenuRect.h)); //handle to see if its being clicked (clean wrapper)
+				bool clickingContextMenu = ContextMenu && isHoverd(ContextMenuRect);//handle to see if its being clicked, and the context menu is on (clean wrapper)
 
 
 				if (!clickingContextMenu && !(event.button.button == SDL_BUTTON_RIGHT)) { //if we DONT click on the rect, and its not the sdlRightButton
-					ContextMenu = false, SaveXYContextMenuPos = false; //set that we want to hide the context menu, as we clicked nothing else
-					//std::cout << "Context Menu OFF, " << "X-Y Lock state: " << SaveXYContextMenuPos << std::endl; //DEBUG
+					ContextMenu = false, SaveXYContextMenuPos = false; //set that we want to hide the context menu, as we clicked nothing else	
 				}
 				if (event.button.button == SDL_BUTTON_LEFT) //check to see if SDL button left is pressed
 				{
 					if (clickingContextMenu) //if we click the context menu, we want to see what button we have clicked on it, then we want to skip the stack
 					{
+						//now we need a way to figure out, how we are going to go from 'clicked' -> detecting the correct buttn -> action, im thinking like how we do tabs, a loop.
+
+						float buttonHeight = 45.0;
+					
+						SDL_FRect CurrentButtnRect;
+
+						//ContextMenuRect.w for our button width, maybe with some padding
+
+						for (int i = 0; i < ContextMenuButtons.size(); i++)
+						{
+
+							//now we want to render each button, like how we render tabs.
+							float buttnX = ContextMenuRect.x; //hold the x of it
+							float buttnY = ContextMenuRect.y + (i * (buttonHeight)); //change the x, based on the size of the button * the i, with some sort of padding
+							CurrentButtnRect = { buttnX, buttnY, ContextMenuRect.w, buttonHeight };
+
+							if (mouseX >= CurrentButtnRect.x && mouseX <= (CurrentButtnRect.x + CurrentButtnRect.w) &&
+								mouseY >= CurrentButtnRect.y && mouseY <= (CurrentButtnRect.y + CurrentButtnRect.h)) {
+								if (ContextMenuButtons[i] == "-------") { break; } //if its not a real button
+								std::cout << "buttnPressed: " << ContextMenuButtons[i] << std::endl; //DEBUG
+
+
+								//ContextMenuButtons = { "New Tab", "Print", "Change Theme", "-------", "Back", "Forward", "-------", }; ///legend
+								
+								//NOW LOGIC FOR EACH BUTTON
+								if (ContextMenuButtons[i] == "New Tab")
+								{
+									Tab newTab; //create a temp Tab handler to hold the newTab.
+									newTab.title = "New Tab"; //give it a title
+									//push it back
+									{
+										std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+										tabs.push_back(newTab); //send a new tab to the list
+										//update the active tab
+										activeTab = tabs.size() - 1; //set the activetab to the size of the tabs, -1 to fit the 0 = element 1
+										lastsearchedtabID = tabs[activeTab].tabID;//set the tab when i click.
+									}
+									NavigateTo("new::tab", render, font, true); //go to the new tab, using the id
+								}
+								if (ContextMenuButtons[i] == "Print")
+								{
+									int uiHeight = 80; //crop the uiHeight
+									SDL_Rect contentArea; //create a temp content area
+
+									//x,w, h we leave, but, y we adjust
+									contentArea.x = 0; 	contentArea.y = uiHeight; 	contentArea.w = WinW; 	contentArea.h = WinH - uiHeight; //we save the x, y, and width of the window, but we crop the h	
+									SDL_Surface* screenshot = SDL_RenderReadPixels(render, &contentArea); //create a surface, holding the screenshot, taking the rect we want to capture
+
+									if (screenshot != nullptr)
+									{
+										std::cout << "Printing..." << std::endl; //DEBUG
+										std::string saveFolder = "Printed_Pages"; //create a temp string "Printed Pages"
+										std::filesystem::create_directories(saveFolder); //create a new dir, called "Printed_Pages"
+
+										std::string filenameStr = saveFolder + "\\Tab_print_" + std::to_string(SDL_GetTicks()) + ".bmp"; //create a file, in our folder, calling it Tab_print_ (then a time) .bmp
+										const char* filename = filenameStr.c_str(); //create a char to prevent errors
+
+										SDL_SaveBMP(screenshot, filename); 	//now we run the print command
+										ShellExecuteA(NULL, "print", filename, NULL, NULL, SW_SHOWNORMAL); 	// Ask Windows to handle the printing, but SHOW the menu normally
+
+										SDL_DestroySurface(screenshot);//we are done here, destroy the old screenshot
+									}
+								}
+								if (ContextMenuButtons[i] == "Change Theme") //CURRENT BUG, TEXT DONT CHANGE COLOR - TODO
+								{
+									darkmode = !darkmode; //flip it
+									if (urlInput != "")
+									{
+										NavigateTo(urlInput, render, font, false); //reload
+									}
+									else {
+										NavigateTo("new::tab", render, font, false); //reload
+									}
+									
+								}
+								if (ContextMenuButtons[i] == "Back") //CURRENT BUG, NEED TO SHOW IF YOU CAN PRESS OR NOT - TODO
+								{
+									if (tabs[activeTab].historypos > 0) //we do > 0, as we want to go back one, and we cannot go to -1
+									{
+										tabs[activeTab].historypos--; //move the history back one
+										std::string prevURL = tabs[activeTab].history[tabs[activeTab].historypos]; //grab the prev url
+										urlInput = prevURL; //set the urlInput to the prevURL
+										std::cout << prevURL; //DEBUG
+										NavigateTo(prevURL, render, font, false); //Navigate to the new url
+									}
+								}
+								if (ContextMenuButtons[i] == "Forward") //CURRENT BUG, NEED TO SHOW IF YOU CAN PRESS OR NOT - TODO
+								{
+									if (tabs[activeTab].historypos < (int)tabs[activeTab].history.size() - 1)  //we do < (int)tabs[activeTab].history.size() - 1, as we want to go forward one, and we cannot go past the limit
+									{
+										tabs[activeTab].historypos++; //move the history forward one
+										std::string nextURL = tabs[activeTab].history[tabs[activeTab].historypos]; //grab the next url
+										urlInput = nextURL; //set the urlInput, to the nextURL
+										currentURL = ""; //reset
+										tabs[activeTab].url = "";  //reset
+										NavigateTo(nextURL, render, font, false); //Navigate to the new url
+									}
+								}
+
+								//------------------------------------------------------------------------------------------------------------------------------------------------
+								//HANDLE TAB CONTEXT MENU STUFF
+
+
+								// ContextMenuButtons = { "Reload", "Close", "-------", "Minimize", "Close All Tabs", "Performance", "-------", }; ///legend
+
+								if (ContextMenuButtons[i] == "Reload")
+								{
+									if (currentURL != "") { NavigateTo(urlInput, render, font, false); } //don't reload for the mainpage, but just index the same url
+								}
+								if (ContextMenuButtons[i] == "Close" && tabs.size() > 1) //CURRENT BUG, NEED TO SHOW IF YOU CAN PRESS OR NOT - TODO
+								{
+									std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+
+									if (clickedTab == -1)
+									{
+										if (tabs[activeTab].domRoot != nullptr) { DeleteTree(tabs[activeTab].domRoot); } // if the domRoot contains something, we destory the tree, for cleanup
+										tabs.erase(tabs.begin() + activeTab); //remove the tab
+
+										//make sure that that we cannot let the tabs go negative, if that were possible.
+										if (activeTab >= (int)tabs.size()) { activeTab = tabs.size() - 1; }//if we don't meet the condition, we can close it.
+
+										//if we end up closing, and have no active tabs, create a new one, to prevent a softlock
+										if (tabs.empty()) { tabs.push_back(Tab()); activeTab = 0; }
+
+										//update the url's to the tab, and fills in the info
+										currentURL = tabs[activeTab].url;
+										urlInput = tabs[activeTab].url;
+									}
+									else {
+										if (tabs[clickedTab].domRoot != nullptr) { DeleteTree(tabs[clickedTab].domRoot); } // if the domRoot contains something, we destory the tree, for cleanup
+										tabs.erase(tabs.begin() + clickedTab); //remove the tab
+
+										if (clickedTab < activeTab) { activeTab--; }
+										//make sure that that we cannot let the tabs go negative, if that were possible.
+										if (clickedTab >= (int)tabs.size()) { clickedTab = tabs.size() - 1; }//if we don't meet the condition, we can close it.
+
+										//if we end up closing, and have no active tabs, create a new one, to prevent a softlock
+										if (tabs.empty()) { tabs.push_back(Tab()); activeTab = 0; }
+
+										//update the url's to the tab, and fills in the info
+										currentURL = tabs[activeTab].url;
+										urlInput = tabs[activeTab].url;
+									}	
+								}
+
+								if (ContextMenuButtons[i] == "Minimize")
+								{
+									SDL_MinimizeWindow(window);
+								}
+								if (ContextMenuButtons[i] == "Close All Tabs")
+								{
+									
+									for(int t = tabs.size() - 2; t >= 0; t--)
+									{	
+										std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+
+										if (tabs[activeTab].domRoot != nullptr) { DeleteTree(tabs[activeTab].domRoot); } // if the domRoot contains something, we destory the tree, for cleanup
+										tabs.erase(tabs.begin() + activeTab); //remove the tab
+
+										//make sure that that we cannot let the tabs go negative, if that were possible.
+										if (activeTab >= (int)tabs.size()) { activeTab = tabs.size() - 1; }//if we don't meet the condition, we can close it.
+
+										//if we end up closing, and have no active tabs, create a new one, to prevent a softlock
+										if (tabs.empty()) { tabs.push_back(Tab()); activeTab = 0; }
+
+										//update the url's to the tab, and fills in the info
+										currentURL = tabs[activeTab].url;
+										urlInput = tabs[activeTab].url;
+									}	
+									NavigateTo("new::tab", render, font, false); //Open the new tab at the end.
+									
+								}
+
+								if (ContextMenuButtons[i] == "Performance") //TODO
+								{
+
+								}
+								//------------------------------------------------------------------------------------------------------------------------------------------------
+								//HANDLE LINK CONTEXT MENU STUFF
+								
+								// ContextMenuButtons = { "Open", "Open New Tab", "In New Window", "-------", "Copy Link", "Save Link As", "-------", }; ///legend
+
+								if (ContextMenuButtons[i] == "Open") //OPEN the link
+								{
+									urlInput = clickedURL; //set the urlInput to the clicked url
+									NavigateTo(clickedURL, render, font, true); //Now we navigate to it
+								}
+								if (ContextMenuButtons[i] == "Open New Tab") //OPEN the link (in a new tab.)
+								{
+									Tab newTab; //create a temp Tab handler to hold the newTab.
+									newTab.title = "Loading..."; //give it a transition title...
+									//push it back
+									{
+										std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+										tabs.push_back(newTab); //send a new tab to the list
+										//update the active tab
+										activeTab = tabs.size() - 1; //set the activetab to the size of the tabs, -1 to fit the 0 = element 1
+										lastsearchedtabID = tabs[activeTab].tabID;//set the tab when i click.
+									}
+									NavigateTo(clickedURL, render, font, true); //go to the link, as opening a new tab, using the id
+								}
+								if (ContextMenuButtons[i] == "Copy Link") //COPY the link
+								{
+									
+									if (SDL_SetClipboardText(clickedURL.c_str())) { std::cout << "Copied." << std::endl; } //DEBUG
+									else { std::cout << "Error, failed to copy...  Unknown.." << std::endl; }
+								}
+								if (ContextMenuButtons[i] == "Save Link As") //TODO
+								{
+									static std::string saveFileHTMLTemp;
+
+									if (clickedURL.find("http://") != 0 && clickedURL.find("https://") != 0) //if the link does not have a https:// (for other browsers)
+									{
+										clickedURL = "https://" + clickedURL;
+									}
+
+									saveFileHTMLTemp = 
+										"<!DOCTYPE html>\n"
+										"<html>\n"
+										"<head>\n"
+										"    <meta http-equiv=\"refresh\" content=\"0; url=" + clickedURL + "\" />\n"
+										"</head>\n"
+										"<body>\n"
+										"    <p>If you are not redirected, <a href=\"" + clickedURL + "\">click here</a>.</p>\n"
+										"</body>\n"
+										"</html>";
+
+
+									const SDL_DialogFileFilter filters[] = {
+										{ "HTML Files", "html;htm" }
+									};
+									//save settings
+									SDL_ShowSaveFileDialog(
+										SaveCallback, 
+										(void*)(saveFileHTMLTemp.c_str()), //load the file
+										window,             // main SDL window
+										filters, 1,            // save only html
+										NULL                // No default folder path
+									);
+								}
+								if (ContextMenuButtons[i] == "In New Window") //open a new window
+								{
+									char exePath[MAX_PATH]; //holds the full path to the exe.
+
+									GetModuleFileNameA( //get the path of the current program -> the browser engine
+										NULL,
+										exePath, //store it here
+										MAX_PATH //amount of chars to store.
+									);
+
+									std::string commandLine = "\"" + std::string(exePath) + "\" \"" + clickedURL + "\""; //command to open the browser, with the path.
+
+									// additional information
+									STARTUPINFOA si{};
+									PROCESS_INFORMATION pi{};
+
+									// set the size of the structures
+									si.cb = sizeof(si);
+
+									std::vector<char> cmd{
+										commandLine.begin(), commandLine.end()
+									};
+									
+									// start the program up
+									BOOL result = CreateProcessA(
+										NULL,           // the path
+										commandLine.data(),        // Command line
+										NULL,           // Process handle not inheritable
+										NULL,           // Thread handle not inheritable
+										FALSE,          // Set handle inheritance to FALSE
+										0,              // No creation flags
+										NULL,           // Use parent's environment block
+										NULL,           // Use parent's starting directory 
+										&si,            // Pointer to STARTUPINFO structure
+										&pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
+									);
+
+									if (!result) //if there is an error
+									{
+										DWORD error = GetLastError(); //grab the last error
+
+										std::cerr << "ERROR -> " << error << " Attempting to open link in new window, window could NOT be created." << std::endl; //DEBUG
+									}
+									else
+									{
+										// Close process and thread handles. 
+										CloseHandle(pi.hProcess);
+										CloseHandle(pi.hThread);
+									}
+								}
+								//after we click something, we should close the context menu
+								ContextMenu = false, SaveXYContextMenuPos = false;
+							}
+						}
 						continue; //skip the stack
 					}
 					float uiTopBarHeight = 70.0f;  //float to hold the start of the bar
@@ -1199,10 +1610,9 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					SDL_FRect starBtnRect = { searchBarRect.x + searchBarRect.w + padding, topMargin, btnSize, btnSize };  //set a rect for the starBtnRect, using the searchBarRect for offset
 					SDL_FRect printerBtnRect = { starBtnRect.x + starBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the printerBtnRect, using the starBtnRect for offset
 					SDL_FRect settingsBtnRect = { printerBtnRect.x + printerBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the printerBtnRect, using the printerBtnRect for offset
-
+					
 					//test if the backBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
-					if (mouseX >= backBtnRect.x && mouseX <= (backBtnRect.x + backBtnRect.w) &&
-						mouseY >= backBtnRect.y && mouseY <= (backBtnRect.y + backBtnRect.h)) { 
+					if (isHoverd(backBtnRect)) {
 						//first check, is our index var for the area >= 0? as we reference it
 						if (tabs[activeTab].historypos > 0) //we do > 0, as we want to go back one, and we cannot go to -1
 						{
@@ -1214,8 +1624,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 						}
 					}
 					//test if the fwdBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
-					if (mouseX >= fwdBtnRect.x && mouseX <= (fwdBtnRect.x + fwdBtnRect.w) &&
-						mouseY >= fwdBtnRect.y && mouseY <= (fwdBtnRect.y + fwdBtnRect.h)) {
+					if (isHoverd(fwdBtnRect)) {
 						//first check, is our index var for the area <= 0? as we reference it
 						if (tabs[activeTab].historypos < (int)tabs[activeTab].history.size() - 1)  //we do < (int)tabs[activeTab].history.size() - 1, as we want to go forward one, and we cannot go past the limit
 						{
@@ -1229,23 +1638,20 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					}
 
 					//test if the reloadBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
-					if (mouseX >= reloadBtnRect.x && mouseX <= (reloadBtnRect.x + reloadBtnRect.w) &&
-						mouseY >= reloadBtnRect.y && mouseY <= (reloadBtnRect.y + reloadBtnRect.h)) {
+					if (isHoverd(reloadBtnRect)) {
 						if (currentURL != "") { NavigateTo(urlInput, render, font, false); } //don't reload for the mainpage, but just index the same url
 
 					}
 
 
 					//test if the homeBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
-					if (mouseX >= homeBtnRect.x && mouseX <= (homeBtnRect.x + homeBtnRect.w) &&
-						mouseY >= homeBtnRect.y && mouseY <= (homeBtnRect.y + homeBtnRect.h)) {
+					if (isHoverd(homeBtnRect)) {
 						if (currentURL != "") { NavigateTo("new::tab", render, font, false); } //don't go if we are already on the mainpage, but load new::tab
 					}
 
 
 					//test if the printerBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
-					if (mouseX >= printerBtnRect.x && mouseX <= (printerBtnRect.x + printerBtnRect.w) &&
-						mouseY >= printerBtnRect.y && mouseY <= (printerBtnRect.y + printerBtnRect.h)) {
+					if (isHoverd(printerBtnRect)) {
 						int uiHeight = 80; //crop the uiHeight
 						SDL_Rect contentArea; //create a temp content area
 
@@ -1296,34 +1702,10 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 						UpdateHTML(); //update the HTML with the new stuff, on the homepage
 					}
 
-					bool linkwasClicked = false; //create a temp bool to hold if we clicked a link, start it at false
-					std::string clickedURL; //create a temp string to hold the url
-					{
-						std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent other threads to change the tabs
-						for (int i = 0; i < tabs[activeTab].layout.size(); i++) //loop through each tab in the tabs list
-						{
-							if (tabs[activeTab].layout[i].textTex == nullptr) continue; //check if its text, if it is, skip
-							if (tabs[activeTab].layout[i].href.empty()) continue; //check if its a herf, if it does'nt contain anything, skip
-
-							float screeny = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos; //ok we have a link, now lets adjust the activator block to be over it
-
-							//test if the tabs activator button is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
-							if (mouseX >= tabs[activeTab].layout[i].x && mouseX <= (tabs[activeTab].layout[i].x + tabs[activeTab].layout[i].width) &&
-								mouseY >= screeny && mouseY <= (screeny + tabs[activeTab].layout[i].height))
-							{
-								std::cout << "link pressed" << std::endl; //DEBUG
-								std::string finalUrl = tabs[activeTab].layout[i].href; //grab the URL of the link, of what I just pressed
-
-								std::string realDest = FixURLREDIRECT(finalUrl); //fixes issues with the link, and saves it to the string
-								if (!realDest.empty()) { finalUrl = realDest; } //if it's not empty, update the finalURL to the realDest;
-
-								clickedURL = finalUrl; //set the clicked url to the final url
-								linkwasClicked = true; //and say the link was clicked
-								break; //exit
-							}
-						}
-					}
-					if (linkwasClicked) //now that we know we clicked the link
+					
+					
+					
+					if (isLinkClicked(clickedURL, false)) //now that we know we clicked the link
 					{
 						urlInput = clickedURL; //set the urlInput to the clicked url
 						NavigateTo(clickedURL, render, font, true); //Now we navigate to it
@@ -1463,7 +1845,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 					SDL_RenderFillRect(render, &textrec); //draw the BackGround of the text, and draw it over the rect of the text, but under the text, creating a bg
 				}
-
 			
 				if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].imageTex != nullptr) //check if the element is a image, and the activeTab.imageTex contains something
 				{
@@ -1498,7 +1879,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		// --- SCROLL BAR BG --- \\
 
 		float scrollBarWidth = 20.0f; //float to hold the width of the scroll bar
-		float uiTopBarHeight = 70.0f;  //float to hold the start of the bar
+		float uiTopBarHeight = 69.0f;  //float to hold the start of the bar
 		float trackHeight = WinH - uiTopBarHeight; //trackheight holds how long the bar should be, subtracting so that it ends on that start pos
 
 		
@@ -1568,6 +1949,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		// --- BACK+FORWARD BUTTON'S --- \\
 		
 				//BACK-BUTTON\\
+
 
 		SDL_FRect backBtn; //create a rect to hold the backBtn
 
@@ -2025,6 +2407,19 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 			else { SDL_SetRenderDrawColor(render, 224, 224, 224, 255); } //if darkmode is off, make the ContextMenu a light gray
 			SDL_FRect ContextMenuRect;
 			if (SaveXYContextMenuPos) {
+
+				if (ContextMenuYPos >= 30) //Top bar being pressed 
+				{
+					ContextMenuButtons = { "New Tab", "Print", "Change Theme", "-------", "Back", "Forward", "-------", }; //Holds the names of the buttons, and the engine will fit them.
+				}
+				else {
+					ContextMenuButtons = { "Reload", "Close", "-------", "Minimize", "Close All Tabs", "Performance", "-------", }; //Holds the names of the buttons, and the engine will fit them.
+				}
+				if (isLinkClicked(clickedURL, true))
+				{
+					ContextMenuButtons = { "Open", "Open New Tab", "In New Window", "-------", "Copy Link", "Save Link As", "-------", }; //Holds the names of the buttons, and the engine will fit them.
+				}
+
 				if (WinH / 2 > mouseY) //if you click on the lower half
 				{
 					if (WinW / 2 > mouseX) //that means we are on the right side
@@ -2038,16 +2433,18 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				else { //if you click on the upper half
 					if (WinW / 2 > mouseX) //that means we are on the right side
 					{
-						ContextMenuXPos = mouseX; ContextMenuYPos = mouseY - 400; //set the temp x and y with an offset to the Y
+						ContextMenuXPos = mouseX; ContextMenuYPos = mouseY - 315; //set the temp x and y with an offset to the Y
 					}
 					else { //check if we are on the left side
-						ContextMenuXPos = mouseX - 200; ContextMenuYPos = mouseY - 400; //set the temp x and y with an offset to the Y and X
+						ContextMenuXPos = mouseX - 200; ContextMenuYPos = mouseY - 315; //set the temp x and y with an offset to the Y and X
 					}
 				}
 				SaveXYContextMenuPos = false; //set it to false, to not update again
 			}
 			else { //RENDER IT
-				ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 400 }; //render the context menu
+
+				
+				ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 315 }; //render the context menu
 
 				SDL_RenderFillRect(render, &ContextMenuRect); //send it to be uploaded to the render.
 
@@ -2055,40 +2452,57 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				//-- RENDER EACH BUTTON --\\
 				
 				float buttonHeight = 45.0;
-				if (darkmode) { SDL_SetRenderDrawColor(render, 0, 0, 0, 255); }//if darkmode is on, make the ContextMenu a dark gray
-				else { SDL_SetRenderDrawColor(render, 224, 224, 224, 255); } //if darkmode is off, make the ContextMenu a light gray
-
+				
+				TTF_SetFontHinting(iconFont, TTF_HINTING_NORMAL); // Options: TTF_HINTING_NORMAL, TTF_HINTING_LIGHT, or TTF_HINTING_MONO
 				SDL_FRect CurrentButtnRect;
-				//ContextMenuRect.w for our button width, maybe with some padding
-				std::vector<std::string> ContextMenuButtons = {"example1", "example2", "example3"}; //Holds the names of the buttons, and the engine will fit them.
-				for (int i = 0; i < ContextMenuButtons.size(); i++)
-				{
-					
-					//now we want to render each button, like how we render tabs.
-					float buttnX = ContextMenuRect.x; //hold the x of it
-					float buttnY = ContextMenuRect.y + (i * (buttonHeight + 2)); //change the x, based on the size of the button * the i, with some sort of padding
-					CurrentButtnRect = { buttnX, buttnY, ContextMenuRect.w, buttonHeight };
-					
-					SDL_RenderFillRect(render, &CurrentButtnRect); //send it to be uploaded to the render.
+				
 
 				
+				//ContextMenuRect.w for our button width, maybe with some padding
+				
+				for (int i = 0; i < ContextMenuButtons.size(); i++)
+				{
+
+					//now we want to render each button, like how we render tabs.
+					float buttnX = ContextMenuRect.x; //hold the x of it
+					float buttnY = ContextMenuRect.y + (i * (buttonHeight + 0)); //change the x, based on the size of the button * the i, with some sort of padding
+					CurrentButtnRect = { buttnX, buttnY, ContextMenuRect.w, buttonHeight };
 					
+					if (mouseX >= CurrentButtnRect.x && mouseX <= (CurrentButtnRect.x + CurrentButtnRect.w) &&
+						mouseY >= CurrentButtnRect.y && mouseY <= (CurrentButtnRect.y + CurrentButtnRect.h) && ContextMenuButtons[i] != "-------") {
+						if (darkmode) { SDL_SetRenderDrawColor(render, 28, 28, 28, 255);  } //if darkmode is on, make the ContextMenu a dark gray
+						else { SDL_SetRenderDrawColor(render, 221, 221, 221, 255); } //if darkmode is off, make the ContextMenu a light gray
+					}
+					else {
+						if (darkmode) { SDL_SetRenderDrawColor(render, 5, 5, 5, 255); } 
+						else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); }
+					}
+
+					SDL_RenderFillRect(render, &CurrentButtnRect); //send it to be uploaded to the render.
+
+					SDL_Color buttnTextColor; //create a var to hold the RGB color
+					if (darkmode) { buttnTextColor = { 255,255,255,255 }; } //if darkmode is enabled, set the text color to white
+					else { buttnTextColor = { 0,0,0,255 }; } //if darkmode is disabled, set the text color to black 
+
+
+					//now lets render the text
+					SDL_Surface* buttnSerf; //build a surf to hold the 'x' for closing a tab
+					buttnSerf = TTF_RenderText_Solid(iconFont, ContextMenuButtons[i].c_str(), 0, buttnTextColor);
+					
+
+					if (buttnSerf != nullptr) //if our xSurf has been created 
+					{
+						float textX = SDL_roundf(CurrentButtnRect.x + (CurrentButtnRect.w - (float)buttnSerf->w) / 2.0);
+						float textY = SDL_roundf(CurrentButtnRect.y + (CurrentButtnRect.h - (float)buttnSerf->h) / 2.0);
+					
+						SDL_Texture* xTex = SDL_CreateTextureFromSurface(render, buttnSerf); //create a temp texture to hold the 'x' text
+						SDL_FRect xRect = { textX, textY, (float)buttnSerf->w, (float)buttnSerf->h}; //move the rect to fit in the tab
+						SDL_RenderTexture(render, xTex, nullptr, &xRect); //send the texture to the render to be rendered
+
+						SDL_DestroyTexture(xTex); //we are done, destroy the texture
+						SDL_DestroySurface(buttnSerf); //we are done, destroy the surface
+					}
 				}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 			}
 		}
 		SDL_RenderPresent(render); //Send our final render, with all the data, to the screen
