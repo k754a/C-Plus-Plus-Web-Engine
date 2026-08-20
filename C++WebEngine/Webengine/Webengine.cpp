@@ -31,33 +31,33 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
 
     //======LOAD-MAIN-MENU======\\
     
-    if (argc <= 1) //if we start WITHOUT a link
-    {
-        std::ifstream file("main.html"); //open on start, in read mode
+    
+    std::ifstream file("main.html"); //open on start, in read mode
 
-        if (!file.is_open()) { //if we cannot open the file
-            std::cout << "Could not open main file." << std::endl; //send an error, as we need this for new tab
+    if (!file.is_open()) { //if we cannot open the file
+        std::cout << "Could not open main file." << std::endl; //send an error, as we need this for new tab
 
-            return -1; //return an error code
-        }
-
-        std::stringstream buffer;  buffer << file.rdbuf(); //create the buffer, and write the main.html file data to it
-
-        std::string fileinfo = buffer.str(); //convert that buffer, into a string for the parser
-
-        Parser(fileinfo); //send the new tab to the parser for rendering
+        return -1; //return an error code
     }
-    else { //if we start WITH a link
-        std::string tempString = argv[1];
-        std::wstring temp(tempString.begin(), tempString.end()); //hold our temp string
-        ConnectSocketHTTPS(temp);
-    }
+
+    std::stringstream buffer;  buffer << file.rdbuf(); //create the buffer, and write the main.html file data to it
+
+    std::string fileinfo = buffer.str(); //convert that buffer, into a string for the parser
+
+    Parser(fileinfo); //send the new tab to the parser for rendering
     
    
     //======RENDER-GUI======\\
 
-    GUIRENDER(); //Run the GUI loop, this again, is a loops, so we wont continue until we close it
-
+    if (argc > 1) //if there is a argc
+    {
+        std::string tempString = argv[1];
+        GUIRENDER(tempString); //Run the GUI loop, this again, is a loops, so we wont continue until we close it
+    }
+    else {
+        GUIRENDER(""); //Run the GUI loop, this again, is a loops, so we wont continue until we close it
+    }
+ 
     //======DEBUG======\\
 
     //std::cout << "Press enter to exit...";

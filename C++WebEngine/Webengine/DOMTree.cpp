@@ -113,6 +113,8 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 			}
 
 
+			//TODO - any spaces screw it up, so i NEED to fix that.
+
 			size_t srcPos = rawToken.find("src=\""); //attempt to find 'src=\'
 			if (srcPos != std::string::npos) //if the srcPos condition is met (it returns a value)
 			{
@@ -135,7 +137,7 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 				}
 			}
 
-			size_t idPos = rawToken.find("id=\""); //attempt to find the classPos
+			size_t idPos = rawToken.find("id=\""); //attempt to find the idPos
 			if (idPos != std::string::npos) //if it exists
 			{
 				size_t StartPos = idPos + 4; //set the StartPos to start PAST, the class=\.
@@ -144,6 +146,63 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 				{
 					TempNode->idName = rawToken.substr(StartPos, EndPos - StartPos); //grab only the inside part, like image.png.
 				}
+			}
+
+
+			
+			size_t stylePos = rawToken.find("style=\""); //attempt to find the stylePos
+			if (stylePos != std::string::npos) //if it exists
+			{
+				size_t textalignPos = rawToken.find("text-align:"); //now that we have found the style, for our first run, we are going to attempt to see if its text-align:
+				if (textalignPos != std::string::npos)
+				{
+					size_t CenterPos = rawToken.find("center");
+					if (CenterPos != std::string::npos)
+					{
+						//OK, now lets grab everything past hte text-align
+						size_t StartPos = textalignPos + 11; //set the StartPos to start PAST, the text-align:.
+						size_t EndPos = rawToken.find("\"", StartPos); //find the end part
+						if (EndPos != std::string::npos)
+						{
+							//-1, as we will pick up the ;
+							std::cout << rawToken.substr(StartPos, (EndPos - 1) - StartPos) << std::endl; //DEBUG
+							TempNode->style = rawToken.substr(StartPos, (EndPos - 1) - StartPos); //grab only the inside part, like image.png.
+						}
+					}
+
+					size_t LeftPos = rawToken.find("left");
+					if (LeftPos != std::string::npos)
+					{
+						//OK, now lets grab everything past hte text-align
+						size_t StartPos = textalignPos + 11; //set the StartPos to start PAST, the text-align:.
+						size_t EndPos = rawToken.find("\"", StartPos); //find the end part
+						if (EndPos != std::string::npos)
+						{
+							//-1, as we will pick up the ;
+							std::cout << rawToken.substr(StartPos, (EndPos - 1) - StartPos) << std::endl; //DEBUG
+							TempNode->style = rawToken.substr(StartPos, (EndPos - 1) - StartPos); //grab only the inside part, like image.png.
+						}
+					}
+
+					size_t RightPos = rawToken.find("right");
+					if (RightPos != std::string::npos)
+					{
+						//OK, now lets grab everything past hte text-align
+						size_t StartPos = textalignPos + 11; //set the StartPos to start PAST, the text-align:.
+						size_t EndPos = rawToken.find("\"", StartPos); //find the end part
+						if (EndPos != std::string::npos)
+						{
+							//-1, as we will pick up the ;
+							std::cout << rawToken.substr(StartPos, (EndPos - 1) - StartPos) << std::endl; //DEBUG
+							TempNode->style = rawToken.substr(StartPos, (EndPos - 1) - StartPos); //grab only the inside part, like image.png.
+						}
+					}
+
+				}
+
+
+				//TODO - More of these.
+				
 			}
 
 			size_t space = rawToken.find(' '); //find if we have a space
@@ -166,14 +225,6 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 			std::string_view MToken = rawToken; //temp var to hold our modified (cleaned) token.
 
 
-
-
-
-
-
-
-
-		
 
 			//-------------------------------------------------------------------------------------
 
@@ -232,13 +283,7 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 		}
 
 	}
-
-
 	LayoutTree(Root); //ok send it to the layout
 
 	return 0;
 }
-
-
-
-

@@ -42,9 +42,9 @@ struct Tab //tab struct
 
 extern float zoomAmount;
 
-
+inline int WinW, WinH; //create 2 ints to hold the window's width, and the window's height - GLOBAL
 void SetTabTitle(std::string title);
-int GUIRENDER();
+int GUIRENDER(std::string StartingTab);
 int IMPORT(std::vector<Layout> layoutList, Node* node);
 int LoadStarredPages();
 int UpdateHTML();

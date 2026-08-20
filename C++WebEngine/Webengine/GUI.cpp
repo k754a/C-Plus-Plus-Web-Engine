@@ -24,7 +24,7 @@
 #include <SDL3_image/SDL_image.h> //images lib - For all the Image rendering, and handling it.
 #include <SDL3/SDL_dialog.h> //for the save menu
 #include <filesystem> //for just the print window button, just that.
-
+#include <iomanip> //for rounding the performace text
 
 #pragma endregion
 
@@ -67,6 +67,8 @@ std::vector<std::string> ContextMenuButtons; //Holds the names of the buttons, a
 std::string clickedURL; //create a temp string to hold the url
 int clickedTab;
 
+//HISTORY STUFF
+int TabBefore;
 float zoomAmount = 1.0f; //global float to handle the zoom amount
 float mouseX; //save the pos of the mouseX
 float mouseY; //save the pos of the mouseY
@@ -78,6 +80,9 @@ std::vector<Tab> tabs;        // a vector that holds our custom tab struct, allo
 int activeTab = 0;            // holds the amount of tabs open
 int lastsearchedtabID; //holds the id of the last searched tab.
 
+//SETTINGS
+bool ShowPerformace = false;
+bool ShowSettingsMenu = false;
 #pragma endregion
 
 #pragma region //Create First Tab (On Start)
@@ -151,12 +156,12 @@ int UpdateHTML() //UPDATE HTML returns an int, and takes nothing in
 					font-size: 24px;
 				}
 				a {
-					color: #4A90E2; /* Visible blue link */
+					color: #4A90E2;
 					font-size: 22px;
 				}
-				/* Style to make the logo look nice and neat */
+				
 				.browser-image {
-					max-width: 200px; /* Limits the size of the logo */
+					max-width: 200px; 
 					height: auto;
 					display: block;
 					margin-top: 20px;
@@ -165,18 +170,18 @@ int UpdateHTML() //UPDATE HTML returns an int, and takes nothing in
 				}
 			</style></head><body>
 			<div>
-				<h1>C++Browse</h1>
-				<p>This is my C++ web browser project.</p>
+				<h1 style="center">C++Browse</h1>
+				<p style="center">This is my C++ web browser project.</p>
        
 
-				<h1>To start, search anything. ы </h1>
+				<h1 style="center">To start, search anything. ы </h1>
 				<h1>&nbsp;</h1>
 		)";
 
 			
 		if (!starredPages.empty()) //make sure that the starred pages list contain something
 		{
-			htmlFile << "        <br>Starred Pages:\n"; //small starred page header
+			htmlFile << "        <br >Starred Pages:\n"; //small starred page header
 			for (const std::string& site : starredPages) { //go through each line in starPages
 				
 				htmlFile << "        <p>ж -<a href=\"" << site << "\">" << site << "</a></p>\n"; //add the site to the html file, as a new line
@@ -350,6 +355,25 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 	std::cout << "target-> " << target << std::endl;//DEBUG
 
 	if (target.empty()) return; //if the target is empty, to save time, just return.
+
+	if (addToHistory) //if we should save the history
+	{
+		std::lock_guard<std::mutex> lock(gTabsMutex); //lock to prevent errors
+
+		//grab the current tab
+		auto& tab = tabs[activeTab];
+
+		if (tab.historypos < static_cast<int>(tab.history.size()) - 1) //if the historypos is less than the history (we behind) and then we made a new branch
+		{
+			tab.history.resize(tab.historypos + 1); //remove all the forward stuff 
+		}
+		//if the history is empty, or if the URL is different from the last thing
+		if (tab.history.empty() || tab.history.back() != target)
+		{
+			tab.history.push_back(target); //add the new url to the end of the history
+			tab.historypos = static_cast<int>(tab.history.size()) - 1;//update the current history to make it the new added page
+		}
+	}
 	std::error_code ec; //temp var to hold the error code
 	if (std::filesystem::exists(target, ec) && !ec) //check if the target contains a valid path, and no error is thrown
 	{
@@ -452,7 +476,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 			return; //return.
 		}
 		else {
-
 			std::cout << "Not A Valid File Format To Load" << std::endl; //DEBUG
 
 			std::string html = "<html><title>" + path + "</title><body><h1>ERROR, not a valid format.</h1><h3>You can disable this in settings</h3></body></html>"; //fake html, that just forces the error code
@@ -479,7 +502,56 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 			return; //return.
 		}
 	}
-	
+	if (target.find("history::tab") == 0) //check if the target contains the value history::tab
+	{
+		//if so, load custom html file. (like new::tab)
+		{
+			std::lock_guard<std::mutex> lock(gTabsMutex); //lock to insure no corruption
+			auto& active = tabs[activeTab]; //create a temp var to hold our active tab
+
+			active.loadGen++; //increase the loadGen, stopping other threads
+
+			for (auto& item : active.layout) //destroy the old item, and clear the layout for text and images, to avoid issues
+			{
+				if (item.textTex) SDL_DestroyTexture(item.textTex); //destroy the text
+				if (item.imageTex) SDL_DestroyTexture(item.imageTex); //destroy the images
+			}
+			active.layout.clear(); //clear the layout
+
+			active.scrollpos = 40; //reset the scroll pos
+			//lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
+
+			urlInput = "history::tab";
+		}
+		std::string temp = "<html><head><title>History</title></head><body><h1 style=\"text-align:center;\">" + tabs[TabBefore].title + "'s Tab Search History" + "</h1><p style=\"text-align:right;\">This text is right.</p></body></html>";
+
+		Parser(temp);
+		return;
+	}
+	if (target.find("settings::tab") == 0) //check if the target contains the value settings::tab
+	{
+		
+		{
+			std::lock_guard<std::mutex> lock(gTabsMutex); //lock to insure no corruption
+			auto& active = tabs[activeTab]; //create a temp var to hold our active tab
+
+			active.loadGen++; //increase the loadGen, stopping other threads
+
+			for (auto& item : active.layout) //destroy the old item, and clear the layout for text and images, to avoid issues
+			{
+				if (item.textTex) SDL_DestroyTexture(item.textTex); //destroy the text
+				if (item.imageTex) SDL_DestroyTexture(item.imageTex); //destroy the images
+			}
+			active.layout.clear(); //clear the layout
+
+			active.scrollpos = 40; //reset the scroll pos
+			lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
+
+			urlInput = "settings::tab"; 
+		}
+		Parser("<html><head><title>Settings</title></head></html>");
+		return;
+	}
 	if (target.find("new::tab") == 0) //check if the target contains the value new::tab
 	{
 		std::cout << "FOUND NEW TAB" << std::endl; //DEBUG
@@ -1029,8 +1101,68 @@ static void SaveCallback(void* str, const char* const* files, int filter) //Save
 
 bool isHoverd(SDL_FRect rect) { return (mouseX >= rect.x && mouseX <= (rect.x + rect.w) && mouseY >= rect.y && mouseY <= (rect.y + rect.h)); }
 
-int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
+void ReloadTabLayout()
 {
+	if (tabs.empty() || activeTab < 0 || activeTab >= tabs.size()) return;
+
+	// 1. Increment loadGen to cancel any pending background thread jobs
+	tabs[activeTab].loadGen++;
+
+	// 2. SAVE OLD IMAGES! Map the old image source paths to their GPU textures.
+	std::unordered_map<std::string, SDL_Texture*> oldImageCache;
+	for (const auto& item : tabs[activeTab].layout) {
+		if (item.isImage && item.imageTex != nullptr && item.node != nullptr) {
+			oldImageCache[item.node->src] = item.imageTex;
+		}
+		else if (item.textTex) {
+			SDL_DestroyTexture(item.textTex); // Destroy old text, it recalculates fast
+		}
+	}
+
+	// 3. Clear current layout (images are safe in our cache!)
+	tabs[activeTab].layout.clear();
+
+	// 4. Set domRoot to nullptr so LayoutTree's internal IMPORT doesn't delete the tree!
+	Node* root = tabs[activeTab].domRoot;
+	tabs[activeTab].domRoot = nullptr;
+
+	// 5. Recalculate! (Calls LayoutTree, which calls IMPORT)
+	LayoutTree(root);
+
+	// 6. RESTORE OLD IMAGES! Loop through the newly generated layout
+	for (auto& newItem : tabs[activeTab].layout) {
+		if (newItem.isImage && newItem.node != nullptr) {
+			auto it = oldImageCache.find(newItem.node->src);
+			if (it != oldImageCache.end()) {
+				// We found this image! Apply it to the new layout.
+				newItem.imageTex = it->second;
+				newItem.imageAttempted = true; // Tell PreRender to skip downloading!
+
+				// FIX: Use temporary floats, then cast to int
+				float w, h;
+				SDL_GetTextureSize(newItem.imageTex, &w, &h);
+				newItem.width = (int)w;
+				newItem.height = (int)h;
+
+				oldImageCache.erase(it); // Remove from cache so we don't delete it
+			}
+		}
+	}
+
+	// 7. CLEAN UP LEAKS! Destroy any images that weren't used in the new layout
+	for (auto& pair : oldImageCache) {
+		if (pair.second) SDL_DestroyTexture(pair.second);
+	}
+
+
+
+}
+
+int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes in nothing
+{
+	currentURL = tabs[activeTab].url;
+	urlInput = tabs[activeTab].url;
+
 	SDL_Texture* fontText = nullptr; //create a SDL_Texture holds the font texture overall.
 
 	//we want to use the screen so use video
@@ -1075,11 +1207,32 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 	bool running = true; //this var gets set to false when the window is closed, cleanly ending this.
 
+
+
+	//LOAD
+	if (!StartingTab.empty())
+	{
+		NavigateTo(StartingTab, render, font);
+	}
+	
+
 	while (running) //loop till running is false
 	{
+		Uint64 start = SDL_GetPerformanceCounter(); //start the Performance overview
+
 		#pragma region //SDL event's
 		while (SDL_PollEvent(&event)) //poll the SDL event's
 		{
+			if (event.type == SDL_EVENT_WINDOW_RESIZED) //if the size is resized
+			{
+				WinW = event.window.data1; //update the Width
+				WinH = event.window.data2; //update the height
+
+				float OldScrollPos = tabs[activeTab].scrollpos; //save the old scrollPos
+				ReloadTabLayout(); //reload
+				tabs[activeTab].scrollpos = OldScrollPos; //New scroll pos
+			}
+
 			if (event.type == SDL_EVENT_QUIT) { running = false; } //if the window 'x' close button is pressed, we end the loop
 
 			mouseX = event.button.x; //save the pos of the mouseX
@@ -1346,12 +1499,27 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 								if (ContextMenuButtons[i] == "Change Theme") //CURRENT BUG, TEXT DONT CHANGE COLOR - TODO
 								{
 									darkmode = !darkmode; //flip it
-									if (urlInput != "")
+									
+									std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+
+									for (auto& tab : tabs) //for each tab in tabs
 									{
-										NavigateTo(urlInput, render, font, false); //reload
-									}
-									else {
-										NavigateTo("new::tab", render, font, false); //reload
+										tab.loadGen++; // update the loadGen
+										for (auto& item : tab.layout) //for each tab in tabs
+										{
+											if (item.textTex) { //if the texture exists, destroy it, to re-renders
+												SDL_DestroyTexture(item.textTex);
+												item.textTex = nullptr;
+											}
+											item.textAttempted = false; //make prerender render the node again
+
+											if (item.href.empty()) //invert only text, not links
+											{
+												item.textColor.r = 255 - item.textColor.r; //flip the color
+												item.textColor.g = 255 - item.textColor.g; //flip the color
+												item.textColor.b = 255 - item.textColor.b; //flip the color
+											}
+										}
 									}
 									
 								}
@@ -1383,7 +1551,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 								//HANDLE TAB CONTEXT MENU STUFF
 
 
-								// ContextMenuButtons = { "Reload", "Close", "-------", "Minimize", "Close All Tabs", "Performance", "-------", }; ///legend
+								// ContextMenuButtons = { "Reload", "Close", "-------", "History", "Close All Tabs", "Performance", "-------", }; ///legend
 
 								if (ContextMenuButtons[i] == "Reload")
 								{
@@ -1424,21 +1592,38 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 										urlInput = tabs[activeTab].url;
 									}	
 								}
-
-								if (ContextMenuButtons[i] == "Minimize")
+								if (ContextMenuButtons[i] == "History" && tabs[activeTab].url != "history::tab") //Dont allow it to work for the history tab itself.
 								{
-									SDL_MinimizeWindow(window);
+									//grab the last tab id (before we switch)
+									TabBefore = activeTab;
+
+									Tab settingsTab; //create a temp Tab handler to hold the settingsTab.
+									settingsTab.title = currentURL; //give it a transition title...
+									settingsTab.url = "history::tab"; //set the url
+									currentURL = "history::tab";
+									//push it back
+									{
+										std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+										tabs.push_back(settingsTab); //send a new tab to the list
+										//update the active tab
+										activeTab = tabs.size() - 1; //set the activetab to the size of the tabs, -1 to fit the 0 = element 1
+										lastsearchedtabID = tabs[activeTab].tabID;//set the tab when i click.
+									}
+									
+
+									std::cout << TabBefore << std::endl;
+									NavigateTo("history::tab", render, font, false); //go to the link, as opening a new tab, using the id, do not save history when opening
+									//History
 								}
 								if (ContextMenuButtons[i] == "Close All Tabs")
 								{
-									
 									for(int t = tabs.size() - 2; t >= 0; t--)
 									{	
 										std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
 
 										if (tabs[activeTab].domRoot != nullptr) { DeleteTree(tabs[activeTab].domRoot); } // if the domRoot contains something, we destory the tree, for cleanup
 										tabs.erase(tabs.begin() + activeTab); //remove the tab
-
+										 
 										//make sure that that we cannot let the tabs go negative, if that were possible.
 										if (activeTab >= (int)tabs.size()) { activeTab = tabs.size() - 1; }//if we don't meet the condition, we can close it.
 
@@ -1450,12 +1635,11 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 										urlInput = tabs[activeTab].url;
 									}	
 									NavigateTo("new::tab", render, font, false); //Open the new tab at the end.
-									
 								}
 
 								if (ContextMenuButtons[i] == "Performance") //TODO
 								{
-
+									ShowPerformace = !ShowPerformace;
 								}
 								//------------------------------------------------------------------------------------------------------------------------------------------------
 								//HANDLE LINK CONTEXT MENU STUFF
@@ -1646,9 +1830,9 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 					//test if the homeBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
 					if (isHoverd(homeBtnRect)) {
+
 						if (currentURL != "") { NavigateTo("new::tab", render, font, false); } //don't go if we are already on the mainpage, but load new::tab
 					}
-
 
 					//test if the printerBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
 					if (isHoverd(printerBtnRect)) {
@@ -1701,8 +1885,28 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 						UpdateHTML(); //update the HTML with the new stuff, on the homepage
 					}
 
-					
-					
+					if (isHoverd(settingsBtnRect))
+					{
+						Tab settingsTab; //create a temp Tab handler to hold the settingsTab.
+						settingsTab.title = "Loading..."; //give it a transition title...
+						settingsTab.url = "settings::tab"; //set the url
+						currentURL = "settings::tab";
+						//push it back
+						{
+							std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+							tabs.push_back(settingsTab); //send a new tab to the list
+							//update the active tab
+							activeTab = tabs.size() - 1; //set the activetab to the size of the tabs, -1 to fit the 0 = element 1
+							lastsearchedtabID = tabs[activeTab].tabID;//set the tab when i click.
+						}
+						NavigateTo("settings::tab", render, font, true); //go to the link, as opening a new tab, using the id
+					}
+
+
+
+
+
+
 					
 					if (isLinkClicked(clickedURL, false)) //now that we know we clicked the link
 					{
@@ -1866,15 +2070,12 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 		}
 		#pragma endregion
 
-
-		int WinW, WinH; //create 2 ints to hold the window's width, and the window's height
 		SDL_GetCurrentRenderOutputSize(render, &WinW, &WinH); // grab the output size, and assign the WinW and WinH
 	
 
 		float scaleX, scaleY; //create 2 floats to hold the windows's scaleX and scaleY
 		SDL_GetRenderScale(render, &scaleX, &scaleY); //assign the scaleX, scaleY using SDL_GetRenderScale
 		
-
 		// --- SCROLL BAR BG --- \\
 
 		float scrollBarWidth = 20.0f; //float to hold the width of the scroll bar
@@ -2412,7 +2613,7 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 					ContextMenuButtons = { "New Tab", "Print", "Change Theme", "-------", "Back", "Forward", "-------", }; //Holds the names of the buttons, and the engine will fit them.
 				}
 				else {
-					ContextMenuButtons = { "Reload", "Close", "-------", "Minimize", "Close All Tabs", "Performance", "-------", }; //Holds the names of the buttons, and the engine will fit them.
+					ContextMenuButtons = { "Reload", "Close", "-------", "History", "Close All Tabs", "Performance", "-------", }; //Holds the names of the buttons, and the engine will fit them.
 				}
 				if (isLinkClicked(clickedURL, true))
 				{
@@ -2447,7 +2648,6 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 
 				SDL_RenderFillRect(render, &ContextMenuRect); //send it to be uploaded to the render.
 
-
 				//-- RENDER EACH BUTTON --\\
 				
 				float buttonHeight = 45.0;
@@ -2455,13 +2655,10 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				TTF_SetFontHinting(iconFont, TTF_HINTING_NORMAL); // Options: TTF_HINTING_NORMAL, TTF_HINTING_LIGHT, or TTF_HINTING_MONO
 				SDL_FRect CurrentButtnRect;
 				
-
-				
 				//ContextMenuRect.w for our button width, maybe with some padding
 				
 				for (int i = 0; i < ContextMenuButtons.size(); i++)
 				{
-
 					//now we want to render each button, like how we render tabs.
 					float buttnX = ContextMenuRect.x; //hold the x of it
 					float buttnY = ContextMenuRect.y + (i * (buttonHeight + 0)); //change the x, based on the size of the button * the i, with some sort of padding
@@ -2504,6 +2701,122 @@ int GUIRENDER() //GUIRENDER returns an ' int ' and takes in nothing
 				}
 			}
 		}
+		
+
+		//HANDLE THE SETTINGS.
+	
+
+		if (tabs[activeTab].url == "settings::tab")
+		{
+			std::cout << "OPEN SETTINGS MENU" << std::endl; //DEBUG
+			SDL_FRect SettingsMenuBackground; //create a rect to hold the printer button
+			SettingsMenuBackground.w = WinW;
+			SettingsMenuBackground.h = WinH - 47;
+			SettingsMenuBackground.x = (WinW - SettingsMenuBackground.w) / 2;
+			SettingsMenuBackground.y = (WinH - SettingsMenuBackground.h) / 2 + 47;
+
+			if (darkmode) //if the darkmode tag is flagged
+			{
+				SDL_SetRenderDrawColor(render, (255 - backgroundColor.r), (255 - backgroundColor.g), (255 - backgroundColor.b), 255); // reverse the colors of the site, as darkmode is a flipped colored version, or on starting, black
+			}
+			else {
+				SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255); // keep the colors normal, and set them to the colors of the site, or on starting, white
+			}
+
+			SDL_RenderFillRect(render, &SettingsMenuBackground); //send the rect to the render to be queued for rendering
+		}
+			
+		
+
+
+
+		 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		//RENDER THE PERFORMANCE MENU
+		if (ShowPerformace)
+		{
+			static std::string performanceText = "";
+			static Uint64 lastUpdate = 0;
+
+			if (SDL_GetTicks() - lastUpdate >= 500) //if the ticks - last update are correct, half a second has passed
+			{
+				lastUpdate = SDL_GetTicks();
+				Uint64 end = SDL_GetPerformanceCounter();//grab the performace val
+				double ms = (double)(end - start) / SDL_GetPerformanceFrequency() * 1000.0; //convert to ms
+				double fps = (1000 / ms);
+				std::stringstream ss;
+				ss << std::fixed << std::setprecision(1) << fps << "FPS | " << ms << "ms";
+				performanceText = "Render Time: " + ss.str();
+			}
+			SDL_Surface* PERFORMANCESurf = nullptr; //create a serf to hold the printer icon
+			{ //LOCK
+				std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a guard to prevent other threads editing the TTF list, and causing a crash.
+				PERFORMANCESurf = TTF_RenderText_Solid(iconFont, performanceText.c_str(), 0, textColor);		
+			}
+
+			if (PERFORMANCESurf != nullptr) //if the icon was created successfully
+			{
+				SDL_Texture* PERFORMANCETex = SDL_CreateTextureFromSurface(render, PERFORMANCESurf);
+				SDL_SetTextureScaleMode(PERFORMANCETex, SDL_SCALEMODE_NEAREST);
+				float printerX = WinW - PERFORMANCESurf->w; //adjust them to the size of the screen, x
+				float printerY = WinH - PERFORMANCESurf->h; //adjust them to the size of the screen, y
+
+				SDL_FRect backTexRect = { printerX, printerY, (float)PERFORMANCESurf->w, (float)PERFORMANCESurf->h }; //create a rect to make the button
+				SDL_RenderTexture(render, PERFORMANCETex, nullptr, &backTexRect); //send the texture to the render to be rendered
+
+				SDL_DestroyTexture(PERFORMANCETex); //we are done, destroy the texture
+				SDL_DestroySurface(PERFORMANCESurf); //we are done, destroy the surface
+			}
+
+		}
+
+
 		SDL_RenderPresent(render); //Send our final render, with all the data, to the screen
 	}
 	//we need to quit to clean up all the subsystems

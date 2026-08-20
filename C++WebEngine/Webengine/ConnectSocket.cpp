@@ -376,10 +376,6 @@ int ConnectSocketHTTPS(std::wstring input)
                 }
 
 
-
-
-
-
                 //create a buffer, to hold our packets
                 char buffer[4096];
                 DWORD bytesRead = 0; //how many bytes read

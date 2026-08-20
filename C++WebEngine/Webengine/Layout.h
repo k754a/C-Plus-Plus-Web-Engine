@@ -21,6 +21,7 @@ struct Node {
 
 	std::string href = ""; //If we contain a link
 	std::string src = ""; //If we contain an image
+	std::string style = ""; //If the text has a style
 
     int measuredWidth = 0; //hold the measured Width
     int measuredHeight = 0; //hold the measured Height
@@ -52,7 +53,6 @@ struct Layout
 	bool hasBg = false; //start off false
 
 	std::string href; //we have non links "" clickable ones are filled in!
-
 
 
 	//images

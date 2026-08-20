@@ -1,8 +1,6 @@
 //THIS WILL HANDLE THE LAYOUT OF THE ENGINE
 //it will assign things like the positions of elements, and assign things like x and y
 
-
-
 #include "Layout.h"
 #include "GUI.h"
 #include "DOMTree.h"
@@ -270,8 +268,6 @@ RGB ParseHexColor(std::string hex) // This funct returns our custom RGB class ({
 	
 } //END OF PARSE-HEX-COLOR
 
-
-
 #pragma endregion //holds our css code
 
 
@@ -508,6 +504,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 		}
 
 
+		
 
 		//we are gonna handle our flex stuff here.
 		//first check if its a flex node
@@ -596,17 +593,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 		}
 
 
-
-
-
-
-
-
-
-
-
-
-
 		//this will let more stuff on one line, and will make the formating better
 		//first we check if its a structure block tag (div), (p), (h1)
 		// Block elements: push down to a new line
@@ -630,10 +616,22 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			//gives collums and stuff
 			currentXpos = ((currentXpos / 200) + 1) * 200;
 		}
-
-
-
-
+		
+		if (node->style == "center") //HANDLE CENTER TEXT
+		{
+			std::cout << "ATTEMPT TO CENTER" << std::endl; //DEBUG
+			currentXpos = (WinW -node->measuredWidth) / 2; //Center middle
+		}
+		if (node->style == "left") //HANDLE LEFT TEXT
+		{
+			std::cout << "ATTEMPT TO LEFT" << std::endl; //DEBUG
+			currentXpos = 20; //basic left off the wall
+		}
+		if (node->style == "right") //HANDLE LEFT TEXT
+		{
+			std::cout << "ATTEMPT TO RIGHT" << std::endl; //DEBUG
+			currentXpos = (WinW - 30) - node->measuredWidth; //Width - scroll bar width - text width.
+		}
 		//check if its an image
 		//check if its a img and its not empty
 		if (node->tagValue == "img" && !node->src.empty())
@@ -757,9 +755,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 	{
 		PositionNodes(child, currentXpos, currentYpos, fontsize, textColor, bgColor, hasBg, currentHref, false);
 	}
-
-
-
 }
 
 
