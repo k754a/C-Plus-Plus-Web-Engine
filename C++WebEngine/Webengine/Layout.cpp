@@ -30,23 +30,22 @@
 
 //=====================================================================================================================
 
-
-
-
-
-
 //looks through all our CSS rules to find the one that matches our tag in our tree
+
+std::vector<CSSToken>* activeCSS = nullptr; //hold the current css
 
 //=======Find ID======\\
 
 CSSToken* FindID(const static std::string input) //FIND-ID returns in our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), and takes in a std::string
 {
+	if (activeCSS == nullptr) return nullptr;
+
 	//loop and check through each element, for the size of globalCSS
-	for (int i = 0; i < globalCSS.size(); i++)
+	for (int i = 0; i < activeCSS->size(); i++)
 	{
-		if (globalCSS[i].id == input) //if the current id = to the input
+		if ((*activeCSS)[i].id == input) //if the current id = to the input
 		{
-			return &globalCSS[i]; //we return the id, and the vector string, holding the properties
+			return &(*activeCSS)[i]; //we return the id, and the vector string, holding the properties
 		}
 	}
 
@@ -281,34 +280,37 @@ std::vector<Layout> layoutList; //create a custom 'vector', holding our custom L
 //Measure Nodes calculates layout dimensions of elements, and accounts for font sizes and images.
 void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning nothing, it takes in our custom 'Node*' struct, and a int.
 {
-	
-	if (node->measured) return; //first we pull the 'measured' val from our 'node' struct we import, if it's true, we don't want to handle it again (to save performance), so we end it early.
-
 	//I first want to look through the nodes tag, to see if it has a tag value tagValue
 	//we check that it has a tagValue, if not, we return false
 
 	//using our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), we attempt to find our tagValue, using find ID, (with the funct above)
 	CSSToken* id = FindID(node->tagValue);
 
-	
 	if (id != nullptr) //insure that the id we have attempted to find, exists, and is NOT null.
 	{
 		std::string fs = FindProperty(id, "font-size"); //now we create a temp string, using our 'FindProperty', ({const static CSSToken* rule, const static std::string propertyName}), we put in our 'id', and what we want to find, the result is added to 'fs'
-		if (!fs.empty() && std::isdigit(fs[0])) //check that the font size property is NOT blank, and contains a number.
+		if (!fs.empty()) //check if its not empty
 		{
-			fontsize = std::stoi(fs) * 2; //we convert the number from a string "32" -> 32, then * by 2, to make sure its big enough.
+			while (!fs.empty() && std::isspace((unsigned char)fs.front())) //if theres a space
+			{
+				fs.erase(fs.begin()); //rm the space
+			} 
+
+			if (!fs.empty() && std::isdigit(fs[0])) //check that the font size property is NOT blank, and contains a number.
+			{
+				fontsize = std::stoi(fs) * 2; //we convert the number from a string "32" -> 32, then * by 2, to make sure its big enough.
+			}
 		}
+		
 	}
 	else if (node->tag == NODETYPE::START && !node->tagValue.empty()) //If we cannot find our "id" of the text, but it is a START node, and the tagValue is NOT null
 	{
-
 		//we use predetermined points, using the nodes tag value.
 		if (node->tagValue == "h1") { fontsize = 96; }
 		else if (node->tagValue == "p") { fontsize = 48; }
 		else if (node->tagValue == "a") { fontsize = 36; }
 		else if (node->tagValue == "span") { fontsize = 36; }
 	}
-	
 
 	//HANDLE IMAGES
 	if (node->tag == NODETYPE::START && node->tagValue == "img" && !node->src.empty()) //check if its a START node, the tagValue contains "img", and the link of the img is NOT empty.
@@ -320,9 +322,6 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 		return; //done.
 	}
 
-
-
-
 	//HANDLE TEXT
 	if (node->tag == NODETYPE::TEXT)
 	{
@@ -333,7 +332,6 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 		node->measured = true; //set the measured flag to 'true" to insure we do NOT measure it again.
 		return; //done.
 	}
-
 
 	//ok, now we do what we came to do:
 	//we understand that this node has children (like a div, body, a, ect)
@@ -368,21 +366,22 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 } //END OF MEASURE-NODES
 
 
-
-
-
 //=======Position Nodes======\\
 
 
 //This code handles positioning our nodes, and handling/assigning/creating the layout tree.
 void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref, bool inFlex = false) //this code returns nothing, and takes in 3 ints, our custom Node* class, 2 SDL_COLOR's, 2 Bools, and a String.
 {
-
 	
 	if (node->tag == NODETYPE::START) //check if the current node's value is a NODETYPE::START tag.
 	{
-		
-
+		if (!node->style.empty()) //if the node contains a style
+		{
+			for (Node* child : node->children)
+			{
+				child->style = node->style; //apply it to the children
+			}
+		}
 		//check the nodes, 'href' value to see if it contains it.
 		if (!node->href.empty())
 		{	
@@ -425,27 +424,28 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 				//if we find that the css of the bg is defined with a var, we skip, as we dont want an issue.
 				if (bg.find("var(") != std::string::npos) {
-					std::cout << "ERROR, CSS Defined with Var, Auto Skipping page color!" << "\r" << "This is not a problem :)" << std::endl; return; //end.
+					std::cout << "ERROR, CSS Defined with Var, Auto Skipping page color!" << "\r" << "This is not a problem :)"; //end.
+				}
+				else {
+					std::cout << "BG RAW: [" << bg << "]" << std::endl; //DEBUG
+
+					RGB parsed = ParseHexColor(bg); //get the RGB value, by parsing our current hex color, and setting it to RGB
+
+
+					if (node->tagValue == "body") //how check if the tag value is defined as "body"
+					{
+						backgroundColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we set our background color
+					}
+					else {
+
+						bgColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we set our background color
+						hasBg = true;
+					}
+
 				}
 			
 
-				std::cout << "BG RAW: [" << bg << "]" << std::endl; //DEBUG
-
-				RGB parsed = ParseHexColor(bg); //get the RGB value, by parsing our current hex color, and setting it to RGB
-
-				
-				if (node->tagValue == "body") //how check if the tag value is defined as "body"
-				{
-
-
-					backgroundColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we set our background color
-				}
-				else {
-					
-					bgColor = { (Uint8)parsed.r, (Uint8)parsed.g, (Uint8)parsed.b, 255 }; //we set our background color
-					hasBg = true;
-				}
-
+			
 			}
 
 
@@ -503,9 +503,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			}
 		}
 
-
-		
-
 		//we are gonna handle our flex stuff here.
 		//first check if its a flex node
 		if (IsFlex(node))
@@ -545,9 +542,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 					flexY += tallestChild + 8; //we move the y down
 					tallestChild = 0; //reset for the new row
 				}
-
 			}
-
 			//after we place the children, lets update the cursor to avoid overlapping
 
 			currentYpos = flexY + tallestChild + 8; //move it down!
@@ -556,11 +551,8 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			currentYpos += tallestChild + 20;
 			currentXpos = 20;
 
-
 			return;
-
 		}
-
 		//handle absolute pos
 		int absX = 0;
 		int absY = 0;
@@ -592,7 +584,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			return;
 		}
 
-
 		//this will let more stuff on one line, and will make the formating better
 		//first we check if its a structure block tag (div), (p), (h1)
 		// Block elements: push down to a new line
@@ -617,21 +608,151 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			currentXpos = ((currentXpos / 200) + 1) * 200;
 		}
 		
-		if (node->style == "center") //HANDLE CENTER TEXT
+		///////////////////// - text-align stuff - \\\\\\\\\\\\\\\\\\\\\\\
+
+		if (node->style.find("center") != std::string::npos) //HANDLE CENTER TEXT
 		{
 			std::cout << "ATTEMPT TO CENTER" << std::endl; //DEBUG
-			currentXpos = (WinW -node->measuredWidth) / 2; //Center middle
+			currentXpos = (WinW - node->measuredWidth) /2; //Center middle
 		}
-		if (node->style == "left") //HANDLE LEFT TEXT
+		if (node->style.find("left") != std::string::npos) //HANDLE LEFT TEXT
 		{
 			std::cout << "ATTEMPT TO LEFT" << std::endl; //DEBUG
 			currentXpos = 20; //basic left off the wall
 		}
-		if (node->style == "right") //HANDLE LEFT TEXT
+		if (node->style.find("right") != std::string::npos) //HANDLE LEFT TEXT
 		{
 			std::cout << "ATTEMPT TO RIGHT" << std::endl; //DEBUG
-			currentXpos = (WinW - 30) - node->measuredWidth; //Width - scroll bar width - text width.
+			currentXpos = (WinW - 30) - (node->measuredWidth); //Width - scroll bar width - text width.
 		}
+
+		///////////////////// - vertical-align stuff - \\\\\\\\\\\\\\\\\\\\\\\
+
+		if (node->style.find("top") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO place top" << std::endl; //DEBUG
+			currentYpos = 90; //Height, attempt to set the Ypos at the top
+		}
+		if (node->style.find("middle") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO place middle" << std::endl; //DEBUG
+			if (node->measuredHeight > 0 && WinH > 0)
+			{
+				currentYpos = (WinH / 2) - (node->measuredHeight / 2); //Height, attempt to set the Ypos at the middle
+			}
+		}
+		if (node->style.find("bottom") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO place bottom" << std::endl; //DEBUG
+			if (node->measuredHeight > 0 && WinH > 0)
+			{
+				currentYpos = WinH - (node->measuredHeight); //Height, attempt to set the Ypos at the middle
+			}
+		}
+
+		///////////////////// - color text stuff - \\\\\\\\\\\\\\\\\\\\\\\
+
+		if (node->style.find("textcolor:red") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO color red" << std::endl; //DEBUG
+			textColor = { 255, 0, 0, 255 };
+		}
+		if (node->style.find("textcolor:green") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO color green" << std::endl; //DEBUG
+			textColor = { 0, 255, 0, 255 };
+		}
+		if (node->style.find("textcolor:blue") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO color blue" << std::endl; //DEBUG
+			textColor = { 0, 0, 255, 255 };
+		}
+		if (node->style.find("textcolor:rgb") != std::string::npos) //HANDLE TOP TEXT
+		{
+			size_t rgbPos = node->style.find("rgb(");
+			std::string temp = node->style.substr(rgbPos + 4); // RM to 255,0,0)
+
+			temp.pop_back(); //rm the )
+
+			int comma1 = temp.find(',');
+			int comma2 = temp.find(',', comma1 + 1);
+
+			int r = std::stoi(temp.substr(0, comma1)); //convert the temp to stoi
+			int g = std::stoi(temp.substr(comma1 + 1, comma2 - comma1 - 1)); //convert the temp to stoi
+			int b = std::stoi(temp.substr(comma2 + 1)); //convert the temp to stoi
+			//std::string pullRGB = ;
+			
+			textColor = { (Uint8)r, (Uint8)g, (Uint8)b, 255 };
+		}
+		if (node->style.find("textcolor:#") != std::string::npos) //HANDLE TOP TEXT
+		{
+			size_t rgbPos = node->style.find("textcolor:#");
+			std::string HEXtemp = node->style.substr(rgbPos + 11); // RM to 255,0,0)
+			size_t sp = HEXtemp.find(' ');
+			if (sp != std::string::npos) HEXtemp = HEXtemp.substr(0, sp);
+
+			RGB temp = ParseHexColor(HEXtemp);
+			std::cout << "color:# is " << HEXtemp << std::endl;
+			textColor = { (Uint8)temp.r, (Uint8)temp.g, (Uint8)temp.b, 255 };
+		}
+
+		///////////////////// - color background text stuff - \\\\\\\\\\\\\\\\\\\\\\\
+
+		if (node->style.find("background-color:red") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO color bg red" << std::endl; //DEBUG
+			bgColor = { 255, 0, 0, 255 };
+
+			hasBg = true;
+		}
+		if (node->style.find("background-color:green") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO color bg green" << std::endl; //DEBUG
+			bgColor = { 0, 255, 0, 255 };
+
+			hasBg = true;
+		}
+		if (node->style.find("background-color:blue") != std::string::npos) //HANDLE TOP TEXT
+		{
+			std::cout << "ATTEMPT TO color bg blue" << std::endl; //DEBUG
+			bgColor = { 0, 0, 255, 255 };
+
+			hasBg = true;
+		}
+		if (node->style.find("background-color:rgb") != std::string::npos) //HANDLE TOP TEXT
+		{
+			size_t rgbPos = node->style.find("rgb(");
+			std::string temp = node->style.substr(rgbPos + 4); // RM to 255,0,0)
+
+			temp.pop_back(); //rm the )
+
+			int comma1 = temp.find(',');
+			int comma2 = temp.find(',', comma1 + 1);
+
+			int r = std::stoi(temp.substr(0, comma1)); //convert the temp to stoi
+			int g = std::stoi(temp.substr(comma1 + 1, comma2 - comma1 - 1)); //convert the temp to stoi
+			int b = std::stoi(temp.substr(comma2 + 1)); //convert the temp to stoi
+			//std::string pullRGB = ;
+
+			bgColor = { (Uint8)r, (Uint8)g, (Uint8)b, 255 };
+
+			hasBg = true;
+		}
+		if (node->style.find("background-color:#") != std::string::npos) //HANDLE TOP TEXT
+		{
+			size_t rgbPos = node->style.find("background-color:#");
+			std::string HEXtemp = node->style.substr(rgbPos + 18); // RM to 255,0,0)
+			size_t sp = HEXtemp.find(' ');
+			if (sp != std::string::npos) HEXtemp = HEXtemp.substr(0, sp);
+
+
+			RGB temp = ParseHexColor(HEXtemp);
+			std::cout << "color:# is " << HEXtemp << std::endl;
+			bgColor = { (Uint8)temp.r, (Uint8)temp.g, (Uint8)temp.b, 255 };
+
+			hasBg = true;
+		}
+
 		//check if its an image
 		//check if its a img and its not empty
 		if (node->tagValue == "img" && !node->src.empty())
@@ -664,20 +785,9 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 				currentXpos = 20;
 				currentYpos += node->measuredHeight + 15;
 			}
-
-
 		}
 
-
-
-
-
-
-
-
-
 	}
-
 
 	if (node->tag == NODETYPE::TEXT)
 	{
@@ -694,11 +804,13 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			currentXpos = 20; // reset columns for this new row
 		}
 
+		//recalc the font size, to prevent weird issues
+		node->measuredWidth = (int)(node->tagValue.size() * (fontsize * 0.45));
+		node->measuredHeight = fontsize + 4; 
+
 		layouttree.node = node;
 
 		//when i code css, this will get replaced merging the data.
-
-		
 
 		layouttree.textColor = textColor;
 
@@ -714,7 +826,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 
 		layouttree.href = currentHref;
-
 
 
 		//std::cout << layouttree.fontSize << std::endl;
@@ -737,17 +848,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			currentYpos += fontsize + 4;
 		}
 
-
-
-
-
-
-
-
-
-
-
-
 	}
 
 
@@ -757,23 +857,20 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 	}
 }
 
-
-
 int LayoutTree(Node* node)
 {
 
 	std::cout << "darkmode -> " << darkmode << std::endl; //DEBUG
 	PROFILE("LAYOUTTREE"); //PROFILE THE LAYOUTTREE
 
+	
 	layoutList.clear(); //we need to do this, or we will have errors
 
 	int currentY = 120; //update this, to fix text clipping
 	int currentX = 10;
 	int startingfontsize = (int)(14 * zoomAmount);
 
-
 	MeasureNodes(node, startingfontsize);
-	
 
 	//ok first we assign the node val to our new layout list
 	//now we set it to add the node
@@ -793,8 +890,8 @@ int LayoutTree(Node* node)
 	}
 
 	bool startingHasBg = false;
-																													//current Href starts empty
-	PositionNodes(node, currentX, currentY, startingfontsize, startingTextColor, startingBgColor, startingHasBg, "");
+																													
+	PositionNodes(node, currentX, currentY, startingfontsize, startingTextColor, startingBgColor, startingHasBg, ""); //current Href starts empty
 
 	std::cout << "Layout Complete." << std::endl;
 	

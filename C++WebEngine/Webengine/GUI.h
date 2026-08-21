@@ -9,6 +9,7 @@
 #include <chrono> //load the c-time.
 #include <fstream>  //for loading local files
 #include <sstream> // for the buffer
+#include "DOMTree.h"
 
 extern SDL_Color backgroundColor; // default white, but this needs to be global.
 
@@ -38,6 +39,7 @@ struct Tab //tab struct
 	//use long long to compress it, to prevent hitting the max on int
 	long long tabID = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); //create a tab id, for the new tab. set it to the current time to prevent overlap.
 
+	std::vector<CSSToken> css; //store the css per tab
 };
 
 extern float zoomAmount;

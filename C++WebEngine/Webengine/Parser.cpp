@@ -305,14 +305,8 @@ std::vector<HTMLToken> StripTags(std::string HtmlData)
 				tokenList.push_back(CurrentToken); //save the token
 
 				TokenStack.push_back(tagName); //save the name, like <'example'>
-			}
-
-
-				
+			}	
 		}
-				
-
-			
 		i = i + SaveVar.length(); //to not index the same thing again, we set the next i point, past the <, so that we find the next point
 	}
 		
@@ -429,9 +423,9 @@ std::string RemoveEverythingButCSS(std::string input) //this returns a string, a
 		size_t endpos = input.find("</style>", tag_end); //then find the end pos tag, '</style>'
 		if (endpos == std::string::npos) { break; } //if we can't find it, break
 
-
+		size_t len = endpos - (tag_end + 1); //calculate it better
 		//then we want add to our final, adding the inside part to our css list.
-		ReturnHtmlData.append(input, (tag_end + 1), (endpos - StartPos - 7));
+		ReturnHtmlData.append(input, (tag_end + 1), len);
 		
 
 		//then we check for the next one, and repeat!
@@ -583,11 +577,6 @@ int StripCSS(std::string input) { //this returns an int, and takes in a string.
 		cursor = end_pos + 1;
 	}
 
-
-
-
-
-
 	std::cout << "DONE! " << std::endl; //DEBUG
 
 	//send it to our DOMTREE
@@ -596,10 +585,6 @@ int StripCSS(std::string input) { //this returns an int, and takes in a string.
 
 	return 0; //done
 } //END OF STRIP CSS
-
-
-
-
 
 //=======PULL TITLE======\\
 
@@ -640,7 +625,6 @@ int Parser(std::string input) //this is the global class, and will manage the da
 	//strip the CSS.
 	StripCSS(
 		RemoveEverythingButCSS(input));
-
 	//strip to get the html, then send it to the DOM.
 	DOM(StripTags
 		(ManageNoScript(
@@ -655,9 +639,6 @@ int Parser(std::string input) //this is the global class, and will manage the da
 			) 
 		)
 	);
-	
-
-	
 	//grab the title
 	std::string title = PullTITLE(input);
 

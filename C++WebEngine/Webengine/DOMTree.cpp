@@ -5,7 +5,7 @@
 #include "Profiler.h" //DEBUG
 
 std::vector<CSSToken> globalCSS; //pull our global css class, and assign it (so that any other instances in layout.cpp, works.)
-
+bool cssUpdated = false; //set the cssUpdated to false
 
 
 //======COLLAPSE WHITESPACE======\\
@@ -55,7 +55,7 @@ std::string RemoveNewLineChars(const std::string& input) //this takes a const st
 
 int CSSDOM(std::vector<CSSToken> tokens) { //this takes in our custom CSSToken class ({ std::string id; std::vector<std::string> properties; }), and returns an int
 	globalCSS = tokens; //assign the globalCSS to the current token list, in parser.cpp.
-
+	cssUpdated = true;
 	return 0; //done, return 0;
 }
 
@@ -148,60 +148,90 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 				}
 			}
 
-
-			
 			size_t stylePos = rawToken.find("style=\""); //attempt to find the stylePos
 			if (stylePos != std::string::npos) //if it exists
 			{
-				size_t textalignPos = rawToken.find("text-align:"); //now that we have found the style, for our first run, we are going to attempt to see if its text-align:
-				if (textalignPos != std::string::npos)
+				size_t start = stylePos + 7; 
+				size_t end = rawToken.find("\"", start); //find the end part
+				if (end != std::string::npos)
 				{
-					size_t CenterPos = rawToken.find("center");
-					if (CenterPos != std::string::npos)
+					std::string rawStyle = std::string(rawToken.substr(start, (end - start)));
+					TempNode->style = ""; //reset to be clean
+
+					if (rawStyle.find("text-align:") != std::string::npos)
 					{
-						//OK, now lets grab everything past hte text-align
-						size_t StartPos = textalignPos + 11; //set the StartPos to start PAST, the text-align:.
-						size_t EndPos = rawToken.find("\"", StartPos); //find the end part
-						if (EndPos != std::string::npos)
-						{
-							//-1, as we will pick up the ;
-							std::cout << rawToken.substr(StartPos, (EndPos - 1) - StartPos) << std::endl; //DEBUG
-							TempNode->style = rawToken.substr(StartPos, (EndPos - 1) - StartPos); //grab only the inside part, like image.png.
-						}
+						if (rawStyle.find("center") != std::string::npos) { TempNode->style += "center "; std::cout << "added center, "; }
+						if (rawStyle.find("left") != std::string::npos) { TempNode->style += "left "; std::cout << "added left, "; }
+						if (rawStyle.find("right") != std::string::npos) { TempNode->style += "right "; std::cout << "added right, "; }
 					}
 
-					size_t LeftPos = rawToken.find("left");
-					if (LeftPos != std::string::npos)
+					if (rawStyle.find("vertical-align:") != std::string::npos)
 					{
-						//OK, now lets grab everything past hte text-align
-						size_t StartPos = textalignPos + 11; //set the StartPos to start PAST, the text-align:.
-						size_t EndPos = rawToken.find("\"", StartPos); //find the end part
-						if (EndPos != std::string::npos)
-						{
-							//-1, as we will pick up the ;
-							std::cout << rawToken.substr(StartPos, (EndPos - 1) - StartPos) << std::endl; //DEBUG
-							TempNode->style = rawToken.substr(StartPos, (EndPos - 1) - StartPos); //grab only the inside part, like image.png.
-						}
+						if (rawStyle.find("top") != std::string::npos) { TempNode->style += "top "; std::cout << "added top, "; }
+						if (rawStyle.find("middle") != std::string::npos) { TempNode->style += "middle "; std::cout << "added middle, "; }
+						if (rawStyle.find("bottom") != std::string::npos) { TempNode->style += "bottom "; std::cout << "added bottom, "; }
 					}
 
-					size_t RightPos = rawToken.find("right");
-					if (RightPos != std::string::npos)
+					if (rawStyle.find("color:") != std::string::npos && rawStyle.find("color:") != rawStyle.find("background-color:")) //if we find the color term, and we cannot find the backgroundcolor
 					{
-						//OK, now lets grab everything past hte text-align
-						size_t StartPos = textalignPos + 11; //set the StartPos to start PAST, the text-align:.
-						size_t EndPos = rawToken.find("\"", StartPos); //find the end part
-						if (EndPos != std::string::npos)
-						{
-							//-1, as we will pick up the ;
-							std::cout << rawToken.substr(StartPos, (EndPos - 1) - StartPos) << std::endl; //DEBUG
-							TempNode->style = rawToken.substr(StartPos, (EndPos - 1) - StartPos); //grab only the inside part, like image.png.
+						if (rawStyle.find("color:red") != std::string::npos) { TempNode->style += "textcolor:red "; std::cout << "added red color, "; } //if we find the color:red, we add to the style list, -> textcolor:red (we use textcolor to avoid issues)
+						if (rawStyle.find("color:green") != std::string::npos) { TempNode->style += "textcolor:green "; std::cout << "added green color, "; } //if we find the color:green, we add to the style list, -> textcolor:green (we use textcolor to avoid issues)
+						if (rawStyle.find("color:blue") != std::string::npos) { TempNode->style += "textcolor:blue "; std::cout << "added blue color, "; } //if we find the color:blue, we add to the style list, -> textcolor:blue (we use textcolor to avoid issues)
+
+
+						//HANDLE RAW COLORS
+						size_t rgbPos = rawStyle.find("color:rgb("); //NEED TO BE like this, to prevent overalap.
+						if (rgbPos != std::string::npos){
+							std::string rgbVal = rawStyle.substr(rgbPos);
+							TempNode->style += "text" + rgbVal + " "; std::cout << "added rgb color, ";
 						}
+						
+						size_t hexPos = rawStyle.find("color:#"); //NEED TO BE like this, to prevent overalap.
+						if (hexPos != std::string::npos) {
+							size_t hexEnd = rawStyle.find_first_of("; ", hexPos); //grab the end of the hex link
+							if (hexEnd == std::string::npos) hexEnd = rawStyle.size(); 
+							std::string hexVal = rawStyle.substr(hexPos, hexEnd - hexPos);
+							TempNode->style += "text" + hexVal + " "; std::cout << "added hex color, ";
+						}
+						//handle the RGB, not just the color names
 					}
 
+					if (rawStyle.find("background-color:") != std::string::npos)
+					{
+						if (rawStyle.find("background-color:red") != std::string::npos) { TempNode->style += "background-color:red "; std::cout << "added bg red color, "; }
+						if (rawStyle.find("background-color:green") != std::string::npos) { TempNode->style += "background-color:green "; std::cout << "added bg green color, "; }
+						if (rawStyle.find("background-color:blue") != std::string::npos) { TempNode->style += "background-color:blue "; std::cout << "added bg blue color, "; }
+
+						//HANDLE RAW COLORS
+						size_t rgbPos = rawStyle.find("background-color:rgb("); //NEED TO BE like this, to prevent overalap.
+						if (rgbPos != std::string::npos) {
+							std::string rgbVal = rawStyle.substr(rgbPos);
+							TempNode->style += rgbVal + " "; std::cout << "added bg rgb color, ";
+						}
+
+						size_t hexPos = rawStyle.find("background-color:#"); //NEED TO BE like this, to prevent overalap.
+						if (hexPos != std::string::npos) {
+							size_t hexEnd = rawStyle.find_first_of("; ", hexPos); //grab the end of the hex link
+							if (hexEnd == std::string::npos) hexEnd = rawStyle.size();
+							std::string hexVal = rawStyle.substr(hexPos, hexEnd - hexPos);
+							TempNode->style += hexVal + " "; std::cout << "added bg hex color, ";
+						}
+						//handle the RGB, not just the color names
+					}
+
+					//TODO - More of these.
+
+
+					//remove the spaces in the back
+					if (!TempNode->style.empty() && TempNode->style.back() == ' ')
+					{
+						TempNode->style.pop_back(); //remove the space
+					}
+
+					std::cout << std::endl;
 				}
 
-
-				//TODO - More of these.
+				
 				
 			}
 
@@ -223,8 +253,6 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 
 			
 			std::string_view MToken = rawToken; //temp var to hold our modified (cleaned) token.
-
-
 
 			//-------------------------------------------------------------------------------------
 
@@ -249,8 +277,6 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 			Temp = TempNode;
 		}
 
-
-		
 		if(currentToken.type == TokenType::TEXT) //check if its TEXT or not.
 		{
 			//ok, basically the same, however we don't move up our main dir, because this is text, not a dir
@@ -272,8 +298,6 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 		if (currentToken.type == TokenType::END)
 		{
 			//ok, we want to handle these tokens, by if we get them, we go back a directory.
-			
-			
 			if (Temp != nullptr && Temp->Parent != nullptr) //check that our Temp dir is not null, and our parent for the tag is not null
 			{
 				//if we pass
@@ -283,6 +307,7 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 		}
 
 	}
+	activeCSS = &globalCSS;
 	LayoutTree(Root); //ok send it to the layout
 
 	return 0;

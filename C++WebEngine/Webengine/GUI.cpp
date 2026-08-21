@@ -28,7 +28,6 @@
 
 #pragma endregion
 
-
 SDL_Texture* loadingTex = nullptr; //holds our GLOBAL loadingTexture "texture" -> so that multiple classes can use it! (displays just the loading...)
 
 std::string SearchProvider = "lite.duckduckgo.com/lite/?q="; //you can change this to whatever you want. (note, most do not work)
@@ -170,18 +169,18 @@ int UpdateHTML() //UPDATE HTML returns an int, and takes nothing in
 				}
 			</style></head><body>
 			<div>
-				<h1 style="center">C++Browse</h1>
-				<p style="center">This is my C++ web browser project.</p>
+				<h1 style="text-align:center;">C++Browse</h1>
+				<p style="text-align:center;">This is my C++ web browser project.</p>
        
 
-				<h1 style="center">To start, search anything. ы </h1>
+				<h1 style="text-align:center;">To start, search anything. ы </h1>
 				<h1>&nbsp;</h1>
 		)";
 
 			
 		if (!starredPages.empty()) //make sure that the starred pages list contain something
 		{
-			htmlFile << "        <br >Starred Pages:\n"; //small starred page header
+			htmlFile << "        <br>Starred Pages:\n"; //small starred page header
 			for (const std::string& site : starredPages) { //go through each line in starPages
 				
 				htmlFile << "        <p>ж -<a href=\"" << site << "\">" << site << "</a></p>\n"; //add the site to the html file, as a new line
@@ -195,13 +194,9 @@ int UpdateHTML() //UPDATE HTML returns an int, and takes nothing in
 
 
 		htmlFile.close(); //close the file
-
-
-
 	}
 	return 0; //end, return 0
 } //END OF UpdateHTML
-
 
 
 #pragma endregion
@@ -245,17 +240,22 @@ int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot) //IMPORT
 	tab.domRoot = newRoot; //update the tab with our new domRoot
 	tab.scrollpos = 40; //reset the tabs scroll pos to '40'
 	tab.layout = layoutGOTTEN; //update the old layout with our newer layoutGOTTEN vector
+
+	if (cssUpdated)
+	{
+		tab.css = globalCSS;
+		cssUpdated = false;
+	}
+	
 	if (idx == activeTab) { tabs[idx].url = urlInput; } //if the id of the tab = to the current tab, update the url with url input.
 	currentURL = urlInput; //update the current url setting it to the urlInput.
 	
 	return 0; //return 0
 } //END OF IMPORT
 
-
 #pragma endregion
 
 #pragma region //Handle URL PARSING
-
 
 //=======Percent Decode=======\\
 
@@ -523,14 +523,13 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 
 			urlInput = "history::tab";
 		}
-		std::string temp = "<html><head><title>History</title></head><body><h1 style=\"text-align:center;\">" + tabs[TabBefore].title + "'s Tab Search History" + "</h1><p style=\"text-align:right;\">This text is right.</p></body></html>";
+		std::string temp = "<html><head><title>History</title></head><body><h1 style=\"text-align:center; vertical-align:top; color:#FF0000; background-color:blue;\">" + tabs[TabBefore].title + "'s Tab Search History" + "</h1><p style=\"vertical-align:middle;\">This text is right.</p></body></html>";
 
 		Parser(temp);
 		return;
 	}
 	if (target.find("settings::tab") == 0) //check if the target contains the value settings::tab
-	{
-		
+	{	
 		{
 			std::lock_guard<std::mutex> lock(gTabsMutex); //lock to insure no corruption
 			auto& active = tabs[activeTab]; //create a temp var to hold our active tab
@@ -627,12 +626,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 				tab.history.push_back(resolvedTarget); //if so, we add the new URL to the end of the history vector
 				tab.historypos = tab.history.size() - 1; //update the history index, so it maches the current url
 			}
-
 		}
-
-
 	} //Release the gTabMutex Lock
-
 
 	//LOADING UI ---
 	Layout loadingMSG{}; //create a new layout
@@ -641,7 +636,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 	loadingMSG.fontSize = 72; //set the font size to 72
 	loadingMSG.isImage = false; //set the isImage to false
 
-	
 	SDL_Color loadColor; //create the texture color
 	if (darkmode) //if darkmode is on
 	{
@@ -669,7 +663,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 		}
 
 	}//Release the ttfLock 
-
 
 	std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex);
 	auto& active = tabs[activeTab]; //temp var for cleanness
@@ -745,32 +738,58 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 
 	for (int i = 0; i < (int)tabs[activeTab].layout.size(); i++) { //loop for each element in the vector
 
-		if (lasty != -1 && tabs[activeTab].layout[i].y > lasty) //if the last y not == 1 (prevents running on the first loop) and the layout[i].y > lasty
+		//first check if we have a custom Y element
+		bool CustomY = tabs[activeTab].layout[i].node && (tabs[activeTab].layout[i].node->style.find("top") != std::string::npos ||
+														  tabs[activeTab].layout[i].node->style.find("middle") != std::string::npos ||
+														  tabs[activeTab].layout[i].node->style.find("center") != std::string::npos ||
+														  tabs[activeTab].layout[i].node->style.find("left") != std::string::npos ||
+														  tabs[activeTab].layout[i].node->style.find("right") != std::string::npos ||
+														  tabs[activeTab].layout[i].node->style.find("bottom") != std::string::npos); //will add more
+		if (CustomY) //if its not custom
 		{
-			xtrack = 20; //it is, so now lets set the x track to 20;
-			ytrack += (maxLineHeight + 15); //update the y track, moving it down by the max line height + 15
-			maxLineHeight = 0; //set the new maxLineHeight to 0, for this new line
+			int bottomY = tabs[activeTab].layout[i].y + tabs[activeTab].layout[i].height;
+			
+			if (bottomY > ytrack)
+			{
+				xtrack = 20; //it is, so now lets set the x track to 20;
+				ytrack = bottomY + 15;
+
+				maxLineHeight = 0; //set the new maxLineHeight to 0, for this new line
+			}
+			
+			if (bottomY > lasty)
+			{
+				lasty = bottomY;
+			}
 		}
+		else {
+			if (lasty != -1 && tabs[activeTab].layout[i].y > lasty) //if the last y not == 1 (prevents running on the first loop) and the layout[i].y > lasty
+			{
+				xtrack = 20; //it is, so now lets set the x track to 20;
+				ytrack += (maxLineHeight + 15);
 
-		lasty = tabs[activeTab].layout[i].y; //update the last y with the current letters 'y'
+				maxLineHeight = 0; //set the new maxLineHeight to 0, for this new line
+			}
+
+			lasty = tabs[activeTab].layout[i].y; //update the last y with the current letters 'y'
+
+			if (tabs[activeTab].layout[i].x > 20) //check if this is a table with a column offset larger than 20
+			{
+				//pick whatever x cords is further to the right
+				int colX = (std::max)(xtrack, tabs[activeTab].layout[i].x);
+				tabs[activeTab].layout[i].x = colX; //apply the updated x pos
+			}
+			else //if its not
+			{
+				//if its normal text, assign our current x track pos
+				tabs[activeTab].layout[i].x = xtrack;
+			}
 
 
-
-		if (tabs[activeTab].layout[i].x > 20) //check if this is a table with a column offset larger than 20
-		{
-			//pick whatever x cords is further to the right
-			int colX = (std::max)(xtrack, tabs[activeTab].layout[i].x);
-			tabs[activeTab].layout[i].x = colX; //apply the updated x pos
+			tabs[activeTab].layout[i].y = ytrack; // update the element's actual y screen pos too our current row
 		}
-		else //if its not
-		{
-			//if its normal text, assign our current x track pos
-			tabs[activeTab].layout[i].x = xtrack;
-		}
-
-
-		tabs[activeTab].layout[i].y = ytrack; // update the element's actual y screen pos too our current row
-
+		
+		
 
 		//check if the node is text, and make sure it hasn't generated a texture yet, and hasnt been attempted yet
 		if (tabs[activeTab].layout[i].textTex == nullptr && !tabs[activeTab].layout[i].isImage && !tabs[activeTab].layout[i].textAttempted && tabs[activeTab].layout[i].node != nullptr)
@@ -880,6 +899,16 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 					tabs[activeTab].layout[i].width = w;
 					tabs[activeTab].layout[i].height = h;
 					tabs[activeTab].layout[i].textTex = tex;
+
+					//if its a movement style...
+					if (tabs[activeTab].layout[i].node && tabs[activeTab].layout[i].node->style.find("center") != std::string::npos)
+					{
+						tabs[activeTab].layout[i].x = (WinW - w) / 2;
+					}
+					else if (tabs[activeTab].layout[i].node && tabs[activeTab].layout[i].node->style.find("right") != std::string::npos)
+					{
+						tabs[activeTab].layout[i].x = (WinW - 30) - w;
+					}
 				}
 			}
 		}
@@ -996,21 +1025,31 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 					tabs[activeTab].layout[i].width = w;
 					tabs[activeTab].layout[i].height = h;
 					tabs[activeTab].layout[i].imageTex = tex;
+
+					//if its a movement style...
+					if (tabs[activeTab].layout[i].node && tabs[activeTab].layout[i].node->style.find("center") != std::string::npos)
+					{
+						tabs[activeTab].layout[i].x = (WinW - w) / 2;
+					}
+					else if (tabs[activeTab].layout[i].node && tabs[activeTab].layout[i].node->style.find("right") != std::string::npos)
+					{
+						tabs[activeTab].layout[i].x = (WinW - 30) - w;
+					}
 				}
 			}
 		}
-		//update the max line height, if its taller than its previous element
-		if (tabs[activeTab].layout[i].height > maxLineHeight)
+
+		if (!CustomY)
 		{
-			maxLineHeight = tabs[activeTab].layout[i].height;
+			//update the max line height, if its taller than its previous element
+			if (tabs[activeTab].layout[i].height > maxLineHeight)
+			{
+				maxLineHeight = tabs[activeTab].layout[i].height;
+			}
+
+			//move the x by the width of the text + 12 for padding.
+			xtrack += (tabs[activeTab].layout[i].width + 12);
 		}
-
-
-		//move the x by the width of the text + 12 for padding.
-		xtrack += (tabs[activeTab].layout[i].width + 12);
-
-
-
 	}
 
 } // END OF PreRender
@@ -1103,58 +1142,76 @@ bool isHoverd(SDL_FRect rect) { return (mouseX >= rect.x && mouseX <= (rect.x + 
 
 void ReloadTabLayout()
 {
-	if (tabs.empty() || activeTab < 0 || activeTab >= tabs.size()) return;
+	if (tabs.empty() || activeTab < 0 || activeTab >= tabs.size()) { return;  } //if the tabs are out of loading, or empty, dont do this
 
-	// 1. Increment loadGen to cancel any pending background thread jobs
-	tabs[activeTab].loadGen++;
-
-	// 2. SAVE OLD IMAGES! Map the old image source paths to their GPU textures.
-	std::unordered_map<std::string, SDL_Texture*> oldImageCache;
-	for (const auto& item : tabs[activeTab].layout) {
-		if (item.isImage && item.imageTex != nullptr && item.node != nullptr) {
-			oldImageCache[item.node->src] = item.imageTex;
-		}
-		else if (item.textTex) {
-			SDL_DestroyTexture(item.textTex); // Destroy old text, it recalculates fast
-		}
+	Node* root = tabs[activeTab].domRoot; //build a new root
+	if (root == nullptr)
+	{
+		return;
 	}
 
-	// 3. Clear current layout (images are safe in our cache!)
-	tabs[activeTab].layout.clear();
+	//now that we know we are for SURE loading the new stuff, first save the current scroll pos
+	float oldScrollPos = tabs[activeTab].scrollpos;
 
-	// 4. Set domRoot to nullptr so LayoutTree's internal IMPORT doesn't delete the tree!
-	Node* root = tabs[activeTab].domRoot;
-	tabs[activeTab].domRoot = nullptr;
+	std::unordered_map<std::string, SDL_Texture*> oldImageCache; //holds the old images
+	
+	{ //LOCK
+		
+		std::lock_guard<std::mutex> lock(gTabsMutex);
+		tabs[activeTab].loadGen++; //increase the loadGen, stopping other threads
 
-	// 5. Recalculate! (Calls LayoutTree, which calls IMPORT)
-	LayoutTree(root);
+		for (auto& item : tabs[activeTab].layout) {
 
-	// 6. RESTORE OLD IMAGES! Loop through the newly generated layout
-	for (auto& newItem : tabs[activeTab].layout) {
-		if (newItem.isImage && newItem.node != nullptr) {
-			auto it = oldImageCache.find(newItem.node->src);
-			if (it != oldImageCache.end()) {
-				// We found this image! Apply it to the new layout.
-				newItem.imageTex = it->second;
-				newItem.imageAttempted = true; // Tell PreRender to skip downloading!
+			if (item.isImage && item.imageTex != nullptr && item.node != nullptr) //if the item has an image, is an image, and has a texture...
+			{
+				oldImageCache[item.node->src] = item.imageTex; //save the imageTex
+				item.imageTex = nullptr;
+			}
+		}
+	}
+	
+	tabs[activeTab].domRoot = nullptr; //force layouttree to regen the 
 
-				// FIX: Use temporary floats, then cast to int
-				float w, h;
-				SDL_GetTextureSize(newItem.imageTex, &w, &h);
-				newItem.width = (int)w;
-				newItem.height = (int)h;
+	activeCSS = &tabs[activeTab].css;
 
-				oldImageCache.erase(it); // Remove from cache so we don't delete it
+	LayoutTree(root); //regen
+
+	tabs[activeTab].scrollpos = oldScrollPos; //make sure to set the scroll pos, to prevent teleportation to the top of the page
+
+	//ok, load images back
+	{ //LOCK
+		std::lock_guard<std::mutex> lock(gTabsMutex);
+		for (auto& newitem : tabs[activeTab].layout) {
+			if (newitem.isImage && newitem.node != nullptr)
+			{
+				auto img = oldImageCache.find(newitem.node->src); //attempt to see if its an image node
+				if (img != oldImageCache.end()) //if so...
+				{
+					newitem.imageTex = img->second; //set the newitem, to the imageText
+
+					newitem.imageAttempted = true; //mark we started (like how we load above)
+					
+					float w, h; //hold w and h
+
+					SDL_GetTextureSize(newitem.imageTex, &w, &h); //get the size of the text, and its w + h
+
+					newitem.width = w;
+					newitem.height = h;
+
+					oldImageCache.erase(img); //we done, to prevent mem leak
+				}
 			}
 		}
 	}
 
-	// 7. CLEAN UP LEAKS! Destroy any images that weren't used in the new layout
-	for (auto& pair : oldImageCache) {
-		if (pair.second) SDL_DestroyTexture(pair.second);
+	//Destory all the extra old images
+	for (auto& pair : oldImageCache)
+	{
+		if (pair.second) { SDL_DestroyTexture(pair.second); } //if the second part contains an image, rm
 	}
 
 
+	
 
 }
 
@@ -1206,15 +1263,16 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 	const float topMargin = 37.0f; // dist from the top of the window
 
 	bool running = true; //this var gets set to false when the window is closed, cleanly ending this.
+	static bool RecalcLayout = false;
+	static float LastTickSinceRecalcLayout = 0; 
 
-
-
+	
 	//LOAD
 	if (!StartingTab.empty())
 	{
 		NavigateTo(StartingTab, render, font);
+		ReloadTabLayout(); //reload before start
 	}
-	
 
 	while (running) //loop till running is false
 	{
@@ -1228,12 +1286,26 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 				WinW = event.window.data1; //update the Width
 				WinH = event.window.data2; //update the height
 
-				float OldScrollPos = tabs[activeTab].scrollpos; //save the old scrollPos
-				ReloadTabLayout(); //reload
-				tabs[activeTab].scrollpos = OldScrollPos; //New scroll pos
+				RecalcLayout = true;
+				LastTickSinceRecalcLayout = SDL_GetTicks(); //get the ticks
 			}
 
 			if (event.type == SDL_EVENT_QUIT) { running = false; } //if the window 'x' close button is pressed, we end the loop
+
+			if (event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN)
+			{
+				ReloadTabLayout();
+			}
+			if (event.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN)
+			{
+				ReloadTabLayout();
+			}
+
+
+
+
+
+
 
 			mouseX = event.button.x; //save the pos of the mouseX
 			mouseY = event.button.y; //save the pos of the mouseY
@@ -1949,9 +2021,17 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 							//check if the tab itself was clicked
 							if (mouseX >= tabX && mouseX <= tabX + tabW)
 							{
-								std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
-								activeTab = t; //set the active tab, to the current tab we just pressed
-								urlInput = tabs[activeTab].url; //then update the url input to the tab we pressed
+
+								{
+									std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
+									activeTab = t; //set the active tab, to the current tab we just pressed
+
+									lastsearchedtabID = tabs[activeTab].tabID; //save the last search tab, to avoid overwriting it
+
+									urlInput = tabs[activeTab].url; //then update the url input to the tab we pressed
+								}
+
+								ReloadTabLayout(); //update the thing
 								break; //exit, we are done
 							}
 							tabX += tabW + 2; //move the collider box to the next tab
@@ -2013,6 +2093,17 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 		}
 
 		#pragma endregion
+
+		//recalc layout
+		if (RecalcLayout && SDL_GetTicks() - LastTickSinceRecalcLayout > 100)
+		{
+			float OldScrollPos = tabs[activeTab].scrollpos; //save the old scrollPos
+			ReloadTabLayout(); //reload
+			tabs[activeTab].scrollpos = OldScrollPos; //New scroll pos
+
+			RecalcLayout = false;
+		}
+
 
 		// --- RENDERING --- \\
 
@@ -2813,10 +2904,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 				SDL_DestroyTexture(PERFORMANCETex); //we are done, destroy the texture
 				SDL_DestroySurface(PERFORMANCESurf); //we are done, destroy the surface
 			}
-
 		}
-
-
 		SDL_RenderPresent(render); //Send our final render, with all the data, to the screen
 	}
 	//we need to quit to clean up all the subsystems
