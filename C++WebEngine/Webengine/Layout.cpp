@@ -7,8 +7,8 @@
 #include "Profiler.h"
 
 
-
-
+#include <algorithm>
+#include <cctype>
 
 
 
@@ -203,7 +203,7 @@ RGB hexToRgb(const static unsigned int hexValue) //This funct returns our custom
 	color.g = (hexValue >> 8) & 0xFF;  // Extract the middle 2 hex digits
 	color.b = hexValue & 0xFF;         // Extract the last 2 hex digits
 
-	if (darkmode) //if darkmode is enabled
+	if (darkmode && (color.r == 0 && color.g == 0 && color.b == 0) || (color.r == 255 && color.g == 255 && color.b == 255)) //if darkmode is enabled, and the color is white o black
 	{
 		//convert r -> (255 -r)
 		color.r = (255 - color.r);
@@ -275,6 +275,41 @@ RGB ParseHexColor(std::string hex) // This funct returns our custom RGB class ({
 std::vector<Layout> layoutList; //create a custom 'vector', holding our custom Layout struct. This is a global list to hold it all
 
 
+int SetFontSize(const Node* node)
+{
+	size_t fsPos = node->style.find("font-size"); //attempt to find the font size
+	if (fsPos == std::string::npos) return -1; //if we didnt find it...
+
+	std::string TextSize = node->style.substr(fsPos + 10); //grab the text size
+	size_t sp = TextSize.find(' ');
+	if (sp != std::string::npos) TextSize = TextSize.substr(0, sp);
+
+	if (TextSize.find("px") != std::string::npos)
+	{
+		TextSize.resize(TextSize.size() - 2); //rm px
+	}
+
+	if (!TextSize.empty() && std::isdigit((unsigned char)TextSize[0]))
+	{
+		return std::stoi(TextSize); //return the text size
+	}
+
+	return -1;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 //=======Measure Nodes======\\
 
 //Measure Nodes calculates layout dimensions of elements, and accounts for font sizes and images.
@@ -312,6 +347,8 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 		else if (node->tagValue == "span") { fontsize = 36; }
 	}
 
+	int SetFS = SetFontSize(node); //grab the value off our node
+	if (SetFS > 0) fontsize = SetFS; //if its bigger than 1, set it.
 	//HANDLE IMAGES
 	if (node->tag == NODETYPE::START && node->tagValue == "img" && !node->src.empty()) //check if its a START node, the tagValue contains "img", and the link of the img is NOT empty.
 	{
@@ -370,7 +407,7 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 
 
 //This code handles positioning our nodes, and handling/assigning/creating the layout tree.
-void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref, bool inFlex = false) //this code returns nothing, and takes in 3 ints, our custom Node* class, 2 SDL_COLOR's, 2 Bools, and a String.
+void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, int fontWeight, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref, bool inFlex = false) //this code returns nothing, and takes in 3 ints, our custom Node* class, 2 SDL_COLOR's, 2 Bools, and a String.
 {
 	
 	if (node->tag == NODETYPE::START) //check if the current node's value is a NODETYPE::START tag.
@@ -503,6 +540,9 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			}
 		}
 
+		int SetFS = SetFontSize(node); //grab the value off our node
+		if (SetFS > 0) fontsize = SetFS; //if its bigger than 1, set it.
+
 		//we are gonna handle our flex stuff here.
 		//first check if its a flex node
 		if (IsFlex(node))
@@ -525,7 +565,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 				int childY = flexY;
 
 				//change the pos of each child at the flex pos
-				PositionNodes(child, childX, childY, fontsize, textColor, bgColor, hasBg, currentHref, true);
+				PositionNodes(child, childX, childY, fontsize, fontWeight, textColor, bgColor, hasBg, currentHref, true);
 
 
 				//forgot to update this! it wont work wihout
@@ -573,7 +613,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			//render 
 			for (Node* child : node->children)
 			{
-				PositionNodes(child, currentXpos, currentYpos, fontsize, textColor, bgColor, hasBg, currentHref, false);
+				PositionNodes(child, currentXpos, currentYpos, fontsize, fontWeight, textColor, bgColor, hasBg, currentHref, false);
 			}
 
 			//update the current x and y pos back, as we need them
@@ -615,25 +655,44 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			std::cout << "ATTEMPT TO CENTER" << std::endl; //DEBUG
 			currentXpos = (WinW - node->measuredWidth) /2; //Center middle
 		}
-		if (node->style.find("left") != std::string::npos) //HANDLE LEFT TEXT
+		else if (node->style.find("left") != std::string::npos) //HANDLE LEFT TEXT
 		{
 			std::cout << "ATTEMPT TO LEFT" << std::endl; //DEBUG
 			currentXpos = 20; //basic left off the wall
 		}
-		if (node->style.find("right") != std::string::npos) //HANDLE LEFT TEXT
+		else if (node->style.find("right") != std::string::npos) //HANDLE LEFT TEXT
 		{
 			std::cout << "ATTEMPT TO RIGHT" << std::endl; //DEBUG
 			currentXpos = (WinW - 30) - (node->measuredWidth); //Width - scroll bar width - text width.
 		}
+		else if (node->style.find("text-align:") != std::string::npos)
+		{
+			//we can lowkey guess that its going to be a number...
+			size_t VAPos = node->style.find("text-align:");
+			std::string VAVAL = node->style.substr(VAPos + 11); // RM to number
+			size_t sp = VAVAL.find(' ');
+			if (sp != std::string::npos) VAVAL = VAVAL.substr(0, sp);
 
+			//ok, before we assing, check if its a int, and does not contain any chars
+			std::cout << "ATTEMPT TO ADD CUSTOM POS" << VAVAL << std::endl;
+			if (!VAVAL.empty() && std::all_of(VAVAL.begin(), VAVAL.end(), [](unsigned char c) {return std::isdigit(c); }))
+			{
+				int num = std::stoi(VAVAL);
+				std::cout << "PASSED" << num << std::endl;
+
+				currentXpos = num;
+			}
+		}
 		///////////////////// - vertical-align stuff - \\\\\\\\\\\\\\\\\\\\\\\
 
+	
 		if (node->style.find("top") != std::string::npos) //HANDLE TOP TEXT
 		{
 			std::cout << "ATTEMPT TO place top" << std::endl; //DEBUG
-			currentYpos = 90; //Height, attempt to set the Ypos at the top
+			currentYpos = 120; //Height, attempt to set the Ypos at the top
+			
 		}
-		if (node->style.find("middle") != std::string::npos) //HANDLE TOP TEXT
+		else if (node->style.find("middle") != std::string::npos) //HANDLE TOP TEXT
 		{
 			std::cout << "ATTEMPT TO place middle" << std::endl; //DEBUG
 			if (node->measuredHeight > 0 && WinH > 0)
@@ -641,12 +700,30 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 				currentYpos = (WinH / 2) - (node->measuredHeight / 2); //Height, attempt to set the Ypos at the middle
 			}
 		}
-		if (node->style.find("bottom") != std::string::npos) //HANDLE TOP TEXT
+		else if (node->style.find("bottom") != std::string::npos) //HANDLE TOP TEXT
 		{
 			std::cout << "ATTEMPT TO place bottom" << std::endl; //DEBUG
 			if (node->measuredHeight > 0 && WinH > 0)
 			{
-				currentYpos = WinH - (node->measuredHeight); //Height, attempt to set the Ypos at the middle
+				currentYpos = WinH - (node->measuredHeight); //Height, attempt to set the Ypos at the bottom
+			}
+		}
+		else if (node->style.find("vertical-align:") != std::string::npos)
+		{
+			//we can lowkey guess that its going to be a number...
+			size_t VAPos = node->style.find("vertical-align:");
+			std::string VAVAL = node->style.substr(VAPos + 15); // RM to number
+			size_t sp = VAVAL.find(' ');
+			if (sp != std::string::npos) VAVAL = VAVAL.substr(0, sp);
+
+			//ok, before we assing, check if its a int, and does not contain any chars
+			std::cout << "ATTEMPT TO ADD CUSTOM POS" << VAVAL << std::endl;
+			if (!VAVAL.empty() && std::all_of(VAVAL.begin(), VAVAL.end(), [](unsigned char c) {return std::isdigit(c); }))
+			{
+				int num = std::stoi(VAVAL);
+				std::cout << "PASSED" << num << std::endl;
+
+				currentYpos = num;
 			}
 		}
 
@@ -695,7 +772,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			std::cout << "color:# is " << HEXtemp << std::endl;
 			textColor = { (Uint8)temp.r, (Uint8)temp.g, (Uint8)temp.b, 255 };
 		}
-
 		///////////////////// - color background text stuff - \\\\\\\\\\\\\\\\\\\\\\\
 
 		if (node->style.find("background-color:red") != std::string::npos) //HANDLE TOP TEXT
@@ -751,6 +827,39 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			bgColor = { (Uint8)temp.r, (Uint8)temp.g, (Uint8)temp.b, 255 };
 
 			hasBg = true;
+		}
+		///////////////////// - TEXT HANDLING stuff - \\\\\\\\\\\\\\\\\\\\\\\
+		 
+		//FONT SIZE HAS BEEN MOVED TO 'SetFontSize(node)' fontWeight
+		if (node->style.find("font-weight:normal") != std::string::npos) //HANDLE CENTER TEXT
+		{
+			std::cout << "ATTEMPT TO NORMAL" << std::endl; //DEBUG
+			fontWeight = TTF_FONT_WEIGHT_NORMAL;
+		}
+		else if (node->style.find("font-weight:bold") != std::string::npos) //HANDLE LEFT TEXT
+		{
+			std::cout << "ATTEMPT TO BOLD" << std::endl; //DEBUG
+			fontWeight = TTF_FONT_WEIGHT_BOLD;
+		}
+		else if (node->style.find("font-weight:") != std::string::npos)
+		{
+			//we can lowkey guess that its going to be a number...
+			size_t FWPos = node->style.find("font-weight:");
+			std::string FWVAL = node->style.substr(FWPos + 12); // RM to number
+			size_t sp = FWVAL.find(' ');
+			if (sp != std::string::npos) FWVAL = FWVAL.substr(0, sp);
+
+			//ok, before we assing, check if its a int, and does not contain any chars
+			std::cout << "ATTEMPT TO ADD CUSTOM WEIGHT" << FWVAL << std::endl;
+			if (!FWVAL.empty() && std::all_of(FWVAL.begin(), FWVAL.end(), [](unsigned char c) {return std::isdigit(c); }))
+			{
+				int num = std::stoi(FWVAL);
+				std::cout << "PASSED" << num << std::endl;
+				
+				fontWeight = num;
+			}
+
+
 		}
 
 		//check if its an image
@@ -812,6 +921,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 		//when i code css, this will get replaced merging the data.
 
+		
 		layouttree.textColor = textColor;
 
 		if (!currentHref.empty())
@@ -819,6 +929,8 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			layouttree.textColor = { 0, 50, 255, 255 }; //blue
 		}
 		layouttree.fontSize = fontsize;
+
+		layouttree.fontWeight = fontWeight;
 
 		layouttree.bgColor = bgColor;
 
@@ -850,10 +962,10 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 	}
 
-
+	
 	for (Node* child : node->children)
 	{
-		PositionNodes(child, currentXpos, currentYpos, fontsize, textColor, bgColor, hasBg, currentHref, false);
+		PositionNodes(child, currentXpos, currentYpos, fontsize, fontWeight, textColor, bgColor, hasBg, currentHref, false);
 	}
 }
 
@@ -863,13 +975,12 @@ int LayoutTree(Node* node)
 	std::cout << "darkmode -> " << darkmode << std::endl; //DEBUG
 	PROFILE("LAYOUTTREE"); //PROFILE THE LAYOUTTREE
 
-	
 	layoutList.clear(); //we need to do this, or we will have errors
 
 	int currentY = 120; //update this, to fix text clipping
 	int currentX = 10;
 	int startingfontsize = (int)(14 * zoomAmount);
-
+	int startingfontWeight = TTF_FONT_WEIGHT_NORMAL;
 	MeasureNodes(node, startingfontsize);
 
 	//ok first we assign the node val to our new layout list
@@ -891,7 +1002,7 @@ int LayoutTree(Node* node)
 
 	bool startingHasBg = false;
 																													
-	PositionNodes(node, currentX, currentY, startingfontsize, startingTextColor, startingBgColor, startingHasBg, ""); //current Href starts empty
+	PositionNodes(node, currentX, currentY, startingfontsize, startingfontWeight, startingTextColor, startingBgColor, startingHasBg, ""); //current Href starts empty
 
 	std::cout << "Layout Complete." << std::endl;
 	

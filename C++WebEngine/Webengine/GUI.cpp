@@ -82,6 +82,12 @@ int lastsearchedtabID; //holds the id of the last searched tab.
 //SETTINGS
 bool ShowPerformace = false;
 bool ShowSettingsMenu = false;
+
+
+
+//GLOBAL HISTORY
+std::vector<std::pair<std::string, std::string>> GlobalHistory; //create a vector that holds an 2 strings, (one string will hold time), string will hold the link.
+
 #pragma endregion
 
 #pragma region //Create First Tab (On Start)
@@ -105,6 +111,96 @@ struct TabInit { //as soon as GUI is started, we run this before everything, thi
 } _tabInit; //insure it runs on start
 
 #pragma endregion
+
+
+#pragma region //GLOBAL History STUFF
+void DestoryHistory()
+{
+	std::ofstream historyFile("History.history", std::ios::trunc); //clear the file
+
+	if (!historyFile.is_open())
+	{
+		std::cerr << "COULD NOT OPEN FILE. ERR" << std::endl;
+		return;
+	}
+
+	historyFile.close(); //we are done
+
+	return;
+}
+void AddToHistory(std::string link)
+{
+	//OK, now that we have the link the user searched, lets first pull the current time
+	auto now = std::chrono::system_clock::now();
+	std::string time = std::format("{:%Y-%m-%d %H:%M}", now);
+	
+
+	//now that we have both info, lets add to our list...
+	GlobalHistory.push_back({ time, link });
+
+	//now that we have added it to the list, lets now load it into a file...
+	std::ofstream historyFile("History.history", std::ios::trunc);  //open the file "History.history" but overwrite everything in it
+
+	if (!historyFile.is_open())
+	{
+		std::cerr << "COULD NOT OPEN FILE. ERR" << std::endl;
+		return;
+	}
+	for  (auto const history : GlobalHistory) { //go through each line in starPages
+		historyFile << history.first + " | " + history.second + "\n";
+	}
+
+	historyFile.close(); //we are done
+
+	return;
+}
+void LoadFromHistory() //load from the list... this will be used on things like new tab creation.
+{
+	//lets load onto the list...
+	std::ifstream historyFile("History.history");  //open the file "History.history" but leave it as a readme
+
+
+	if (!historyFile.is_open())
+	{
+		std::cerr << "COULD NOT OPEN FILE. ERR" << std::endl;
+		return;
+	}
+
+	//now we are loaded, lets clear the GlobHist to prevent errors
+	GlobalHistory.clear();
+	//now lets read it line by line
+	std::string line;
+
+	while (std::getline(historyFile, line))
+	{
+		//ok, now we grab the line, but we need to populate the GlobalHistory
+		size_t breakPos = line.find("|");
+
+		if (breakPos == std::string::npos) break;
+
+		std::string dateTemp = line.substr(0, breakPos);
+		std::string urlTemp = line.substr(breakPos + 1);
+
+		while (!urlTemp.empty() && urlTemp.front() == ' ')
+		{
+			urlTemp.erase(urlTemp.begin());
+		}
+		while (!urlTemp.empty() && urlTemp.back() == ' ')
+		{
+			urlTemp.pop_back();
+		}
+		std::cout << "GRABBED " << dateTemp << " & " << urlTemp << std::endl;
+
+		GlobalHistory.push_back({ dateTemp, urlTemp }); //push back the date and url Temp's
+	}
+
+	historyFile.close(); //we are done
+
+	return;
+}
+
+#pragma endregion
+
 
 #pragma region //Handle Star Functions
 
@@ -151,7 +247,7 @@ int UpdateHTML() //UPDATE HTML returns an int, and takes nothing in
 					font-size: 36px;
 				}
 				p {
-					color: #111111;
+					color: #444444;
 					font-size: 24px;
 				}
 				a {
@@ -169,15 +265,15 @@ int UpdateHTML() //UPDATE HTML returns an int, and takes nothing in
 				}
 			</style></head><body>
 			<div>
-				<h1 style="text-align:center;">C++Browse</h1>
-				<p style="text-align:center;">This is my C++ web browser project.</p>
+				<h1 style="text-align:center; font-weight:900;">C++Browse</h1>
+				<p style="text-align:center; vertical-align:300;">This is my C++ web browser project.</p>
        
 
-				<h1 style="text-align:center;">To start, search anything. ы </h1>
+				<h1 style="text-align:center; vertical-align:400;">To start, search anything. ы </h1>
+
 				<h1>&nbsp;</h1>
 		)";
 
-			
 		if (!starredPages.empty()) //make sure that the starred pages list contain something
 		{
 			htmlFile << "        <br>Starred Pages:\n"; //small starred page header
@@ -190,8 +286,7 @@ int UpdateHTML() //UPDATE HTML returns an int, and takes nothing in
 			htmlFile << "<br>No Starred Pages\n"; //display that
 		}
 
-		htmlFile << R"(    </div></body></html>)"; //end peices, to insure its valid html
-
+		htmlFile << R"( </div></body></html>)"; //end peices, to insure its valid html
 
 		htmlFile.close(); //close the file
 	}
@@ -462,7 +557,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 
 				urlInput = path; 	//clear the url input, as it is a new tab
 			}
-
 			Parser(fileinfo); //now we inject it into the parser, to force it to load this html
 			return; //return.
 		}
@@ -504,6 +598,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 	}
 	if (target.find("history::tab") == 0) //check if the target contains the value history::tab
 	{
+		LoadFromHistory(); //first load history
+		
 		//if so, load custom html file. (like new::tab)
 		{
 			std::lock_guard<std::mutex> lock(gTabsMutex); //lock to insure no corruption
@@ -523,7 +619,36 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 
 			urlInput = "history::tab";
 		}
-		std::string temp = "<html><head><title>History</title></head><body><h1 style=\"text-align:center; vertical-align:top; color:#FF0000; background-color:blue;\">" + tabs[TabBefore].title + "'s Tab Search History" + "</h1><p style=\"vertical-align:middle;\">This text is right.</p></body></html>";
+		std::string temp = R"(
+									<head>
+										<title>History</title>
+									</head>
+									<body>
+										<h1 style="text-align:center; vertical-align:top; color:#000000; font-weight:900;"> Search History </h1>
+										<h3 style="text-align:center; vertical-align:185;">_______________________________________________</h3>
+										)";													
+
+
+		if (GlobalHistory.size() < 1)
+		{
+			temp += R"(<p style="text-align:center; vertical-align:400;">No history yet :( go search for some!</p>)";
+		}
+		else {
+			for (auto line : GlobalHistory)
+			{
+				if (line.first.empty() || line.second.empty()) continue; 
+				//create a link value, holding our link. however, make sure that we remove all the spaces, to prevent issues.
+				std::string value = "<p style=\"text-align:center;\" href=\"" + line.second + "\">" + line.first + "-- " + line.second + "</p> \r";
+				temp += value;
+			}
+		}
+		//grab the current time
+		auto now = std::chrono::system_clock::now();
+		temp += " <p style=\"text-align:left; font-size:25; vertical-align:top; color:#444444; font-weight:900;\"> Updated: " + std::format("{:%d %H:%M}", now) + "</p>"; //display the last time up to date
+		temp += " <p style=\"text-align:left; font-size:25; vertical-align:150; color:#e6c670; font-weight:900;\"> Reset History </p>"; //Reset history Text, for button.
+		temp += " <p style=\"text-align:left; font-size:20; vertical-align:180; color:#6b6969; font-weight:900;\"> Click it   τ </p>"; //Info for it
+
+		temp += "<body><html>"; //add the end on.
 
 		Parser(temp);
 		return;
@@ -548,7 +673,7 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 
 			urlInput = "settings::tab"; 
 		}
-		Parser("<html><head><title>Settings</title></head></html>");
+		Parser("<html><head><title>Settings</title></head><body></body><p style=\"text-align:80; vertical-align:150; font-weight:900;\">Settings</p></html>");
 		return;
 	}
 	if (target.find("new::tab") == 0) //check if the target contains the value new::tab
@@ -626,6 +751,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 				tab.history.push_back(resolvedTarget); //if so, we add the new URL to the end of the history vector
 				tab.historypos = tab.history.size() - 1; //update the history index, so it maches the current url
 			}
+
+			AddToHistory(resolvedTarget); //hold the search pos.
 		}
 	} //Release the gTabMutex Lock
 
@@ -804,6 +931,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 
 				//grab everything the thread will need.
 				int fontsize = tabs[activeTab].layout[i].fontSize; //create an 'int' and set it to the fontsize.
+				int fontweight = tabs[activeTab].layout[i].fontWeight; //create an 'int' and set it to the fontweight
 				SDL_Color color = tabs[activeTab].layout[i].textColor; //set the color to the text color
 				bool isLink = !tabs[activeTab].layout[i].href.empty(); //set the bool if its a link. if its true, its false, and if its false, its true
 
@@ -813,7 +941,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 				int currentIndex = i; //keep track of which index this is
 
 				lock.unlock(); //unlock before the thread to prevent a crash in release mode
-				gTextRenderPool.enqueue([text, fontsize, color, isLink, currentTabID, myGen, currentIndex]() { //start the thread, and import the vars into the thread
+				gTextRenderPool.enqueue([text, fontsize, fontweight, color, isLink, currentTabID, myGen, currentIndex]() { //start the thread, and import the vars into the thread
 					
 					TTF_Font* threadFont = nullptr;
 					SDL_Surface* nodeSurf = nullptr;
@@ -839,9 +967,28 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 
 						if (isLink) { TTF_SetFontStyle(threadFont, TTF_STYLE_UNDERLINE); } //if this text is a link, give it a underline
 
+						TTF_FontStyleFlags style = TTF_STYLE_NORMAL;
+
+						//BECAUSE FONTWEIGHTS NEED TO BE THE STUPID SDL3 FORMATS, im doing this..
+						if (fontweight >= 700)
+						{
+							style |= TTF_STYLE_BOLD;
+						}
+
+						// underline for links
+						if (isLink)
+						{
+							style |= TTF_STYLE_UNDERLINE;
+						}
+
+						TTF_SetFontStyle(threadFont, style);
+
 						nodeSurf = TTF_RenderText_Solid(threadFont, text.c_str(), 0, color); //create a temp nodeSerf, to hold it
+						
+						//TTF_SetFontStyle(threadFont, fontweight); //RENDER THE FONT WEIGHT
 
 						if (isLink) { TTF_SetFontStyle(threadFont, TTF_STYLE_NORMAL); } //reset the style after to prevent leaks
+
 					}
 
 					if (nodeSurf != nullptr) { //if the nodeSurf contains things
@@ -947,7 +1094,6 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 				}
 				if (!bytes.empty()) //if we got something (did NOT fail)
 				{
-
 					//create a IO mem stream from the raw bytes
 												 //grab the bytes, and the size of it
 					SDL_IOStream* io = SDL_IOFromMem(bytes.data(), (int)bytes.size());
@@ -969,7 +1115,6 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 								std::cout << "IMG Downloaded into RAM" << std::endl; //DEBUG
 								tabs[currentTabID].layout[currentIndex].pendingSurface = imageSurf; //set the surf to the imageSurf.
 							}
-							
 						}
 						else { //ERROR, the bytes were screwed up.
 							std::cout << "ERROR - Trying To Download IMG" << std::endl; //DEBUG
@@ -986,10 +1131,9 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 			if (tabs.empty() || activeTab < 0 || activeTab >= (int)tabs.size() || tabs[activeTab].loadGen != currentLoadGen) return;
 		}
 
-
 		//--- GPU texture conversion for images ---\\
 
-	//check if a background thread is done, and it is an image
+		//check if a background thread is done, and it is an image
 		if (tabs[activeTab].layout[i].isImage && tabs[activeTab].layout[i].pendingSurface != nullptr)
 		{
 			//swap to the gpu
@@ -1232,7 +1376,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 	//title, width, height, and flags
 	//make it 1080p sizewise
 	//for flags, its in this format -> UINT64_C(0X0000000000000020), we also can add more tags through |
-	window = SDL_CreateWindow("Browse++", 1920, 1080, SDL_WINDOW_RESIZABLE);
+	window = SDL_CreateWindow("Browse++", 1600, 900, SDL_WINDOW_RESIZABLE);
 
 	SDL_Renderer* render = SDL_CreateRenderer(window, nullptr); //Create a render, using the window values, and that we can assign more values to this render, to render more things
 
@@ -1253,7 +1397,6 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 	
 	if (font == nullptr || iconFont == nullptr || reloadFont == nullptr) { std::cout << "Failed to open TTF" << std::endl; return -1; } //if any of the fonts fail to load, we return some DEBUG, then return -1
  
-
 	//shows events like window changes and stuff
 	SDL_Event event; //we make an SDL event handler
 
@@ -1271,8 +1414,9 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 	if (!StartingTab.empty())
 	{
 		NavigateTo(StartingTab, render, font);
-		ReloadTabLayout(); //reload before start
 	}
+
+	SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND); //For the shadow
 
 	while (running) //loop till running is false
 	{
@@ -1571,28 +1715,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 								if (ContextMenuButtons[i] == "Change Theme") //CURRENT BUG, TEXT DONT CHANGE COLOR - TODO
 								{
 									darkmode = !darkmode; //flip it
-									
-									std::lock_guard<std::mutex> lock(gTabsMutex); //create a lock to prevent a crash when other threads access the values
-
-									for (auto& tab : tabs) //for each tab in tabs
-									{
-										tab.loadGen++; // update the loadGen
-										for (auto& item : tab.layout) //for each tab in tabs
-										{
-											if (item.textTex) { //if the texture exists, destroy it, to re-renders
-												SDL_DestroyTexture(item.textTex);
-												item.textTex = nullptr;
-											}
-											item.textAttempted = false; //make prerender render the node again
-
-											if (item.href.empty()) //invert only text, not links
-											{
-												item.textColor.r = 255 - item.textColor.r; //flip the color
-												item.textColor.g = 255 - item.textColor.g; //flip the color
-												item.textColor.b = 255 - item.textColor.b; //flip the color
-											}
-										}
-									}
+									ReloadTabLayout();
 									
 								}
 								if (ContextMenuButtons[i] == "Back") //CURRENT BUG, NEED TO SHOW IF YOU CAN PRESS OR NOT - TODO
@@ -1681,10 +1804,12 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 										activeTab = tabs.size() - 1; //set the activetab to the size of the tabs, -1 to fit the 0 = element 1
 										lastsearchedtabID = tabs[activeTab].tabID;//set the tab when i click.
 									}
-									
+									LoadFromHistory(); //load the history
 
 									std::cout << TabBefore << std::endl;
 									NavigateTo("history::tab", render, font, false); //go to the link, as opening a new tab, using the id, do not save history when opening
+
+
 									//History
 								}
 								if (ContextMenuButtons[i] == "Close All Tabs")
@@ -1854,8 +1979,11 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 					}
 
 					SDL_GetWindowSize(window, &WinW, &WinH); //grab the window, and assign the WinW, and the WinH.
+					SDL_FRect ResetHistoryBtn; //create a rect to hold the settings button
 
-
+					ResetHistoryBtn.h = btnSize; ResetHistoryBtn.w = 200; ResetHistoryBtn.x = 0 + ResetHistoryBtn.w - 178; ResetHistoryBtn.y = 0 + ResetHistoryBtn.h + 82;
+					
+					SDL_FRect ResetHistoryBtnRect = {(float)ResetHistoryBtn.x, (float)ResetHistoryBtn.y, (float)ResetHistoryBtn.w, (float)ResetHistoryBtn.h};
 					SDL_FRect backBtnRect = { padding, topMargin, btnSize, btnSize }; //set a rect for the backBtnRect
 					SDL_FRect fwdBtnRect = { backBtnRect.x + backBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the fwdBtnRect, using the backBtnRect for offset
 					SDL_FRect reloadBtnRect = { fwdBtnRect.x + fwdBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the reloadBtnRect, using the fwdBtnRect for offset
@@ -1867,6 +1995,12 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 					SDL_FRect printerBtnRect = { starBtnRect.x + starBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the printerBtnRect, using the starBtnRect for offset
 					SDL_FRect settingsBtnRect = { printerBtnRect.x + printerBtnRect.w + padding, topMargin, btnSize, btnSize }; //set a rect for the printerBtnRect, using the printerBtnRect for offset
 					
+					if (isHoverd(ResetHistoryBtnRect)) //handle reset button for the history menu
+					{
+						DestoryHistory(); //rm the history
+						if (currentURL != "") { NavigateTo(urlInput, render, font, false); } //reload
+					}
+
 					//test if the backBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
 					if (isHoverd(backBtnRect)) {
 						//first check, is our index var for the area >= 0? as we reference it
@@ -1896,13 +2030,10 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 					//test if the reloadBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
 					if (isHoverd(reloadBtnRect)) {
 						if (currentURL != "") { NavigateTo(urlInput, render, font, false); } //don't reload for the mainpage, but just index the same url
-
 					}
-
 
 					//test if the homeBtnRect is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
 					if (isHoverd(homeBtnRect)) {
-
 						if (currentURL != "") { NavigateTo("new::tab", render, font, false); } //don't go if we are already on the mainpage, but load new::tab
 					}
 
@@ -1973,12 +2104,6 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 						}
 						NavigateTo("settings::tab", render, font, true); //go to the link, as opening a new tab, using the id
 					}
-
-
-
-
-
-
 					
 					if (isLinkClicked(clickedURL, false)) //now that we know we clicked the link
 					{
@@ -2110,7 +2235,8 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 		PreRender(render, font); //load the textures, images, and fonts, and the style for them.
 
 		#pragma region //Render Text and Images from websites
-		if (darkmode) //if the darkmode tag is flagged
+
+		if (darkmode) //if the darkmode tag is flagged, and inverted colors
 		{
 			SDL_SetRenderDrawColor(render, (255 - backgroundColor.r), (255 - backgroundColor.g), (255 - backgroundColor.b), 255); // reverse the colors of the site, as darkmode is a flipped colored version, or on starting, black
 		}
@@ -2134,7 +2260,8 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 				//draw the bg color
 				if (tabs[activeTab].layout[i].hasBg)
 				{
-					if (darkmode) { SDL_SetRenderDrawColor(render, (255 - tabs[activeTab].layout[i].bgColor.r), (255 - tabs[activeTab].layout[i].bgColor.g), (255 - tabs[activeTab].layout[i].bgColor.b), 255); } //Dark mode, inverting the text bg (if its colored)
+					
+					if (darkmode) { SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); }
 					else { SDL_SetRenderDrawColor(render, tabs[activeTab].layout[i].bgColor.r, tabs[activeTab].layout[i].bgColor.g, tabs[activeTab].layout[i].bgColor.b, 255); } //Not dark mode, rendering the text bg color normaly
 
 					SDL_RenderFillRect(render, &textrec); //draw the BackGround of the text, and draw it over the rect of the text, but under the text, creating a bg
@@ -2733,8 +2860,6 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 				SaveXYContextMenuPos = false; //set it to false, to not update again
 			}
 			else { //RENDER IT
-
-				
 				ContextMenuRect = { ContextMenuXPos, ContextMenuYPos, 200, 315 }; //render the context menu
 
 				SDL_RenderFillRect(render, &ContextMenuRect); //send it to be uploaded to the render.
@@ -2748,6 +2873,18 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 				
 				//ContextMenuRect.w for our button width, maybe with some padding
 				
+				if (darkmode) { SDL_SetRenderDrawColor(render, 0, 0, 0, 90); }
+				else { SDL_SetRenderDrawColor(render, 100, 100, 100, 90); }
+				SDL_FRect shadow = {
+						ContextMenuRect.x + 5,
+						ContextMenuRect.y + 5,
+						ContextMenuRect.w,
+						ContextMenuRect.h,
+				};
+
+				SDL_RenderFillRect(render, &shadow);
+
+
 				for (int i = 0; i < ContextMenuButtons.size(); i++)
 				{
 					//now we want to render each button, like how we render tabs.
@@ -2757,11 +2894,11 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 					
 					if (mouseX >= CurrentButtnRect.x && mouseX <= (CurrentButtnRect.x + CurrentButtnRect.w) &&
 						mouseY >= CurrentButtnRect.y && mouseY <= (CurrentButtnRect.y + CurrentButtnRect.h) && ContextMenuButtons[i] != "-------") {
-						if (darkmode) { SDL_SetRenderDrawColor(render, 28, 28, 28, 255);  } //if darkmode is on, make the ContextMenu a dark gray
+						if (darkmode) { SDL_SetRenderDrawColor(render, 54, 54, 54, 255);  } //if darkmode is on, make the ContextMenu a dark gray
 						else { SDL_SetRenderDrawColor(render, 221, 221, 221, 255); } //if darkmode is off, make the ContextMenu a light gray
 					}
 					else {
-						if (darkmode) { SDL_SetRenderDrawColor(render, 5, 5, 5, 255); } 
+						if (darkmode) { SDL_SetRenderDrawColor(render, 31, 31, 31, 255); } 
 						else { SDL_SetRenderDrawColor(render, 200, 200, 200, 255); }
 					}
 
@@ -2774,100 +2911,59 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 
 					//now lets render the text
 					SDL_Surface* buttnSerf; //build a surf to hold the 'x' for closing a tab
-					buttnSerf = TTF_RenderText_Solid(iconFont, ContextMenuButtons[i].c_str(), 0, buttnTextColor);
-					
-
-					if (buttnSerf != nullptr) //if our xSurf has been created 
+					if (ContextMenuButtons[i] == "-------")
 					{
-						float textX = SDL_roundf(CurrentButtnRect.x + (CurrentButtnRect.w - (float)buttnSerf->w) / 2.0);
-						float textY = SDL_roundf(CurrentButtnRect.y + (CurrentButtnRect.h - (float)buttnSerf->h) / 2.0);
-					
-						SDL_Texture* xTex = SDL_CreateTextureFromSurface(render, buttnSerf); //create a temp texture to hold the 'x' text
-						SDL_FRect xRect = { textX, textY, (float)buttnSerf->w, (float)buttnSerf->h}; //move the rect to fit in the tab
-						SDL_RenderTexture(render, xTex, nullptr, &xRect); //send the texture to the render to be rendered
+						if (darkmode) { SDL_SetRenderDrawColor(render, 58, 58, 58, 255); }
+						else { SDL_SetRenderDrawColor(render, 100, 100, 100, 255); }
 
-						SDL_DestroyTexture(xTex); //we are done, destroy the texture
-						SDL_DestroySurface(buttnSerf); //we are done, destroy the surface
+						SDL_RenderLine(
+							render,
+							CurrentButtnRect.x + 8,
+							CurrentButtnRect.y + CurrentButtnRect.h / 2,
+							CurrentButtnRect.x + CurrentButtnRect.w - 8,
+							CurrentButtnRect.y + CurrentButtnRect.h / 2
+						);
+					}
+					else {
+						buttnSerf = TTF_RenderText_Solid(iconFont, ContextMenuButtons[i].c_str(), 0, buttnTextColor);
+
+
+						if (buttnSerf != nullptr) //if our xSurf has been created 
+						{
+							float textX = SDL_roundf(CurrentButtnRect.x + (CurrentButtnRect.w - (float)buttnSerf->w) / 2.0);
+							float textY = SDL_roundf(CurrentButtnRect.y + (CurrentButtnRect.h - (float)buttnSerf->h) / 2.0);
+
+							SDL_Texture* xTex = SDL_CreateTextureFromSurface(render, buttnSerf); //create a temp texture to hold the 'x' text
+							SDL_FRect xRect = { textX, textY, (float)buttnSerf->w, (float)buttnSerf->h }; //move the rect to fit in the tab
+							SDL_RenderTexture(render, xTex, nullptr, &xRect); //send the texture to the render to be rendered
+
+							SDL_DestroyTexture(xTex); //we are done, destroy the texture
+							SDL_DestroySurface(buttnSerf); //we are done, destroy the surface
+						}
 					}
 				}
+				
+				if (darkmode) { SDL_SetRenderDrawColor(render, 58, 58, 58, 255); }
+				else { SDL_SetRenderDrawColor(render, 100, 100, 100, 255); }
+				int thickness = 3;
+				for (int i = 0; i < thickness; i++)
+				{
+					SDL_FRect border = {
+						ContextMenuRect.x + i,
+						ContextMenuRect.y + i,
+						ContextMenuRect.w - (i * 2),
+						ContextMenuRect.h - (i * 2),
+					};
+					SDL_RenderRect(render, &border);
+				}	
 			}
 		}
-		
-
 		//HANDLE THE SETTINGS.
-	
 
 		if (tabs[activeTab].url == "settings::tab")
 		{
-			std::cout << "OPEN SETTINGS MENU" << std::endl; //DEBUG
-			SDL_FRect SettingsMenuBackground; //create a rect to hold the printer button
-			SettingsMenuBackground.w = WinW;
-			SettingsMenuBackground.h = WinH - 47;
-			SettingsMenuBackground.x = (WinW - SettingsMenuBackground.w) / 2;
-			SettingsMenuBackground.y = (WinH - SettingsMenuBackground.h) / 2 + 47;
-
-			if (darkmode) //if the darkmode tag is flagged
-			{
-				SDL_SetRenderDrawColor(render, (255 - backgroundColor.r), (255 - backgroundColor.g), (255 - backgroundColor.b), 255); // reverse the colors of the site, as darkmode is a flipped colored version, or on starting, black
-			}
-			else {
-				SDL_SetRenderDrawColor(render, backgroundColor.r, backgroundColor.g, backgroundColor.b, 255); // keep the colors normal, and set them to the colors of the site, or on starting, white
-			}
-
-			SDL_RenderFillRect(render, &SettingsMenuBackground); //send the rect to the render to be queued for rendering
+			//HANDLE LATER
 		}
-			
-		
-
-
-
-		 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 		//RENDER THE PERFORMANCE MENU
 		if (ShowPerformace)

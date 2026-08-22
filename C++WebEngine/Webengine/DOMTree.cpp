@@ -161,15 +161,36 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 					if (rawStyle.find("text-align:") != std::string::npos)
 					{
 						if (rawStyle.find("center") != std::string::npos) { TempNode->style += "center "; std::cout << "added center, "; }
-						if (rawStyle.find("left") != std::string::npos) { TempNode->style += "left "; std::cout << "added left, "; }
-						if (rawStyle.find("right") != std::string::npos) { TempNode->style += "right "; std::cout << "added right, "; }
+						else if (rawStyle.find("left") != std::string::npos) { TempNode->style += "left "; std::cout << "added left, "; }
+						else if (rawStyle.find("right") != std::string::npos) { TempNode->style += "right "; std::cout << "added right, "; }
+						else if ("text-align:")
+						{
+							size_t verticalVal = rawStyle.find("text-align:"); //NEED TO BE like this, to prevent overalap.
+							if (verticalVal != std::string::npos) {
+								size_t verticalEnd = rawStyle.find_first_of("; ", verticalVal); //grab the end of the vertical link
+								if (verticalEnd == std::string::npos) verticalEnd = rawStyle.size();
+								std::string hexVal = rawStyle.substr(verticalVal, verticalEnd - verticalVal);
+								TempNode->style += hexVal + " "; std::cout << " added text-align, " << hexVal;
+							}
+						}
 					}
 
 					if (rawStyle.find("vertical-align:") != std::string::npos)
 					{
 						if (rawStyle.find("top") != std::string::npos) { TempNode->style += "top "; std::cout << "added top, "; }
-						if (rawStyle.find("middle") != std::string::npos) { TempNode->style += "middle "; std::cout << "added middle, "; }
-						if (rawStyle.find("bottom") != std::string::npos) { TempNode->style += "bottom "; std::cout << "added bottom, "; }
+						else if (rawStyle.find("middle") != std::string::npos) { TempNode->style += "middle "; std::cout << "added middle, "; }
+						else if (rawStyle.find("bottom") != std::string::npos) { TempNode->style += "bottom "; std::cout << "added bottom, "; }
+						else if ("vertical-align:")
+						{
+							size_t verticalVal = rawStyle.find("vertical-align:"); //NEED TO BE like this, to prevent overalap.
+							if (verticalVal != std::string::npos) {
+								size_t verticalEnd = rawStyle.find_first_of("; ", verticalVal); //grab the end of the vertical link
+								if (verticalEnd == std::string::npos) verticalEnd = rawStyle.size();
+								std::string hexVal = rawStyle.substr(verticalVal, verticalEnd - verticalVal);
+								TempNode->style += hexVal + " "; std::cout <<" added vertical-align, " << hexVal;
+							}
+						}
+
 					}
 
 					if (rawStyle.find("color:") != std::string::npos && rawStyle.find("color:") != rawStyle.find("background-color:")) //if we find the color term, and we cannot find the backgroundcolor
@@ -219,6 +240,34 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 						//handle the RGB, not just the color names
 					}
 
+
+					if (rawStyle.find("font-size:") != std::string::npos) //check for fontsize
+					{
+						size_t fontSize = rawStyle.find("font-size:"); //NEED TO BE like this, to prevent overalap.
+						if (fontSize != std::string::npos) {
+							size_t hexEnd = rawStyle.find_first_of("; ", fontSize); //grab the end of the fontSize link
+							if (hexEnd == std::string::npos) hexEnd = rawStyle.size();
+							std::string hexVal = rawStyle.substr(fontSize, hexEnd - fontSize);
+							TempNode->style += hexVal + " "; std::cout << hexVal << " added font size, ";
+						}
+					}
+
+					if (rawStyle.find("font-weight:") != std::string::npos)
+					{
+						if (rawStyle.find("font-weight:normal") != std::string::npos) { TempNode->style += "font-weight:normal "; std::cout << "added bg red color, "; }
+						else if (rawStyle.find("font-weight:bold") != std::string::npos) { TempNode->style += "font-weight:bold "; std::cout << "added bg green color, "; }
+						else if ("font-weight:")
+						{
+							size_t fontWeight = rawStyle.find("font-weight:"); //NEED TO BE like this, to prevent overalap.
+							if (fontWeight != std::string::npos) {
+								size_t hexEnd = rawStyle.find_first_of("; ", fontWeight); //grab the end of the fontWeight link
+								if (hexEnd == std::string::npos) hexEnd = rawStyle.size();
+								std::string hexVal = rawStyle.substr(fontWeight, hexEnd - fontWeight);
+								TempNode->style += hexVal + " "; std::cout << hexVal << " added font Weight, ";
+							}
+						}
+
+					}
 					//TODO - More of these.
 
 

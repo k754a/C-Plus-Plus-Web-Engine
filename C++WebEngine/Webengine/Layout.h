@@ -8,7 +8,6 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 inline bool darkmode = true; //setting to handle "dark mode" -> we take the rgb for example 0, 0, 0, and subtract 255 by each one, so then it becomes -> 255, 255, 255, we do this for everything.     
-inline bool invertcolors = false;
 
 enum class NODETYPE { START, TEXT, END }; //NODETYPE holds 1 value out of 3 types (a fancy bool)
 
@@ -40,7 +39,7 @@ struct Layout
 
 	int width = 0; int height = 0; //handle the width and height of the text
 
-	int fontSize = 0; 
+	int fontSize = 0;  int fontWeight = TTF_FONT_WEIGHT_NORMAL; 
 
 	SDL_Texture* textTex = nullptr; //we are gonna prerender the text, so we don't gotta do it on the fly.
 

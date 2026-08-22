@@ -31,17 +31,10 @@ void PrintDomTree(Node* node, int debth = 0)
         {
                 std::cout << indent << "└──── \" " << node->tagValue << " \"" << std::endl;
         }
-
-
-
-
         for (int i = 0; i < node->children.size(); i++)
         {
                 PrintDomTree(node->children[i], debth + 1);
         }
-
-
-
 }
 
 // CHANGED WITH AI: Ported globalCSS from the Windows engine.

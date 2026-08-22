@@ -1,3 +1,7 @@
+# THIS README IS MADE BY AI, AS LINUX IS NOT SUPPORTED FOR THE MAIN CODE
+# But you can run this on linux, but you'll need a web browser to veiw it.
+
+
 # C++Browse — Web Server Package
 
 This is the complete web version of the C++Browse browser engine, ready to deploy
