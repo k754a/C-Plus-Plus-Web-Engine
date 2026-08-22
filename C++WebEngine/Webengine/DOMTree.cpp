@@ -7,7 +7,6 @@
 std::vector<CSSToken> globalCSS; //pull our global css class, and assign it (so that any other instances in layout.cpp, works.)
 bool cssUpdated = false; //set the cssUpdated to false
 
-
 //======COLLAPSE WHITESPACE======\\
 
 std::string RemoveNewLineChars(const std::string& input) //this takes a const std::string, and returns a string.
@@ -28,12 +27,10 @@ std::string RemoveNewLineChars(const std::string& input) //this takes a const st
 				if (!result.empty())
 					result.push_back(' '); //if its not blank, we add a new space, like "EXAMPLE" -> "EXAMPLE "
 			}
-
 			inWhitespace = true; //we are in whitespace, so now we start to skip chars, for example "EXAM    PLE" -> "EXAM  PLE" -> "EXAM PLE" -> "EXAMPLE"
 		}
 		else
 		{
-
 			result.push_back(c); //we dont have whitespace, so we can add to our result so we go "E"  -> "X" ...
 			inWhitespace = false; //we found a normal char, we are not in whitespace
 		}
@@ -46,11 +43,6 @@ std::string RemoveNewLineChars(const std::string& input) //this takes a const st
 	return result; //return our final cleaned string
 } //END OF REMOVE NEW LINE CHARS
 
-
-
-
-
-
 //======CSSDOM======\\
 
 int CSSDOM(std::vector<CSSToken> tokens) { //this takes in our custom CSSToken class ({ std::string id; std::vector<std::string> properties; }), and returns an int
@@ -58,8 +50,6 @@ int CSSDOM(std::vector<CSSToken> tokens) { //this takes in our custom CSSToken c
 	cssUpdated = true;
 	return 0; //done, return 0;
 }
-
-
 
 //======DOM======\\
 
@@ -88,12 +78,8 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 		//check if its a "START" tag.
 		if (currentToken.type == TokenType::START) //check if its a start token
 		{
-
-
-			
 			Node* TempNode = new Node(); //Temp node, to temporally assign values.
 			
-
 			std::string_view rawToken = currentToken.value;  //get the current token value, and assign it to a string
 
 
@@ -105,14 +91,9 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 				size_t EndPos = rawToken.find("\"", StartPos); //find the end part of our raw token. so our href= 'https://google.com'/
 				if (EndPos != std::string::npos)
 				{
-					
-
 					TempNode->href = rawToken.substr(StartPos, EndPos - StartPos); //grab the 'https://google.com' inside part
-
 				}
 			}
-
-
 			//TODO - any spaces screw it up, so i NEED to fix that.
 
 			size_t srcPos = rawToken.find("src=\""); //attempt to find 'src=\'
@@ -190,7 +171,6 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 								TempNode->style += hexVal + " "; std::cout <<" added vertical-align, " << hexVal;
 							}
 						}
-
 					}
 
 					if (rawStyle.find("color:") != std::string::npos && rawStyle.find("color:") != rawStyle.find("background-color:")) //if we find the color term, and we cannot find the backgroundcolor
@@ -244,7 +224,11 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 					if (rawStyle.find("font-size:") != std::string::npos) //check for fontsize
 					{
 						size_t fontSize = rawStyle.find("font-size:"); //NEED TO BE like this, to prevent overalap.
-						if (fontSize != std::string::npos) {
+
+
+						if (rawStyle.find("adjust") != std::string::npos) { TempNode->style += "font-size:adjust "; std::cout << "added font-size:adjust, "; }
+						else if (rawStyle.find("fit") != std::string::npos) { TempNode->style += "font-size:fit "; std::cout << "added font-size:fit, "; }
+						else if (rawStyle.find("font-size:") != std::string::npos) {
 							size_t hexEnd = rawStyle.find_first_of("; ", fontSize); //grab the end of the fontSize link
 							if (hexEnd == std::string::npos) hexEnd = rawStyle.size();
 							std::string hexVal = rawStyle.substr(fontSize, hexEnd - fontSize);
@@ -269,8 +253,6 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 
 					}
 					//TODO - More of these.
-
-
 					//remove the spaces in the back
 					if (!TempNode->style.empty() && TempNode->style.back() == ' ')
 					{
@@ -279,9 +261,6 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 
 					std::cout << std::endl;
 				}
-
-				
-				
 			}
 
 			size_t space = rawToken.find(' '); //find if we have a space
@@ -318,8 +297,6 @@ int DOM(const std::vector<HTMLToken> tokens) //this takes a custom HTMLTOKEN vec
 
 			//ok now with all our values assigned, lets send it to the save node.
 			Temp->children.push_back(TempNode);
-
-
 
 			//finally lets update our Current with our temp
 			//this says, move the main dir forward, like how we did it for the Root.

@@ -19,7 +19,7 @@
   
 </p>
 
-<h3  align="center"> A custom-built C++ web browser engine written from scratch to support HTTP and HTTPS, with a web and desktop version. </h3>
+<h3 align="center"> A custom-built C++ web browser engine written from scratch to support HTTP and HTTPS, with a web and desktop version. </h3>
 
 
 # About:
@@ -30,13 +30,18 @@ This browser has its own Network handler, Html Parser, DOM tree handler, Layout 
 This browser also has a web version (using Next.js and hosted on linux.)
 
 This project was created to help me learn C+, aswell as understand and appricate how modern browsers operate and work under the hood. 
-   
-    
+
 # Demo:
 
 The demo is a bit behind vs the desktop, but operates the exact same as the desktop, but lacks some of the quality of life features like themes, or the right click menu.
 If you would like to try the demo, you can try it here: [k754a.hackclub.app](https://k754a.hackclub.app/)
 
+
+# Cool Ideas I put into the project:
+
+  One of the coolest ideas i did (i just wanted to feature it lol), was that i modified a font file, adding in my own custom icons, as i didnt know how to add images at that point. so the icons of the buttons for the top bar, and all the icons in this, are all font characters!
+
+  Another cool thing is that in some spots, theres overlays of the top bar, and the main editor, to get things like buttons working, on the page!
 
 ## Features
 
@@ -84,8 +89,14 @@ If you would like to try the demo, you can try it here: [k754a.hackclub.app](htt
 
 # Running Locally
 
-  If you would like to run the program locally, you can do such with the release beside. Just unzip the file, and double press the .exe file.
+If you would like to run the program locally, you can do such with the release build. Just unzip the file, and double press the .exe file.
 
+If you would like modify my code, and contribute to the project, you can download the full zip, and open the ```.slnx``` file in visual studio, You do need to place a folder called "Libraries", in your C:/ dir, then place
+``` "C:\Libraries\SDL_ttf" ```
+``` "C:\Libraries\SDL3" ```
+``` "C:\Libraries\SDL3_image" ```
+
+inside, you are then good to go working on the project!
 
 ## Roadmap
 
@@ -109,23 +120,11 @@ If you would like to try the demo, you can try it here: [k754a.hackclub.app](htt
 
 AI has been used in some aspects of this project.
 
-
-
-
 - As a learning tool, an example of which is to generate general examples or to help explain how aspects like trees work in C++, not rewrite, fix, or debug any of my code whatsoever.
-
-
-
 
 - The native Windows code to Linux for the server. Any code changes are clearly marked with (`// CHANGED WITH AI: ...`) if they have been changed with AI.
 
-
-
-
 - The main windows project has NOT been coded with AI whatsoever.
-
-
-
 
 # Contributing
 

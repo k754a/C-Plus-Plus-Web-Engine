@@ -274,15 +274,59 @@ RGB ParseHexColor(std::string hex) // This funct returns our custom RGB class ({
 
 std::vector<Layout> layoutList; //create a custom 'vector', holding our custom Layout struct. This is a global list to hold it all
 
+int AdjustFontSize(int fontsize)
+{
+	float scale = (float)WinW / 1920.0f; //based off screen W
 
+	scale = std::clamp(scale, 0.75f, 1.5f);
+
+	return (int)(fontsize * scale);
+}
+
+int FitFontSize(const Node* node, int fontsize)
+{
+	int availableWidth = (std::max)(WinW - 40, 50); //the width is between the win width, and 100
+
+	if (!node || node->tagValue.empty()) //if a node is missing, or its empty, just resend the old stuff 
+	{
+		return (std::clamp)(fontsize, 8, 50);
+	}
+	
+
+	int textLength = (int)node->tagValue.size(); //grab the text len
+	if (textLength <= 0) //if the text len is -
+	{
+		return(std::clamp)(fontsize, 9, 50); //return to preven err
+	}
+
+	float fixedfontsize = (float)availableWidth / ((float)textLength * 0.45f); //calcuate the font size now
+
+	int newsize = (int)fixedfontsize; //convert to int
+
+	newsize = (std::clamp)(newsize, 8, 50); //set the font, making sure its not too big o small
+
+	return newsize; //return
+}
+
+//GUIDE -1 = no font size, -2 means adjust font size -3, means fit to window width, and anything postive is the font size
 int SetFontSize(const Node* node)
 {
 	size_t fsPos = node->style.find("font-size"); //attempt to find the font size
 	if (fsPos == std::string::npos) return -1; //if we didnt find it...
 
 	std::string TextSize = node->style.substr(fsPos + 10); //grab the text size
-	size_t sp = TextSize.find(' ');
+
+	size_t sp = TextSize.find_first_of(" ;");
 	if (sp != std::string::npos) TextSize = TextSize.substr(0, sp);
+
+	if (TextSize == "adjust")
+	{
+		return -2;
+	}
+	if (TextSize == "fit")
+	{
+		return -3;
+	}
 
 	if (TextSize.find("px") != std::string::npos)
 	{
@@ -294,21 +338,22 @@ int SetFontSize(const Node* node)
 		return std::stoi(TextSize); //return the text size
 	}
 
-	return -1;
+	return -1; 
 
 }
 
+static int ParseStyleNUM(const std::string& style, const std::string& prop)
+{
+	size_t pos = style.find(prop); //find the pos
+	if (pos == std::string::npos) return -1; //if we cant find it
+	pos += prop.size(); //skip the prop name
 
+	size_t end = pos;
+	while (end < style.size() && std::isdigit((unsigned char)style[end])) end++;
 
-
-
-
-
-
-
-
-
-
+	if (end == pos) return -1;
+	return std::stoi(style.substr(pos, end - pos));
+}
 
 //=======Measure Nodes======\\
 
@@ -348,7 +393,12 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 	}
 
 	int SetFS = SetFontSize(node); //grab the value off our node
-	if (SetFS > 0) fontsize = SetFS; //if its bigger than 1, set it.
+	if (SetFS == -2)
+	{
+		fontsize = AdjustFontSize(fontsize);
+	}
+	else if (SetFS > 0) fontsize = SetFS; //if its bigger than 1, set it.
+
 	//HANDLE IMAGES
 	if (node->tag == NODETYPE::START && node->tagValue == "img" && !node->src.empty()) //check if its a START node, the tagValue contains "img", and the link of the img is NOT empty.
 	{
@@ -402,9 +452,7 @@ void MeasureNodes(Node* node, int fontsize) //Measure nodes is a void, returning
 
 } //END OF MEASURE-NODES
 
-
 //=======Position Nodes======\\
-
 
 //This code handles positioning our nodes, and handling/assigning/creating the layout tree.
 void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, int fontWeight, SDL_Color textColor, SDL_Color bgColor, bool hasBg, std::string currentHref, bool inFlex = false) //this code returns nothing, and takes in 3 ints, our custom Node* class, 2 SDL_COLOR's, 2 Bools, and a String.
@@ -541,7 +589,15 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 		}
 
 		int SetFS = SetFontSize(node); //grab the value off our node
-		if (SetFS > 0) fontsize = SetFS; //if its bigger than 1, set it.
+		if (SetFS == -2)
+		{
+			fontsize = AdjustFontSize(fontsize);
+		}
+		else if (SetFS == -3)
+		{
+			fontsize = FitFontSize(node, fontsize);
+		}
+		else if (SetFS > 0) fontsize = SetFS; //if its bigger than 1, set it.
 
 		//we are gonna handle our flex stuff here.
 		//first check if its a flex node
@@ -667,21 +723,12 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 		}
 		else if (node->style.find("text-align:") != std::string::npos)
 		{
-			//we can lowkey guess that its going to be a number...
-			size_t VAPos = node->style.find("text-align:");
-			std::string VAVAL = node->style.substr(VAPos + 11); // RM to number
-			size_t sp = VAVAL.find(' ');
-			if (sp != std::string::npos) VAVAL = VAVAL.substr(0, sp);
-
-			//ok, before we assing, check if its a int, and does not contain any chars
-			std::cout << "ATTEMPT TO ADD CUSTOM POS" << VAVAL << std::endl;
-			if (!VAVAL.empty() && std::all_of(VAVAL.begin(), VAVAL.end(), [](unsigned char c) {return std::isdigit(c); }))
-			{
-				int num = std::stoi(VAVAL);
-				std::cout << "PASSED" << num << std::endl;
-
-				currentXpos = num;
-			}
+			
+			int num = ParseStyleNUM(node->style, "text-align:");
+			
+			if (num >= 0) { std::cout << "PASSED X" << num << std::endl; currentXpos = num; }
+			
+			
 		}
 		///////////////////// - vertical-align stuff - \\\\\\\\\\\\\\\\\\\\\\\
 
@@ -710,21 +757,10 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 		}
 		else if (node->style.find("vertical-align:") != std::string::npos)
 		{
-			//we can lowkey guess that its going to be a number...
-			size_t VAPos = node->style.find("vertical-align:");
-			std::string VAVAL = node->style.substr(VAPos + 15); // RM to number
-			size_t sp = VAVAL.find(' ');
-			if (sp != std::string::npos) VAVAL = VAVAL.substr(0, sp);
+			int num = ParseStyleNUM(node->style, "vertical-align:");
 
-			//ok, before we assing, check if its a int, and does not contain any chars
-			std::cout << "ATTEMPT TO ADD CUSTOM POS" << VAVAL << std::endl;
-			if (!VAVAL.empty() && std::all_of(VAVAL.begin(), VAVAL.end(), [](unsigned char c) {return std::isdigit(c); }))
-			{
-				int num = std::stoi(VAVAL);
-				std::cout << "PASSED" << num << std::endl;
+			if (num >= 0) { std::cout << "PASSED Y" << num << std::endl; currentYpos = num; }
 
-				currentYpos = num;
-			}
 		}
 
 		///////////////////// - color text stuff - \\\\\\\\\\\\\\\\\\\\\\\
@@ -846,7 +882,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			//we can lowkey guess that its going to be a number...
 			size_t FWPos = node->style.find("font-weight:");
 			std::string FWVAL = node->style.substr(FWPos + 12); // RM to number
-			size_t sp = FWVAL.find(' ');
+			size_t sp = FWVAL.find_first_of(' ;');
 			if (sp != std::string::npos) FWVAL = FWVAL.substr(0, sp);
 
 			//ok, before we assing, check if its a int, and does not contain any chars
@@ -961,7 +997,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 		}
 
 	}
-
 	
 	for (Node* child : node->children)
 	{
@@ -976,6 +1011,15 @@ int LayoutTree(Node* node)
 	PROFILE("LAYOUTTREE"); //PROFILE THE LAYOUTTREE
 
 	layoutList.clear(); //we need to do this, or we will have errors
+
+	//reset the bg color, to prevent leaks
+	if (darkmode)
+	{
+		backgroundColor = SDL_Color{ 10,10,10,255 };
+	}
+	else {
+		backgroundColor = SDL_Color{ 245,245,245,255 };
+	}
 
 	int currentY = 120; //update this, to fix text clipping
 	int currentX = 10;
@@ -1010,6 +1054,5 @@ int LayoutTree(Node* node)
 	
 	return 0;
 }
-
 
 #pragma endregion //holds our node handling code

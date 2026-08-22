@@ -1,6 +1,4 @@
-
 #include <SDL3/SDL_main.h> //NEEDED FOR RELEASE BUILD
-
 
 #include "GUI.h" //FOR THE GUIRENDER
 #include "ConnectSocket.h" //FOR THE START WIN SOCK
@@ -20,8 +18,6 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
  
     SetConsoleOutputCP(CP_UTF8); //we do this for ╨á╤â and other weird chars, to render right
 
-   
-
     //=======STARTUP=======\\
 
     
@@ -30,7 +26,6 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
 
 
     //======LOAD-MAIN-MENU======\\
-    
     
     std::ifstream file("main.html"); //open on start, in read mode
 
@@ -46,7 +41,6 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
 
     Parser(fileinfo); //send the new tab to the parser for rendering
     
-   
     //======RENDER-GUI======\\
 
     if (argc > 1) //if there is a argc
@@ -63,8 +57,6 @@ int main(int argc, char* argv[]) //we give the start of main, a starting int and
     //std::cout << "Press enter to exit...";
     //std::cin.get();
 
-    
     return(0); //end
 
 } //END OF MAIN
-
