@@ -104,10 +104,7 @@ std::string Cleanup(std::string linkinput)
 #endif
 
 
-// CHANGED WITH AI: Ported DownloadBytes from the Windows engine.
-// The Windows version uses WinINet (InternetOpen / HttpOpenRequest). On Linux we
-// reuse curl (the same tool the web HTTPS path already shells out to) so we can
-// fetch raw image bytes for the layout.
+
 std::vector<unsigned char> DownloadBytes(std::string url)
 {
         std::vector<unsigned char> result;
