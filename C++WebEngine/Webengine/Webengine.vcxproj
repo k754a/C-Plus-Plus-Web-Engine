@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Libraries\SDL3_image\include;C:\Libraries\SDL3\include;C:\Libraries\SDL_ttf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Libraries\SDL3_image\include;C:\Libraries\SDL3\include;C:\Libraries\SDL_ttf\include;$(ProjectDir)libs\SDL3\include;$(ProjectDir)libs\SDL_ttf\include;$(ProjectDir)libs\SDL3_image\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -134,7 +134,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Libraries\SDL3_image\include;C:\Libraries\SDL3\include;C:\Libraries\SDL_ttf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Libraries\SDL3_image\include;C:\Libraries\SDL3\include;C:\Libraries\SDL_ttf\include;$(ProjectDir)libs\SDL3\include;$(ProjectDir)libs\SDL_ttf\include;$(ProjectDir)libs\SDL3_image\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ExceptionHandling>Async</ExceptionHandling>
     </ClCompile>
     <Link>

@@ -905,7 +905,7 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 
 				maxLineHeight = 0; //set the new maxLineHeight to 0, for this new line
 			}
-
+			
 			lasty = tabs[activeTab].layout[i].y; //update the last y with the current letters 'y'
 
 			if (tabs[activeTab].layout[i].x > 20) //check if this is a table with a column offset larger than 20
@@ -1437,6 +1437,8 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 
 	SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND); //For the shadow
 
+	LoadFromHistory(); //turn it on
+
 	while (running) //loop till running is false
 	{
 		Uint64 start = SDL_GetPerformanceCounter(); //start the Performance overview
@@ -1587,6 +1589,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 				//if we press enter to search
 				if (event.key.scancode == SDL_SCANCODE_RETURN) {
 					lastsearchedtabID = tabs[activeTab].tabID; //set the TabID, beforehand, to prevent the loading bug
+					inputbarfocused = false;
 					NavigateTo(urlInput, render, font, true); //Send the url we want to go to, the render, font, and we want to save it to history
 				}
 
@@ -2023,13 +2026,94 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 						SDL_floorf(btnSize * scaleY) / scaleY //set the h of the bar
 					};
 
-					if (isHoverd(bar)) //handle reset button for the history menu
+					bool ClickedSuggest = false;
+
+					if (inputbarfocused && !urlInput.empty())
 					{
-						inputbarfocused = true;
+						std::vector<std::string> clickedSuggestions; //hold the suggestions
+
+						std::string typed = urlInput;
+
+						std::transform(typed.begin(), typed.end(), typed.begin(), [](unsigned char c) {
+							return std::tolower(c);
+							}); //convert to lower
+
+						
+						for (const auto& history : GlobalHistory) //for each val in GlobalHistory
+						{
+
+							std::string url = history.second; std::string lowerUrl = url; //grab the url, then make another var to get it lower.
+							std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), [](unsigned char c) {
+								return std::tolower(c); }); //convert to lower
+
+							if (lowerUrl.starts_with(typed)) //if the url starts with the typed
+							{
+								clickedSuggestions.push_back(history.second); //push the url back if it matches with the typed stuff
+
+								if (clickedSuggestions.size() >= 5) //make sure we dont go over.
+									break;
+							}
+						}
+
+						//now that we found things that START with it, lets handle if they contain it
+
+						if (clickedSuggestions.size() < 5)
+						{
+							for (const auto& history : GlobalHistory) //for each val in GlobalHistory
+							{
+								std::string url = history.second; std::string lowerUrl = url; //grab the url, then make another var to get it lower.
+
+								std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), [](unsigned char c) {
+									return std::tolower(c); }); //convert to lower
+
+								if (lowerUrl.find(typed) != std::string::npos && !lowerUrl.starts_with(typed)) //if the url starts with the typed
+								{
+									clickedSuggestions.push_back(history.second); //push the url back if it matches with the typed stuff
+
+									if (clickedSuggestions.size() >= 5) //make sure we dont go over.
+										break;
+								}
+							}
+						}
+
+
+						for (int i = 0; i < static_cast<int>(clickedSuggestions.size()); i++)
+						{
+							SDL_FRect suggestionRect = { bar.x, bar.y + 30 + (bar.h * i), bar.w, bar.h }; //hold the rect of the buttn
+
+							if (isHoverd(suggestionRect))
+							{
+								std::string selectedURL = clickedSuggestions[i];
+
+								std::cout << "clicked: " << selectedURL << " Pushing..." << std::endl;
+
+								urlInput = selectedURL;
+								inputbarfocused = false;
+								ClickedSuggest = true;
+
+
+								lastsearchedtabID = tabs[activeTab].tabID;
+
+								//load
+
+								NavigateTo(selectedURL, render, font, true);
+
+								break;
+							}
+						}
 					}
-					else {
-						inputbarfocused = false;
+
+					if (!ClickedSuggest)
+					{
+						if (isHoverd(bar)) //handle reset button for the history menu
+						{
+							inputbarfocused = true;
+						}
+						else {
+							inputbarfocused = false;
+						}
 					}
+					
 
 					if (isHoverd(ResetHistoryBtnRect)) //handle reset button for the history menu
 					{
@@ -2643,13 +2727,60 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 
 		if (inputbarfocused)
 		{
+			std::vector<std::string> suggestionsList; //hold the suggestions
+			std::string typed = urlInput;
+
+			std::transform(typed.begin(), typed.end(), typed.begin(), [](unsigned char c) {
+				return std::tolower(c);
+				}); //convert to lower
+
+			if (!typed.empty()) //make sure somethin is typed.
+			{
+				for (const auto& history : GlobalHistory) //for each val in GlobalHistory
+				{
+					std::string url = history.second; std::string lowerUrl = url; //grab the url, then make another var to get it lower.
+					std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), [](unsigned char c) {
+						return std::tolower(c); }); //convert to lower
+
+					if (lowerUrl.starts_with(typed)) //if the url starts with the typed
+					{
+						suggestionsList.push_back(history.second); //push the url back if it matches with the typed stuff
+
+						if (suggestionsList.size() >= 5) //make sure we dont go over.
+							break;
+					}
+				}
+
+				//now that we found things that START with it, lets handle if they contain it
+
+				if (suggestionsList.size() < 5)
+				{
+					for (const auto& history : GlobalHistory) //for each val in GlobalHistory
+					{
+						std::string url = history.second; std::string lowerUrl = url; //grab the url, then make another var to get it lower.
+
+						std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), [](unsigned char c) {
+							return std::tolower(c); }); //convert to lower
+
+						if (lowerUrl.find(typed) != std::string::npos && !lowerUrl.starts_with(typed)) //if the url starts with the typed
+						{
+							suggestionsList.push_back(history.second); //push the url back if it matches with the typed stuff
+
+							if (suggestionsList.size() >= 5) //make sure we dont go over.
+								break;
+						}
+					}
+				}
+			}
+
 			//first, grab the size of the history
-			int suggestions = (std::min)(static_cast<int>(GlobalHistory.size()), 5); //min 5 results
-			std::cout << suggestions << std::endl;
+			int suggestions = static_cast<int>(suggestionsList.size()); //min 5 results
+	
 			SDL_FRect menuboarder = { bar.x, bar.y + 30, bar.w, bar.h * suggestions }; //calculate the menu boarder
 			
 			if (darkmode) { SDL_SetRenderDrawColor(render, 0, 0, 0, 90); } //set the theme, if darkmode, black clear
 			else { SDL_SetRenderDrawColor(render, 100, 100, 100, 90); } //set theme, if not darmode, light clear
+
 			SDL_FRect shadow = {
 					menuboarder.x + 5,
 					menuboarder.y + 5,
@@ -2664,18 +2795,65 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 			
 			
 			SDL_FRect ContextMenuRect;
-			if (darkmode) { SDL_SetRenderDrawColor(render, 42, 42, 42, 255); } //if darkmode is on, draw it as a lightish gray
-			else { SDL_SetRenderDrawColor(render, 240, 240, 240, 255); } //if darkmode is off, draw it as a almost white
-
+			
 
 			//render the bar, off the size of the suggestions
 			for (int i = 0; i < suggestions; i++)
 			{
+				
 				ContextMenuRect = { bar.x, (bar.y + 30) + (bar.h * i), bar.w, bar.h }; //render the context menu
+
+				if (isHoverd(ContextMenuRect)) //if i hover over it
+				{
+					if (darkmode) { SDL_SetRenderDrawColor(render, 52, 52, 52, 255); } //if darkmode is on, draw it as a lightish gray
+					else { SDL_SetRenderDrawColor(render, 230, 230, 230, 255); } //if darkmode is off, draw it as a almost white
+				}
+				else {
+					if (darkmode) { SDL_SetRenderDrawColor(render, 42, 42, 42, 255); } //if darkmode is on, draw it as a lightish gray
+					else { SDL_SetRenderDrawColor(render, 240, 240, 240, 255); } //if darkmode is off, draw it as a almost white
+				}
+					
 
 				SDL_RenderFillRect(render, &ContextMenuRect); //send it to be uploaded to the render.
 
+				if (i < suggestions - 1)
+				{
+					if (darkmode) { SDL_SetRenderDrawColor(render, 58, 58, 58, 255); }
+					else { SDL_SetRenderDrawColor(render, 100, 100, 100, 255); }
+
+					SDL_RenderLine(
+						render,
+						ContextMenuRect.x + 8,
+						ContextMenuRect.y + ContextMenuRect.h - 1,
+						ContextMenuRect.x + ContextMenuRect.w - 8,
+						ContextMenuRect.y + ContextMenuRect.h - 1
+					);
+				}	
+
+
+				//render the text now.
+
+				if (darkmode) { SDL_Color color = { 255, 255, 255, 255 }; }
+				else { SDL_Color color = { 0, 0, 0, 255 }; }
+				SDL_Surface* buttnSerf = TTF_RenderText_Solid(font, suggestionsList[i].c_str(), 0, color);
+
+
+				if (buttnSerf != nullptr) //if our xSurf has been created 
+				{
+					float textX = SDL_roundf(ContextMenuRect.x + 10);
+					float textY = SDL_roundf(ContextMenuRect.y + (ContextMenuRect.h - (float)buttnSerf->h) / 2.0);
+
+					SDL_Texture* xTex = SDL_CreateTextureFromSurface(render, buttnSerf); //create a temp texture to hold the 'x' text
+					SDL_FRect xRect = { textX, textY, (float)buttnSerf->w, (float)buttnSerf->h }; //move the rect to fit in the tab
+
+					SDL_RenderTexture(render, xTex, nullptr, &xRect); //send the texture to the render to be rendered
+
+					SDL_DestroyTexture(xTex); //we are done, destroy the texture
+					
+				}
+				SDL_DestroySurface(buttnSerf); //we are done, destroy the surface
 				
+
 			}	
 
 			if (darkmode) { SDL_SetRenderDrawColor(render, 58, 58, 58, 255); }
@@ -3035,7 +3213,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 				SDL_RenderFillRect(render, &ContextMenuRect); //send it to be uploaded to the render.
 
 				//-- RENDER EACH BUTTON --\\
-				
+
 				float buttonHeight = 45.0;
 				
 				TTF_SetFontHinting(iconFont, TTF_HINTING_NORMAL); // Options: TTF_HINTING_NORMAL, TTF_HINTING_LIGHT, or TTF_HINTING_MONO
@@ -3128,7 +3306,6 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 			}
 		}
 		//HANDLE THE SETTINGS.
-
 		if (tabs[activeTab].url == "settings::tab")
 		{
 			//HANDLE LATER
@@ -3179,11 +3356,9 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 			if (darkmode)
 			{
 				icon = IMG_Load("./logo/darkM_icon.png");
-
 			}
 			else {
 				icon = IMG_Load("./logo/lightM_icon.png");
-
 			}
 			
 			if (icon) //if it worked
