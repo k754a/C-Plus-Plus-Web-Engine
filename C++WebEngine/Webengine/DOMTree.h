@@ -13,8 +13,6 @@ struct HTMLToken { TokenType type; std::string value;}; //Create a struct, that 
 int DOM(std::vector<HTMLToken> tokens); //define our class, it returns an 'int' and takes in our custom HTMLToken class.
 
 
-
-
 struct CSSToken { std::string id; std::vector<std::string> properties; }; //create a struct that holds our CSSToken
 extern std::vector<CSSToken> globalCSS; //create an external vector class, a list that holds the CSSToken struct, allowing us to define many tokens in a list. This is used in multiple classes.
 extern bool cssUpdated;

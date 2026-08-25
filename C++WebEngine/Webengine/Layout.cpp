@@ -1,3 +1,5 @@
+//UPDATED FOR LINUX, i changed from const static, to just const
+
 //THIS WILL HANDLE THE LAYOUT OF THE ENGINE
 //it will assign things like the positions of elements, and assign things like x and y
 
@@ -13,9 +15,6 @@
 
 
 #pragma region CSS Handle Code
-
-
-
 
 
 //THIS CODE SECTION HANDLES THE SUBCOMPONETS FOR RENDERING THE CSS, THINGS LIKE FINIDING PROPERTIES, ID's, AND RGB.
@@ -36,7 +35,7 @@ std::vector<CSSToken>* activeCSS = nullptr; //hold the current css
 
 //=======Find ID======\\
 
-CSSToken* FindID(const static std::string input) //FIND-ID returns in our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), and takes in a std::string
+CSSToken* FindID(const std::string input) //FIND-ID returns in our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), and takes in a std::string
 {
 	if (activeCSS == nullptr) return nullptr;
 
@@ -55,7 +54,7 @@ CSSToken* FindID(const static std::string input) //FIND-ID returns in our custom
 
 //=======Find Property======\\
 
-std::string FindProperty(const static CSSToken* rule, const static std::string propertyName) //FindProperty returns a std::string, and takes in our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), and a string
+std::string FindProperty(const CSSToken* rule, const std::string propertyName) //FindProperty returns a std::string, and takes in our custom CSSTOKEN class ({ std::string id; std::vector<std::string> properties; }), and a string
 {
 	for (int i = 0; i < rule->properties.size(); i++)
 	{
@@ -80,7 +79,7 @@ std::string FindProperty(const static CSSToken* rule, const static std::string p
 //=======IS ABSOLUTE======\\
 
 //function to check if a node is IsAbsolute.
-bool IsAbsolute(const static Node* node, int& outX, int& outY) //IsAbsolute returns a bool, and takes in our custom Node class, our outX int, and our outY int
+bool IsAbsolute(const Node* node, int& outX, int& outY) //IsAbsolute returns a bool, and takes in our custom Node class, our outX int, and our outY int
 {
 	//i first want to look through the nodes tag, to see if it has it
 	//we check that it has css values, if not, we return false
@@ -152,7 +151,7 @@ bool IsAbsolute(const static Node* node, int& outX, int& outY) //IsAbsolute retu
 //=======IS FLEX======\\
 
 //this to check if a node is Flex
-bool IsFlex(const static Node* node) //IsFlex returns a bool, we take in a const static custom Node* class we have.
+bool IsFlex(const Node* node) //IsFlex returns a bool, we take in a const static custom Node* class we have.
 {
 	
 	//i first want to look through the nodes tag, to see if it has it
@@ -196,7 +195,7 @@ struct RGB { int r, g, b;  }; //Create a custom "RGB" struct, holding 3 ints, r,
 
 //=======HEX TO RGB======\\
 
-RGB hexToRgb(const static unsigned int hexValue) //This funct returns our custom RGB class ({ int r, g, b;  }), and takes in a single int, holding a converted hexValue, for example 3A5 -> 933 (we convert the 3A5 using ParseHexColor)
+RGB hexToRgb(const unsigned int hexValue) //This funct returns our custom RGB class ({ int r, g, b;  }), and takes in a single int, holding a converted hexValue, for example 3A5 -> 933 (we convert the 3A5 using ParseHexColor)
 {
 	RGB color; //Create a temp RGB var struct.
 	color.r = (hexValue >> 16) & 0xFF; // Extract the first 2 hex digits

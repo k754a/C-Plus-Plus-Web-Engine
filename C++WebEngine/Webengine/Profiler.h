@@ -48,10 +48,6 @@ class Timer //we still make the timer to avoid errors
 
 
 #endif
-
-
-
-
 //now we create the id class
 #ifdef _DEBUG //if we are running the debug version, we want to do this
 #define PROFILE(name) Timer timer(name) //create another way to call Timer timer(name), thats much simpler. (we do this normaly in .h files)

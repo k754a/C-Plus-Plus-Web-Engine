@@ -1,3 +1,12 @@
+//GUI FIXED FOR LINUX. (just some debug notes)
+
+//switched the open in new tab to work for both, and work a bit better overall using SDL3
+
+//Fixed issues with the printing button, as that used win libs only, so now it works for linux, even tho its a bit worse...
+
+//Thats it.
+
+
 //THIS IS THE WINDOW RENDER
 //(THIS WILL TAKE IN MULTIPLE INPUTS, FROM Layout.cpp, and Webengine.cpp.
 
@@ -85,7 +94,6 @@ bool ShowPerformace = false;
 bool ShowSettingsMenu = false;
 
 
-
 //GLOBAL HISTORY
 std::vector<std::pair<std::string, std::string>> GlobalHistory; //create a vector that holds an 2 strings, (one string will hold time), string will hold the link.
 
@@ -112,7 +120,6 @@ struct TabInit { //as soon as GUI is started, we run this before everything, thi
 } _tabInit; //insure it runs on start
 
 #pragma endregion
-
 
 #pragma region //GLOBAL History STUFF
 void DestoryHistory()
@@ -202,14 +209,12 @@ void LoadFromHistory() //load from the list... this will be used on things like 
 
 #pragma endregion
 
-
 #pragma region //Handle Star Functions
 
 //=======LOAD STARRED PAGES=======\\
 
 int LoadStarredPages() //load star pages returns an int, and takes nothing in
 {
-	
 	starredPages.clear(); //takes our global vector<string> class, and removes everything from it on start
 
 	std::ifstream bookmarks("starred_pages.STAR"); //attempt to open our starred_pages.STAR file
@@ -1663,7 +1668,6 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 					}
 				}
 
-
 				bool clickingContextMenu = ContextMenu && isHoverd(ContextMenuRect);//handle to see if its being clicked, and the context menu is on (clean wrapper)
 
 
@@ -1727,13 +1731,27 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 										std::cout << "Printing..." << std::endl; //DEBUG
 										std::string saveFolder = "Printed_Pages"; //create a temp string "Printed Pages"
 										std::filesystem::create_directories(saveFolder); //create a new dir, called "Printed_Pages"
+										#ifdef _WIN32 //handle windows
+											std::string filenameStr = saveFolder + "\\Tab_print_" + std::to_string(SDL_GetTicks()) + ".bmp"; //create a file, in our folder, calling it Tab_print_ (then a time) .bmp
+											const char* filename = filenameStr.c_str(); //create a char to prevent errors
 
-										std::string filenameStr = saveFolder + "\\Tab_print_" + std::to_string(SDL_GetTicks()) + ".bmp"; //create a file, in our folder, calling it Tab_print_ (then a time) .bmp
-										const char* filename = filenameStr.c_str(); //create a char to prevent errors
-
+										#else //Handle linux
+											std::string filenameStr = saveFolder + "/Tab_print_" + std::to_string(SDL_GetTicks()) + ".bmp"; //create a file, in our folder, calling it Tab_print_ (then a time) .bmp
+											const char* filename = filenameStr.c_str(); //create a char to prevent errors
+										#endif // _WIN32
+										
 										SDL_SaveBMP(screenshot, filename); 	//now we run the print command
-										ShellExecuteA(NULL, "print", filename, NULL, NULL, SW_SHOWNORMAL); 	// Ask Windows to handle the printing, but SHOW the menu normally
 
+										#ifdef _WIN32 //handle windows
+											ShellExecuteA(NULL, "print", filename, NULL, NULL, SW_SHOWNORMAL); 	// Ask Windows to handle the printing, but SHOW the menu normally
+
+										#else //Handle linux
+
+											std::string printcmd = "lp \"" + filenameStr + "\""; //build the command to send to CUPS (To print)
+											system(printcmd.c_str());
+										#endif // _WIN32
+
+									
 										SDL_DestroySurface(screenshot);//we are done here, destroy the old screenshot
 									}
 								}
@@ -1928,52 +1946,35 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 								}
 								if (ContextMenuButtons[i] == "In New Window") //open a new window
 								{
-									char exePath[MAX_PATH]; //holds the full path to the exe.
+					
+									const char* mainpath = SDL_GetBasePath(); //found this in the docs, this grabs the dir where the app is running, but cross platform!
 
-									GetModuleFileNameA( //get the path of the current program -> the browser engine
-										NULL,
-										exePath, //store it here
-										MAX_PATH //amount of chars to store.
-									);
-
-									std::string commandLine = "\"" + std::string(exePath) + "\" \"" + clickedURL + "\""; //command to open the browser, with the path.
-
-									// additional information
-									STARTUPINFOA si{};
-									PROCESS_INFORMATION pi{};
-
-									// set the size of the structures
-									si.cb = sizeof(si);
-
-									std::vector<char> cmd{
-										commandLine.begin(), commandLine.end()
-									};
-									
-									// start the program up
-									BOOL result = CreateProcessA(
-										NULL,           // the path
-										commandLine.data(),        // Command line
-										NULL,           // Process handle not inheritable
-										NULL,           // Thread handle not inheritable
-										FALSE,          // Set handle inheritance to FALSE
-										0,              // No creation flags
-										NULL,           // Use parent's environment block
-										NULL,           // Use parent's starting directory 
-										&si,            // Pointer to STARTUPINFO structure
-										&pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
-									);
-
-									if (!result) //if there is an error
+									if (!mainpath)
 									{
-										DWORD error = GetLastError(); //grab the last error
-
-										std::cerr << "ERROR -> " << error << " Attempting to open link in new window, window could NOT be created." << std::endl; //DEBUG
+										std::cerr << "ERROR, could not find exe: " << SDL_GetError() << std::endl;
 									}
-									else
+									else 
 									{
-										// Close process and thread handles. 
-										CloseHandle(pi.hProcess);
-										CloseHandle(pi.hThread);
+										//handle the path off the os, for the exe.
+
+										#ifdef _WIN32 //windows
+											std::string exepath = std::string(mainpath) + "WebEngine.exe";
+
+										#else //linux
+											std::string exepath = std::string(mainpath) + "WebEngine";
+										#endif // DEBUG
+
+										const char* args[] = { exepath.c_str(), clickedURL.c_str(), nullptr }; //provide the better args, to work for both, and works a bit better for sdl3
+
+										SDL_Process* main = SDL_CreateProcess(args, false); //create the process
+
+										if (!main)
+										{
+											std::cerr << "ERROR, could not open new window: " << SDL_GetError() << std::endl;
+										}
+										else {
+											SDL_DestroyProcess(main);
+										}
 									}
 								}
 								//after we click something, we should close the context menu
@@ -2176,8 +2177,13 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 							const char* filename = filenameStr.c_str(); //create a char to prevent errors
 
 							SDL_SaveBMP(screenshot, filename); 	//now we run the print command
-							ShellExecuteA(NULL, "print", filename, NULL, NULL, SW_SHOWNORMAL); 	// Ask Windows to handle the printing, but SHOW the menu normally
 
+							#ifdef _WIN32 //windows
+								ShellExecuteA(NULL, "print", filename, NULL, NULL, SW_SHOWNORMAL); 	// Ask Windows to handle the printing, but SHOW the menu normally
+							#else //linux
+								std::string cmd = "lp \"" + std::string(filename) + "\""; //use the lp command, for CUPS (again)
+								system(cmd.c_str()); //send it
+							#endif
 							SDL_DestroySurface(screenshot);//we are done here, destroy the old screenshot
 						}
 					}
@@ -2936,7 +2942,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 		
 		if (isStarred) //if the webpage has been starred
 		{
-			if (darkmode){ SDL_SetRenderDrawColor(render, 0, 0, 255, 255); } //If darkmode is on, set the color to blue, as its an invert of what it is for lightmode
+			if (darkmode){ SDL_SetRenderDrawColor(render, 255, 255, 0, 255); } //If darkmode is on, set the color to blue, as its an invert of what it is for lightmode
 			else { SDL_SetRenderDrawColor(render, 255, 255, 0, 255); } //If darkmode is off, set the color to yellow, as its an invert of what it is for darkmode
 		}
 		else { //if it has not
@@ -2959,8 +2965,16 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 
 		SDL_Surface* starSurf; //create a serf to hold the home icon
 		{ //LOCK
+			SDL_Color custom;
+			if (darkmode && isStarred) {
+				custom = { 20, 20, 20, 255 };
+				starSurf = TTF_RenderText_Solid(iconFont, "ж", 0, custom); //set the icon to the 'ж' that has been manipulated to be a star icon
+			}
+			else {
+				starSurf = TTF_RenderText_Solid(iconFont, "ж", 0, textColor); //set the icon to the 'ж' that has been manipulated to be a star icon
+			}
+			
 			std::lock_guard<std::recursive_mutex> ttfLock(gTTFMutex); //create a guard to prevent other threads editing the TTF list, and causing a crash.
-			starSurf = TTF_RenderText_Solid(iconFont, "ж", 0, textColor); //set the icon to the 'ж' that has been manipulated to be a star icon
 		}
 
 		if (starSurf != nullptr) //if the icon was created successfully

@@ -119,11 +119,6 @@ std::string DecodeEntities(const std::string& input)
 
 } // END OF DECODE ENTITIES
 
-
-
-
-
-
 //=======STRIP TAGS======\\
 
 //Full StripTags code, does not handle things like <a href="link">
