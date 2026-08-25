@@ -57,6 +57,13 @@ if(WIN32)
         SDL3_image
         ws2_32
     )
+    #move the dll's to the main running, to prevent errors.
+        file(COPY 
+            "${CMAKE_CURRENT_SOURCE_DIR}/libs/SDL3/lib/x64/SDL3.dll" 
+            "${CMAKE_CURRENT_SOURCE_DIR}/libs/SDL_ttf/lib/x64/SDL3_ttf.dll" 
+            "${CMAKE_CURRENT_SOURCE_DIR}/libs/SDL3_image/lib/x64/SDL3_image.dll"
+        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}"
+    )
 else() #if its macos or linux...
     find_package(PkgConfig REQUIRED) #find the CMake thing
     pkg_check_modules(SDL3 REQUIRED sdl3)

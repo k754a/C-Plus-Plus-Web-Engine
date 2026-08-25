@@ -4,7 +4,7 @@
 
 //Fixed issues with the printing button, as that used win libs only, so now it works for linux, even tho its a bit worse...
 
-//Thats it.
+//That's it.
 
 
 //THIS IS THE WINDOW RENDER
@@ -22,7 +22,6 @@
 #include "Layout.h"
 
 #pragma endregion
-
 
 #pragma region //Imports from the projects external libs.
 

@@ -881,7 +881,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			//we can lowkey guess that its going to be a number...
 			size_t FWPos = node->style.find("font-weight:");
 			std::string FWVAL = node->style.substr(FWPos + 12); // RM to number
-			size_t sp = FWVAL.find_first_of(' ;');
+			size_t sp = FWVAL.find_first_of(" ;");
 			if (sp != std::string::npos) FWVAL = FWVAL.substr(0, sp);
 
 			//ok, before we assing, check if its a int, and does not contain any chars
@@ -893,8 +893,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 				
 				fontWeight = num;
 			}
-
-
 		}
 
 		//check if its an image
@@ -930,14 +928,12 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 				currentYpos += node->measuredHeight + 15;
 			}
 		}
-
 	}
 
 	if (node->tag == NODETYPE::TEXT)
 	{
 		//make a var that resets every run
 		Layout layouttree;
-
 
 		layouttree.x = currentXpos;
 		layouttree.y = currentYpos;
@@ -994,7 +990,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 			currentXpos = 20;
 			currentYpos += fontsize + 4;
 		}
-
 	}
 	
 	for (Node* child : node->children)
