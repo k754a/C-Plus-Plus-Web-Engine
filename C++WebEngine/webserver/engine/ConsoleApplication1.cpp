@@ -50,7 +50,6 @@ std::string BuildHomeHTML(const std::string& starredPath)
         html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
         html += "<title>New Tab</title>";
         html += "<style>";
-        html += ".notice { background: #FFF3CD; color: #664D03; font-size: 18px; }";
         html += "h1 { color: #000000; font-size: 36px; }";
         html += "p { color: #111111; font-size: 24px; }";
         html += "a { color: #4A90E2; font-size: 22px; }";
@@ -59,7 +58,7 @@ std::string BuildHomeHTML(const std::string& starredPath)
         html += "<h1>C++Browse</h1>";
         html += "<p>This is my C++ web browser project.</p>";
         html += "<h1>To start, search anything.</h1>";
-        html += "<p class=\"notice\">NOTE: this runs on Nest, so you may get hit with captchas. Please enter full links (https://...)!</p>";
+        html += "<p>NOTE: this runs on Nest, so you may get hit with captchas. Please enter full links (https://...)!</p>";
         html += "<h1>To start, search anything.</h1>";
 
         // load starred pages
