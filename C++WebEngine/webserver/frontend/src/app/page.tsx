@@ -310,6 +310,14 @@ export default function Home() {
   function handleLinkClick(href: string, e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    // CHANGED WITH AI: skip links that the engine normalized to "" — these are
+    // javascript: URLs, pure-fragment links (#foo), and other non-navigable
+    // hrefs. Without this guard, clicking a Bing menu button (href=
+    // "javascript:void(0)") would navigate to "" and the engine would treat
+    // empty input as a "home" load, kicking the user back to the start page.
+    if (!href || href.trim() === '') {
+      return;
+    }
     navigate(href, { addToHistory: true });
   }
 
@@ -718,9 +726,18 @@ export default function Home() {
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={handleUrlKeyDown}
-            onFocus={() => setUrlFocused(true)}
+            onFocus={() => {
+              setUrlFocused(true);
+              // CHANGED WITH AI: reset the blink phase so the typing caret shows
+              // IMMEDIATELY when the bar is clicked. The blink interval runs
+              // continuously (every 500ms) even when the bar isn't focused, so
+              // without this reset, clicking during the "off" phase would show
+              // no caret for up to 500ms — which felt like the cursor wasn't
+              // appearing at all.
+              setCursorVisible(true);
+            }}
             onBlur={() => setUrlFocused(false)}
-            placeholder="ы Enter a url..."
+            placeholder={urlFocused ? '' : 'ы Enter a url...'}
             className="url-input"
             spellCheck={false}
             autoComplete="off"
@@ -742,10 +759,16 @@ export default function Home() {
             }}
             aria-label="URL"
           />
-          {urlFocused && urlInput && cursorVisible && (
+          {urlFocused && cursorVisible && (
             <div
               style={{
                 position: 'absolute',
+                // CHANGED WITH AI: position the cursor right after the measured
+                // text width (or at the start of the input when empty, since
+                // textWidth is 0 then). Removed the old `urlInput &&` gate so
+                // the cursor also shows when the bar is empty and clicked —
+                // previously the cursor only appeared when the bar already had
+                // text, which made clicking an empty bar feel broken.
                 left: 8 + textWidth + 1,
                 top: 5,
                 width: 1,

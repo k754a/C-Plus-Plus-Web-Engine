@@ -116,7 +116,17 @@ std::vector<unsigned char> DownloadBytes(std::string url)
         }
 
         std::array<char, 4096> buffer;
-        std::string command = "curl -sSL \"" + url + "\"";
+        // CHANGED WITH AI: send a real Chrome User-Agent + browser-like Accept
+        // headers so image hosts stop returning captcha/challenge pages. The
+        // old "curl -sSL" with no UA was getting flagged as a bot by virtually
+        // every CDN (Cloudflare, Akamai, etc.) which returned a captcha image
+        // instead of the real image bytes.
+        std::string command =
+                "curl -sSL "
+                "-A \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36\" "
+                "-H \"Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8\" "
+                "-H \"Accept-Language: en-US,en;q=0.9\" "
+                "\"" + url + "\"";
 
         std::unique_ptr<FILE, decltype(&pclose)>
                 pipe(popen(command.c_str(), "r"), pclose);
@@ -151,9 +161,20 @@ int ConnectSocketHTTPS(std::string input)
                 return -1;
         }
 
-        //i will need to install curl tho
+        // CHANGED WITH AI: send a real Chrome User-Agent + browser-like Accept
+        // headers so sites stop serving captcha/challenge pages. The old
+        // "curl -sSL" with no UA was getting flagged as a bot by virtually every
+        // CDN (Cloudflare, Akamai, etc.), which returned a captcha or "verify
+        // you are human" page instead of the real HTML. This is the fix for the
+        // "I always hit captchas" issue.
         std::string command =
-                "curl -sSL \"" + input + "\"";
+                "curl -sSL "
+                "-A \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36\" "
+                "-H \"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\" "
+                "-H \"Accept-Language: en-US,en;q=0.9\" "
+                "-H \"Accept-Encoding: gzip, deflate, br\" "
+                "--compressed "
+                "\"" + input + "\"";
 
         std::unique_ptr<FILE, decltype(&pclose)>
                 pipe(popen(command.c_str(), "r"), pclose);

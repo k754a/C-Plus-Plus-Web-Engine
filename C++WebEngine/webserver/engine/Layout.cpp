@@ -6,6 +6,8 @@
 // the rendered output matches the Windows browser.
 #include <string>
 #include <vector>
+#include <cctype> // CHANGED WITH AI: needed for std::isdigit / std::tolower in NormalizeHref
+#include <algorithm> // CHANGED WITH AI: needed for std::transform in NormalizeHref
 #include "Layout.h"
 #include "DOMTree.h"
 
@@ -330,6 +332,211 @@ std::string ResolveURL(std::string src, std::string currentUrl)
 }
 
 
+// CHANGED WITH AI: base64 decoder used to unwrap Bing's /ck/a redirect URLs.
+// Bing wraps every search-result link in https://www.bing.com/ck/a?...&u=a1<base64>&ntb=1
+// where the real destination is the base64-encoded URL after the "a1" prefix.
+// Without unwrapping, clicking a search result navigates to the tracker URL,
+// which returns a JS-based redirect page that the C++ engine can't execute —
+// so the user sees a blank or captcha page instead of the real result.
+//
+// Bing uses URL-SAFE base64 (RFC 4648 §5): '-' instead of '+' and '_' instead
+// of '/'. Padding ('=') is usually omitted. We translate the URL-safe chars
+// to the standard alphabet before decoding.
+//
+// Tolerates missing padding and stray non-alphabet characters (skips them).
+std::string Base64Decode(const std::string& s)
+{
+        // build the lookup table once
+        static int8_t table[256];
+        static bool tableInit = false;
+        if (!tableInit)
+        {
+                for (int i = 0; i < 256; i++) table[i] = -1;
+                const char* alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                for (int i = 0; i < 64; i++) table[(unsigned char)alpha[i]] = (int8_t)i;
+                tableInit = true;
+        }
+
+        std::string out;
+        out.reserve(s.size() * 3 / 4);
+
+        int val = 0;
+        int bits = 0;
+        for (char c : s)
+        {
+                if (c == '=' || c == '\n' || c == '\r' || c == ' ') continue;
+
+                // CHANGED WITH AI: translate URL-safe base64 chars to standard.
+                // Bing encodes with '-' and '_' instead of '+' and '/'. Without
+                // this translation, those chars get skipped (treated as invalid)
+                // and the decode produces garbage bytes mid-URL.
+                unsigned char uc = (unsigned char)c;
+                if (c == '-') uc = (unsigned char)'+';
+                else if (c == '_') uc = (unsigned char)'/';
+
+                int8_t d = table[uc];
+                if (d < 0) continue; // skip any char outside the base64 alphabet
+                val = (val << 6) | d;
+                bits += 6;
+                if (bits >= 8)
+                {
+                        bits -= 8;
+                        out += (char)((val >> bits) & 0xFF);
+                }
+        }
+        return out;
+}
+
+
+// CHANGED WITH AI: Normalize a resolved href into something the engine can
+// actually fetch. Three transformations:
+//
+//   1. Bing /ck/a redirect unwrap. Bing wraps every search-result link in
+//      https://www.bing.com/ck/a?!&&p=...&u=a1<base64>&ntb=1
+//      The real destination is the base64-decoded value of the `u` param
+//      (after stripping the leading "a1" or "a3" prefix). We pull the `u`
+//      param out of the query string and decode it.
+//
+//   2. javascript: URLs → empty string. Bing sprinkles links like
+//      <a href="javascript:void(0)"> on menu buttons. The engine can't
+//      execute JS, and feeding "javascript:void(0)" to curl would just 404
+//      and waste a process spawn. Return "" so the frontend can treat the
+//      link as a no-op (see handleLinkClick in page.tsx, which already
+//      skips empty hrefs).
+//
+//   3. Pure-fragment URLs (#foo, https://host/#, https://host/page#foo) →
+//      empty string. These are same-page anchors. The engine can't scroll
+//      the page; fetching them just re-loads the same page (because the
+//      fragment isn't sent to the server). Return "" so the frontend treats
+//      them as no-ops too.
+//
+// Anything else (real http(s) URLs, already-resolved relative URLs) passes
+// through unchanged.
+std::string NormalizeHref(std::string href)
+{
+        // --- 2. javascript: URLs → empty ---
+        // Bing sometimes sets href="javascript:void(0)" on menu buttons, and
+        // after ResolveURL runs these become "https://www.bing.com/javascript:void(0)".
+        // Detect "javascript:" anywhere in the URL (case-insensitive) so both
+        // the raw and resolved forms get filtered out.
+        {
+                std::string lower = href;
+                std::transform(lower.begin(), lower.end(), lower.begin(),
+                        [](unsigned char c) { return std::tolower(c); });
+                if (lower.find("javascript:") != std::string::npos)
+                {
+                        return "";
+                }
+        }
+
+        // --- 3. pure-fragment URLs → empty ---
+        // Match "#foo", "/#foo", "https://host/#", "https://host/page#frag"
+        {
+                size_t hash = href.find('#');
+                if (hash != std::string::npos)
+                {
+                        // strip the fragment first so the rest of the function
+                        // sees a clean URL
+                        std::string before = href.substr(0, hash);
+
+                        // if everything before the '#' is empty, it's a pure
+                        // fragment link (like "#section1") → drop it. The engine
+                        // can't scroll the page, so navigating to "#section1"
+                        // would just reload the current page.
+                        if (before.empty())
+                        {
+                                return "";
+                        }
+                        // otherwise, strip the fragment and continue with `before`
+                        // (a link like "https://host/page#frag" becomes "https://host/page")
+                        href = before;
+                }
+        }
+
+        // --- 1. Bing /ck/a redirect unwrap ---
+        // Match the host part case-insensitively.
+        {
+                std::string lower = href;
+                std::transform(lower.begin(), lower.end(), lower.begin(),
+                        [](unsigned char c) { return std::tolower(c); });
+
+                // Detect "bing.com/ck/a" anywhere in the URL (handles both
+                // https://www.bing.com/ck/a?... and other variants).
+                if (lower.find("bing.com/ck/a") != std::string::npos)
+                {
+                        // Find the `u` query param. Bing's URL uses &u=a1<base64>&
+                        // (sometimes &u=a3<base64>&, sometimes other prefixes).
+                        // We scan for "u=" in the query string and read up to the
+                        // next & or end.
+                        size_t qpos = href.find('?');
+                        if (qpos != std::string::npos)
+                        {
+                                std::string qs = href.substr(qpos + 1);
+                                // also append a trailing & so the last param is easy to find
+                                qs += '&';
+
+                                size_t upos = qs.find("u=");
+                                while (upos != std::string::npos)
+                                {
+                                        // make sure it's a param name, not a substring of another param
+                                        bool isParamStart = (upos == 0) || (qs[upos - 1] == '&');
+                                        if (isParamStart)
+                                        {
+                                                size_t vstart = upos + 2;
+                                                size_t vend = qs.find('&', vstart);
+                                                if (vend == std::string::npos) vend = qs.size();
+                                                std::string uval = qs.substr(vstart, vend - vstart);
+
+                                                // strip URL-encoding (the base64 may contain + → %2B etc.)
+                                                std::string decoded = PercentDecode(uval);
+
+                                                // strip the "a1" / "a3" / "a2" prefix Bing adds
+                                                if (decoded.size() >= 2 &&
+                                                        decoded[0] == 'a' &&
+                                                        std::isdigit((unsigned char)decoded[1]))
+                                                {
+                                                        decoded = decoded.substr(2);
+                                                }
+
+                                                // base64-decode the rest
+                                                std::string real = Base64Decode(decoded);
+
+                                                // CHANGED WITH AI: Bing's /ck/a wraps both external URLs
+                                                // (base64 of "https://example.com/...") AND Bing's own
+                                                // internal links (base64 of "/images/search?..." etc.).
+                                                // External URLs come out as "http(s)://..." and we
+                                                // accept them directly. Relative paths come out as
+                                                // "/images/search?..." — we resolve those against
+                                                // Bing's host (the /ck/a URL's own host) so the engine
+                                                // can fetch them. Without this, internal Bing links
+                                                // (Images/Videos/Maps/News tabs) couldn't be clicked.
+                                                if (real.rfind("http://", 0) == 0 ||
+                                                        real.rfind("https://", 0) == 0)
+                                                {
+                                                        return real;
+                                                }
+                                                if (!real.empty() && real[0] == '/')
+                                                {
+                                                        // resolve against the bing.com host
+                                                        size_t hostEnd = href.find('/', 8); // skip "https:/"
+                                                        if (hostEnd != std::string::npos)
+                                                        {
+                                                                return href.substr(0, hostEnd) + real;
+                                                        }
+                                                }
+                                        }
+                                        upos = qs.find("u=", upos + 2);
+                                }
+                        }
+                        // couldn't unwrap — fall through and return the raw /ck/a URL
+                        // (better than nothing; the engine will try to fetch it)
+                }
+        }
+
+        return href;
+}
+
+
 //this is the poistion part
 // CHANGED WITH AI: uses WebColor instead of SDL_Color, otherwise identical to Windows.
 void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, WebColor textColor, WebColor bgColor, bool hasBg, std::string currentHref, bool inFlex = false)
@@ -340,7 +547,44 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
                 if (!node->href.empty())
                 {
-                        currentHref = node->href;
+                        // CHANGED WITH AI: resolve relative hrefs against the current
+                        // page URL (g_currentURL) so the frontend always receives an
+                        // absolute URL. Without this, a link like <a href="/example/">
+                        // on https://somesite.com/foo was emitted as the raw string
+                        // "/example/", which the frontend then passed back to the
+                        // engine, where the URL regex didn't match it and the engine
+                        // fell through to the DuckDuckGo-search branch — so clicking
+                        // "/example/" searched DuckDuckGo for "/example/" instead of
+                        // going to https://somesite.com/example/.
+                        //
+                        // ResolveURL already exists for image src; we reuse it here.
+                        // It returns the input unchanged for absolute URLs (http://,
+                        // https://), and resolves protocol-relative, root-relative,
+                        // and path-relative URLs against the current page URL.
+                        //
+                        // Guard: skip resolution when g_currentURL is empty (the home
+                        // page). Home-page links come from BuildHomeHTML and are
+                        // already absolute URLs, so resolving them against "" would
+                        // produce a broken "https:///example/" string.
+                        //
+                        // After resolving, NormalizeHref() cleans up the result:
+                        //   - unwraps Bing /ck/a redirect tracker URLs to the real
+                        //     destination (otherwise clicking a Bing search result
+                        //     navigates to a JS-redirect page the engine can't run)
+                        //   - strips pure-fragment links (#foo) and javascript: URLs
+                        //     to "" so the frontend treats them as no-ops
+                        //   - strips fragments from real URLs (https://host/p#frag →
+                        //     https://host/p) since the engine can't scroll anyway
+                        std::string resolved;
+                        if (!g_currentURL.empty())
+                        {
+                                resolved = ResolveURL(node->href, g_currentURL);
+                        }
+                        else
+                        {
+                                resolved = node->href;
+                        }
+                        currentHref = NormalizeHref(resolved);
                 }
 
                 CSSRule* id = FindID(node->tagValue);
@@ -762,6 +1006,26 @@ int LayoutTree(Node* node)
         bool first = true;
         for (const Layout& l : layoutList)
         {
+                // CHANGED WITH AI: skip empty items BEFORE writing the comma.
+                // The old code wrote `json += ","` and set `first = false` first,
+                // then checked for empty text inside the else-branch and
+                // `continue`d — which left the comma behind, producing `,,`
+                // in the output and breaking JSON parsing in the frontend
+                // ("Unexpected token ','" error). Now we skip-and-continue
+                // before touching the comma/flag, so skipped items leave no
+                // trace in the output.
+
+                // skip empty text items
+                if (!l.isImage && (l.node == nullptr || l.node->tagValue.empty()))
+                {
+                        continue;
+                }
+                // skip images with no resolved src (e.g. broken data: URIs)
+                if (l.isImage && l.imageSrc.empty())
+                {
+                        continue;
+                }
+
                 if (!first) json += ",";
                 first = false;
 
@@ -777,9 +1041,6 @@ int LayoutTree(Node* node)
                 }
                 else
                 {
-                        // skip empty text
-                        if (l.node == nullptr || l.node->tagValue.empty()) continue;
-
                         json += "{\"type\":\"text\",";
                         json += "\"text\":\"" + JsonEscape(l.node->tagValue) + "\",";
                         json += "\"x\":" + std::to_string(l.x) + ",";

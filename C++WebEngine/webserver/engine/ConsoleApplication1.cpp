@@ -58,8 +58,12 @@ std::string BuildHomeHTML(const std::string& starredPath)
         html += "<h1>C++Browse</h1>";
         html += "<p>This is my C++ web browser project.</p>";
         html += "<h1>To start, search anything.</h1>";
-        html += "<p>NOTE: this runs on Nest, so you may get hit with captchas.</p>";
-        html += "<p> Please enter full links(https://...)!</p>";
+        // CHANGED WITH AI: homepage hint text. Bing will occasionally serve a
+        // captcha page despite our real-Chrome UA — when that happens, the
+        // workaround is to enter the full URL directly (e.g. https://example.com/)
+        // instead of searching for it.
+        html += "<p>Sometimes you will be captcha'd.</p>";
+        html += "<p>Use full URLs (https://...) if that happens.</p>";
         html += "<h1>To start, search anything.</h1>";
 
         // load starred pages
@@ -129,20 +133,47 @@ int main(int argc, char* argv[])
         }
         else
         {
-                // CHANGED WITH AI: treat non-URL input as a DuckDuckGo search, like Windows.
+                // CHANGED WITH AI: treat non-URL input as a web search.
+                //
+                // ORIGINAL BEHAVIOR: searched DuckDuckGo's lite endpoint
+                // (https://lite.duckduckgo.com/lite/?q=...). That endpoint is
+                // unreachable from many shared servers (TCP connect hangs) and
+                // also returns captchas aggressively to non-browser clients, so
+                // searches silently failed — the frontend sat on "Loading..."
+                // forever while the engine waited for a curl response that
+                // never came.
+                //
+                // FIX: switched the default search backend to Bing, which
+                // returns 200 OK with clean parseable HTML to a real-Chrome
+                // User-Agent. Also added proper URL-encoding for the query so
+                // characters like &, #, ?, +, % don't break the URL (the old
+                // space-only hack would turn "AT&T" into "?q=AT&T" which Bing
+                // would parse as two separate params).
+
                 std::string query = "";
-                for (int i = 0; i < input.size(); i++)
+                for (unsigned char c : input)
                 {
-                        if (input[i] == ' ')
+                        if ((c >= 'a' && c <= 'z') ||
+                            (c >= 'A' && c <= 'Z') ||
+                            (c >= '0' && c <= '9') ||
+                            c == '-' || c == '_' || c == '.' || c == '~')
                         {
-                                query += "+";
+                                query += (char)c;
                         }
-                        else {
-                                query += input[i];
+                        else if (c == ' ')
+                        {
+                                query += '+';
+                        }
+                        else
+                        {
+                                // percent-encode anything else
+                                char buf[4];
+                                snprintf(buf, sizeof(buf), "%%%02X", c);
+                                query += buf;
                         }
                 }
 
-                input = "https://lite.duckduckgo.com/lite/?q=" + query;
+                input = "https://www.bing.com/search?q=" + query;
                 g_currentURL = input;
                 std::cout << "search url: " << input << std::endl;
                 ConnectSocketHTTPS(input);
