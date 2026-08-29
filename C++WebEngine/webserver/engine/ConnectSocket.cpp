@@ -2,13 +2,25 @@
 #include "Parser.h"
 //THIS IS A GLOBAL SCRIPT.
 
-//CHANGED WITH AI: Add cross-platform guards for winsock specifics
 #ifdef _WIN32
 //this gives compiler specific instructions to c++, telling it to link the winsock libary to our main libary
 #pragma comment(lib, "ws2_32.lib")
 
 WSAData wsaData; //structure to hold our network data, across our diffrent voids and ints
 #endif
+
+#include <cstdio>
+#include <memory>
+#include <array>
+#include <string>
+#include <iostream>
+
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
+
+
 //this starts up our winsock at the begining
 int StartWinSock()
 {
@@ -45,7 +57,6 @@ int EndWinSock()
 std::string URLPath;
 std::string Cleanup(std::string linkinput)
 {
-        //CHANGED WITH AI: Reset URLPath global to prevent data leaking between requests in infinite loop
         URLPath = "";
 
         //this function santizes the input, its super janky but it works lol
@@ -91,42 +102,25 @@ std::string Cleanup(std::string linkinput)
         return santizedlinkinput;
 }
 
-
-#include <cstdio>
-#include <memory>
-#include <array>
-#include <string>
-#include <iostream>
-
-#ifdef _WIN32
-#define popen _popen
-#define pclose _pclose
-#endif
-
-
-
 std::vector<unsigned char> DownloadBytes(std::string url)
 {
         std::vector<unsigned char> result;
 
-        // basic guard against shell injection in the URL
         if (url.find_first_of("\";&|`$<>^\\") != std::string::npos) {
-                std::cout << "Security Alert: Invalid characters detected in image URL." << std::endl;
+                std::cout << "Security Alert: Invalid characters detected in image URL." << std::endl; //prevent chars that could run commands
                 return result;
         }
 
         std::array<char, 4096> buffer;
-        // CHANGED WITH AI: send a real Chrome User-Agent + browser-like Accept
-        // headers so image hosts stop returning captcha/challenge pages. The
-        // old "curl -sSL" with no UA was getting flagged as a bot by virtually
-        // every CDN (Cloudflare, Akamai, etc.) which returned a captcha image
-        // instead of the real image bytes.
+       
         std::string command =
                 "curl -sSL "
                 "-A \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36\" "
                 "-H \"Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8\" "
                 "-H \"Accept-Language: en-US,en;q=0.9\" "
                 "\"" + url + "\"";
+
+        //to prevent getting captcha'd every time you searched
 
         std::unique_ptr<FILE, decltype(&pclose)>
                 pipe(popen(command.c_str(), "r"), pclose);
@@ -157,16 +151,11 @@ int ConnectSocketHTTPS(std::string input)
         std::string response;
 
         if (input.find_first_of("\";&|`$<>^\\") != std::string::npos) {
-                std::cout << "Security Alert: Invalid characters detected in URL." << std::endl;
+                std::cout << "Invalid characters detected in URL." << std::endl; //prevent chars that could run commands
                 return -1;
         }
 
-        // CHANGED WITH AI: send a real Chrome User-Agent + browser-like Accept
-        // headers so sites stop serving captcha/challenge pages. The old
-        // "curl -sSL" with no UA was getting flagged as a bot by virtually every
-        // CDN (Cloudflare, Akamai, etc.), which returned a captcha or "verify
-        // you are human" page instead of the real HTML. This is the fix for the
-        // "I always hit captchas" issue.
+        // CHANGED WITH AI: 
         std::string command =
                 "curl -sSL "
                 "-A \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36\" "
@@ -175,6 +164,8 @@ int ConnectSocketHTTPS(std::string input)
                 "-H \"Accept-Encoding: gzip, deflate, br\" "
                 "--compressed "
                 "\"" + input + "\"";
+
+        //to prevent getting captcha'd every time you searched
 
         std::unique_ptr<FILE, decltype(&pclose)>
                 pipe(popen(command.c_str(), "r"), pclose);
@@ -200,9 +191,6 @@ int ConnectSocketHTTPS(std::string input)
 
         return 0;
 }
-
-
-
 
 
 
@@ -377,10 +365,6 @@ int ConnectSocketHTTP(std::string input)
 
         // Now lets hand it off to the parser for the hard part (with the combed data)
         Parser(fulldata);
-
-
-
-
 
 
         return 0;

@@ -1,11 +1,4 @@
-// ConsoleApplication1.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-// CHANGED WITH AI: Web port of the Windows Webengine.cpp main.
-// The Windows version runs an SDL3 GUI loop. This web version is a one-shot CLI:
-// it takes a URL (or "home") as argv, fetches + parses it, prints a JSON layout,
-// and exits. This lets the Node.js mini-service spawn one short-lived process per
-// navigation instead of keeping a process per user (important for a small shared
-// server like Hat Club Nest).
+//this is a human note lol, this file is probably the largest file changed with ai, but its basically a merge of GUI.cpp, and the main.
 #include <regex>
 #include <iostream>
 #include "ConnectSocket.h" //pulls our validate string global libary
@@ -18,7 +11,7 @@
 const std::regex httpPattern("((http)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 const std::regex httpsPattern("((https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)");
 
-// CHANGED WITH AI: globals declared in Layout.cpp / Parser.cpp that we set before parsing.
+// CHANGED WITH AI: create some tab globals in Layout.cpp / Parser.cpp that we set before parsing.
 extern WebColor g_backgroundColor;
 extern std::string g_pageTitle;
 extern std::string g_currentURL;
@@ -40,9 +33,7 @@ int LoadLocalHTML(const std::string& path)
         return 0;
 }
 
-// CHANGED WITH AI: build the homepage HTML (same content the Windows UpdateHTML()
-// produces) so a fresh "home" load shows the starred pages.
-std::string BuildHomeHTML(const std::string& starredPath)
+std::string UpdateHTML(const std::string& starredPath)
 {
         std::string html;
         html += "<!DOCTYPE html><html lang=\"en\"><head>";
@@ -58,10 +49,6 @@ std::string BuildHomeHTML(const std::string& starredPath)
         html += "<h1>C++Browse</h1>";
         html += "<p>This is my C++ web browser project.</p>";
         html += "<h1>To start, search anything.</h1>";
-        // CHANGED WITH AI: homepage hint text. Bing will occasionally serve a
-        // captcha page despite our real-Chrome UA — when that happens, the
-        // workaround is to enter the full URL directly (e.g. https://example.com/)
-        // instead of searching for it.
         html += "<p>Sometimes you will be captcha'd.</p>";
         html += "<p>Use full URLs (https://...) if that happens.</p>";
 
@@ -73,7 +60,6 @@ std::string BuildHomeHTML(const std::string& starredPath)
                 std::string line;
                 while (std::getline(sf, line))
                 {
-                        // CHANGED WITH AI: strip trailing \r (the STAR file uses CRLF).
                         if (!line.empty() && line.back() == '\r') line.pop_back();
                         if (!line.empty()) starred.push_back(line);
                 }
@@ -106,15 +92,14 @@ int main(int argc, char* argv[])
         // CHANGED WITH AI: take the target from argv instead of an infinite stdin loop.
         std::string input = (argc > 1) ? argv[1] : "home";
 
-        // reset globals per run (one process = one page)
+        // reset globals per run (so each page)
         g_backgroundColor = { 245, 245, 245, 255 };
         g_pageTitle = "New Tab";
         g_currentURL = "";
 
         if (input == "home" || input.empty())
         {
-                // CHANGED WITH AI: parse the generated homepage, like the Windows Home button.
-                std::string homeHtml = BuildHomeHTML("starred_pages.STAR");
+                std::string homeHtml = UpdateHTML("starred_pages.STAR");
                 g_pageTitle = "New Tab";
                 Parser(homeHtml);
         }
@@ -132,22 +117,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-                // CHANGED WITH AI: treat non-URL input as a web search.
-                //
-                // ORIGINAL BEHAVIOR: searched DuckDuckGo's lite endpoint
-                // (https://lite.duckduckgo.com/lite/?q=...). That endpoint is
-                // unreachable from many shared servers (TCP connect hangs) and
-                // also returns captchas aggressively to non-browser clients, so
-                // searches silently failed — the frontend sat on "Loading..."
-                // forever while the engine waited for a curl response that
-                // never came.
-                //
-                // FIX: switched the default search backend to Bing, which
-                // returns 200 OK with clean parseable HTML to a real-Chrome
-                // User-Agent. Also added proper URL-encoding for the query so
-                // characters like &, #, ?, +, % don't break the URL (the old
-                // space-only hack would turn "AT&T" into "?q=AT&T" which Bing
-                // would parse as two separate params).
+                // CHANGED WITH AI: modified the sending part, to work for bing.
 
                 std::string query = "";
                 for (unsigned char c : input)

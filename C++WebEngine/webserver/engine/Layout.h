@@ -1,8 +1,3 @@
-// CHANGED WITH AI: Web port of the Windows Layout.h.
-// This version is SDL-free (no SDL_Texture / SDL_Surface / SDL_Color) because the
-// web engine outputs JSON layout data instead of rendering to an SDL window.
-// The Node and Layout structs mirror the Windows engine so the same layout logic
-// (MeasureNodes / PositionNodes) can be reused.
 #pragma once
 #ifndef  GET_LAYOUT
 #define GET_LAYOUT
@@ -16,7 +11,7 @@
 // this is saying class tokentype( start (like <p>), text (like "this is a test"), and end (like <p>))
 enum class NODETYPE { START, TEXT, END };
 
-// CHANGED WITH AI: SDL_Color replaced with a plain struct for the web port.
+//make a class to hold it ig
 struct WebColor {
     unsigned char r = 0, g = 0, b = 0, a = 255;
 };
@@ -36,9 +31,6 @@ struct Node {
     bool measured = false;  //so we dont measure more than once!
 };
 
-// CHANGED WITH AI: Layout struct for the web port. No SDL_Texture / SDL_Surface.
-// Instead we keep the text payload + a flag for images + the resolved image src,
-// so the frontend can render everything with the pixel font.
 struct Layout
 {
     Node* node = nullptr;
@@ -58,7 +50,6 @@ struct Layout
     std::string href = ""; //we have non links "" clickable ones are filled in!
 
     //images
-    // CHANGED WITH AI: web port keeps the resolved src string instead of an SDL_Texture.
     std::string imageSrc = "";
     bool isImage = false;
 };

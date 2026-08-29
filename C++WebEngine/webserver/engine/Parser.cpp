@@ -1,11 +1,7 @@
 //THIS WILL PARSE THE DATA GOTTEN FROM THE NETWORK SOCKET.
-// CHANGED WITH AI: Ported the Windows engine Parser.cpp to the web version.
-// The old web version was missing: DecodeEntities, pullTITLE, StripCSS,
-// RemoveEverythingButCSS, and the lowercase + self-closing tag handling.
-// Those are all brought over here so the web engine is up to date.
 #include "Parser.h"
 #include "DOMTree.h" //included for the DOM in the dom tree
-#include "Layout.h"  // CHANGED WITH AI: needed so DOM() can call LayoutTree()
+#include "Layout.h" 
 #include <vector>
 #include <list>
 #include <unordered_set> //for the check to make it faster
@@ -30,8 +26,6 @@ bool iswhitespace(std::string& input)
         return true;
 }
 
-// CHANGED WITH AI: Ported DecodeEntities from the Windows engine.
-// The old web parser passed raw entities (&amp; &nbsp; etc.) straight through.
 std::string DecodeEntities(const std::string& input)
 {
         std::string out; //the thing we are gonna return out
@@ -232,7 +226,7 @@ std::vector<Token> StripTags(std::string htmldata)
                         //first we need just the tag name
                         std::string tagName = Savevar.substr(1, Savevar.length() - 2);
 
-                        // CHANGED WITH AI: handle self-closing tags like <img/> (ported from Windows)
+                        
                         if (!tagName.empty() && tagName.back() == '/') {
                                 tagName.pop_back();
                         }
@@ -245,7 +239,6 @@ std::vector<Token> StripTags(std::string htmldata)
                                 tagName = tagName.substr(0, spacePos);
                         }
 
-                        // CHANGED WITH AI: force lowercase (ported from Windows)
                         std::transform(tagName.begin(), tagName.end(), tagName.begin(), ::tolower);
 
                         //before we throw in the towel, lets check to see if its one of our void tags
@@ -318,8 +311,6 @@ std::vector<Token> StripTags(std::string htmldata)
 
 }
 
-// CHANGED WITH AI: Ported pullTITLE from the Windows engine so the web version
-// can set the tab title like the Windows version does.
 std::string pullTITLE(std::string htmldata)
 {
         std::string titlepos;
@@ -503,8 +494,6 @@ std::string ManageNoScript(const std::string& htmldata)
 
 }
 
-// CHANGED WITH AI: Ported RemoveEverythingButCSS from the Windows engine.
-// Pulls just the contents of every <style> block so StripCSS can tokenize it.
 std::string RemoveEverythingButCSS(std::string input)
 {
         std::string returnhtmldata;
@@ -546,10 +535,6 @@ std::string RemoveEverythingButCSS(std::string input)
 
 }
 
-
-// CHANGED WITH AI: Ported StripCSS from the Windows engine.
-// Tokenizes CSS rules (id + properties) and stores them via CSSDOM so the layout
-// can apply font-size / color / background / display:flex / position:absolute.
 int StripCSS(std::string input) {
 
         std::vector<CSSRule> CSS;
@@ -625,9 +610,6 @@ int StripCSS(std::string input) {
 
 int Parser(std::string input)
 {
-
-        // CHANGED WITH AI: grab the title FIRST (before DOM/LayoutTree prints the
-        // JSON), so the title is available when the JSON is serialized.
         extern std::string g_pageTitle;
         std::string title = pullTITLE(input);
         if (!title.empty() && title != "unk tab name")
@@ -635,8 +617,6 @@ int Parser(std::string input)
                 g_pageTitle = title;
         }
 
-        // CHANGED WITH AI: parse CSS first (ported from Windows) so globalCSS is
-        // populated before the DOM/layout runs.
         StripCSS(
                 RemoveEverythingButCSS(input));
 

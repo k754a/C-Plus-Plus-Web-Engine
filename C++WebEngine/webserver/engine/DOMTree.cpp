@@ -1,7 +1,5 @@
 //THIS IS THE DOM TREE.
-// CHANGED WITH AI: Ported the Windows engine DOMTree.cpp to the web version.
-// Brought over: href/src extraction, CollapseWhitespace, CSSDOM/globalCSS, and the
-// LayoutTree() call (the old web version just printed the tree as text).
+
 #include <iostream>
 #include "DOMTree.h"
 #include "Layout.h"
@@ -37,18 +35,14 @@ void PrintDomTree(Node* node, int debth = 0)
         }
 }
 
-// CHANGED WITH AI: Ported globalCSS from the Windows engine.
 std::vector<CSSRule> globalCSS;
 
-// CHANGED WITH AI: Ported CSSDOM from the Windows engine — stores parsed CSS rules.
 int CSSDOM(std::vector<CSSRule> tokens) {
         globalCSS = tokens;
         return 0;
 }
 
 
-// CHANGED WITH AI: Ported CollapseWhitespace from the Windows engine so text nodes
-// are cleaned the same way as the Windows version.
 std::string CollapseWhitespace(const std::string& input)
 {
         //result string
@@ -121,7 +115,6 @@ int DOM(std::vector<Token> tokens)
 
                         std::string rawToken = currentToken.value;
 
-                        // CHANGED WITH AI: Ported href extraction from the Windows engine.
                         size_t hrefPos = rawToken.find("href=\"");
                         if (hrefPos != std::string::npos) //if we do
                         {
@@ -133,7 +126,6 @@ int DOM(std::vector<Token> tokens)
                                 }
                         }
 
-                        // CHANGED WITH AI: Ported src extraction from the Windows engine.
                         size_t srcPos = rawToken.find("src=\"");
                         if (srcPos != std::string::npos) //if we do
                         {
@@ -202,7 +194,7 @@ int DOM(std::vector<Token> tokens)
 
                         Node* TempNode = new Node(); //make the new node.
                         TempNode->tag = NODETYPE::TEXT;
-                        // CHANGED WITH AI: collapse whitespace (ported from Windows)
+                        
                         TempNode->tagValue = CollapseWhitespace(currentToken.value);
                         TempNode->Parent = Save;
 
@@ -224,18 +216,10 @@ int DOM(std::vector<Token> tokens)
                                 Save = Save->Parent;
                         }
                 }
-
-
-
-
         }
 
-        std::cout << std::endl << "DOM TREE" << std::endl;
+        std::cout << std::endl << "DOM TREE" << std::endl
 
-
-        // CHANGED WITH AI: hand the tree to the layout engine (ported from Windows).
-        // The old web version only printed the tree as text — now we build a real
-        // layout that the frontend can render.
         LayoutTree(Root);
 
         return 0;

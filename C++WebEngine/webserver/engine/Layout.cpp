@@ -1,20 +1,14 @@
 //THIS WILL HANDLE THE LAYOUT OF THE ENGINE
-// CHANGED WITH AI: Ported the Windows engine Layout.cpp to the web version.
-// The Windows version renders to SDL3 textures; this web version instead builds
-// the same layout list and serializes it to JSON for the browser frontend.
-// The MeasureNodes / PositionNodes / CSS-application logic is kept identical so
-// the rendered output matches the Windows browser.
 #include <string>
 #include <vector>
-#include <cctype> // CHANGED WITH AI: needed for std::isdigit / std::tolower in NormalizeHref
-#include <algorithm> // CHANGED WITH AI: needed for std::transform in NormalizeHref
+#include <cctype> 
+#include <algorithm>
 #include "Layout.h"
 #include "DOMTree.h"
 
-// CHANGED WITH AI: globals that the main program reads after parsing to build JSON.
 WebColor g_backgroundColor = { 245, 245, 245, 255 }; // default white-ish, gets changed
 std::string g_pageTitle = "New Tab";
-std::string g_currentURL = ""; // set by main before parsing, used to resolve image src
+std::string g_currentURL = "";
 
 
 //looks through all our CSS rules to find the one that matches our tag in our tree
@@ -214,10 +208,6 @@ void MeasureNodes(Node* node, int fontsize)
 
         if (node->tag == NODETYPE::TEXT)
         {
-                // CHANGED WITH AI: fixed width estimate from 0.45 to 0.55 to match
-                // the font's actual average advance width (~0.55 em). The old 0.45
-                // caused text items to overlap in the re-flow because the estimated
-                // width was smaller than the actual rendered width.
                 node->measuredWidth = (int)(node->tagValue.size() * (fontsize * 0.55));
                 node->measuredHeight = fontsize + 4;
                 node->measured = true;
@@ -242,9 +232,6 @@ void MeasureNodes(Node* node, int fontsize)
         node->measured = true;
 }
 
-
-// CHANGED WITH AI: ported PercentDecode + ResolveURL from the Windows GUI.cpp so
-// the web engine can resolve relative image src URLs against the page URL.
 std::string PercentDecode(const std::string& src)
 {
         std::string out;
@@ -331,87 +318,50 @@ std::string ResolveURL(std::string src, std::string currentUrl)
         return direcotry + "/" + src;
 }
 
+//pulled off of https://stackoverflow.com/questions/180947/base64-decode-snippet-in-c
+std::string base64_decode(std::string const& encoded_string) {
+    int in_len = encoded_string.size();
+    int i = 0;
+    int j = 0;
+    int in_ = 0;
+    unsigned char char_array_4[4], char_array_3[3];
+    std::string ret;
 
-// CHANGED WITH AI: base64 decoder used to unwrap Bing's /ck/a redirect URLs.
-// Bing wraps every search-result link in https://www.bing.com/ck/a?...&u=a1<base64>&ntb=1
-// where the real destination is the base64-encoded URL after the "a1" prefix.
-// Without unwrapping, clicking a search result navigates to the tracker URL,
-// which returns a JS-based redirect page that the C++ engine can't execute —
-// so the user sees a blank or captcha page instead of the real result.
-//
-// Bing uses URL-SAFE base64 (RFC 4648 §5): '-' instead of '+' and '_' instead
-// of '/'. Padding ('=') is usually omitted. We translate the URL-safe chars
-// to the standard alphabet before decoding.
-//
-// Tolerates missing padding and stray non-alphabet characters (skips them).
-std::string Base64Decode(const std::string& s)
-{
-        // build the lookup table once
-        static int8_t table[256];
-        static bool tableInit = false;
-        if (!tableInit)
-        {
-                for (int i = 0; i < 256; i++) table[i] = -1;
-                const char* alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-                for (int i = 0; i < 64; i++) table[(unsigned char)alpha[i]] = (int8_t)i;
-                tableInit = true;
+    while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_])) {
+        char_array_4[i++] = encoded_string[in_]; in_++;
+        if (i == 4) {
+            for (i = 0; i < 4; i++)
+                char_array_4[i] = base64_chars.find(char_array_4[i]);
+
+            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+            for (i = 0; (i < 3); i++)
+                ret += char_array_3[i];
+            i = 0;
         }
+    }
 
-        std::string out;
-        out.reserve(s.size() * 3 / 4);
+    if (i) {
+        for (j = i; j < 4; j++)
+            char_array_4[j] = 0;
 
-        int val = 0;
-        int bits = 0;
-        for (char c : s)
-        {
-                if (c == '=' || c == '\n' || c == '\r' || c == ' ') continue;
+        for (j = 0; j < 4; j++)
+            char_array_4[j] = base64_chars.find(char_array_4[j]);
 
-                // CHANGED WITH AI: translate URL-safe base64 chars to standard.
-                // Bing encodes with '-' and '_' instead of '+' and '/'. Without
-                // this translation, those chars get skipped (treated as invalid)
-                // and the decode produces garbage bytes mid-URL.
-                unsigned char uc = (unsigned char)c;
-                if (c == '-') uc = (unsigned char)'+';
-                else if (c == '_') uc = (unsigned char)'/';
+        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
 
-                int8_t d = table[uc];
-                if (d < 0) continue; // skip any char outside the base64 alphabet
-                val = (val << 6) | d;
-                bits += 6;
-                if (bits >= 8)
-                {
-                        bits -= 8;
-                        out += (char)((val >> bits) & 0xFF);
-                }
-        }
-        return out;
+        for (j = 0; (j < i - 1); j++) ret += char_array_3[j];
+    }
+
+    return ret;
 }
 
-
-// CHANGED WITH AI: Normalize a resolved href into something the engine can
-// actually fetch. Three transformations:
-//
-//   1. Bing /ck/a redirect unwrap. Bing wraps every search-result link in
-//      https://www.bing.com/ck/a?!&&p=...&u=a1<base64>&ntb=1
-//      The real destination is the base64-decoded value of the `u` param
-//      (after stripping the leading "a1" or "a3" prefix). We pull the `u`
-//      param out of the query string and decode it.
-//
-//   2. javascript: URLs → empty string. Bing sprinkles links like
-//      <a href="javascript:void(0)"> on menu buttons. The engine can't
-//      execute JS, and feeding "javascript:void(0)" to curl would just 404
-//      and waste a process spawn. Return "" so the frontend can treat the
-//      link as a no-op (see handleLinkClick in page.tsx, which already
-//      skips empty hrefs).
-//
-//   3. Pure-fragment URLs (#foo, https://host/#, https://host/page#foo) →
-//      empty string. These are same-page anchors. The engine can't scroll
-//      the page; fetching them just re-loads the same page (because the
-//      fragment isn't sent to the server). Return "" so the frontend treats
-//      them as no-ops too.
-//
-// Anything else (real http(s) URLs, already-resolved relative URLs) passes
-// through unchanged.
+// CHANGED WITH AI (Largest ai change): Normalize a resolved href into something the engine can
+// actually fetch. 
 std::string NormalizeHref(std::string href)
 {
         // --- 2. javascript: URLs → empty ---
@@ -528,53 +478,20 @@ std::string NormalizeHref(std::string href)
                                         upos = qs.find("u=", upos + 2);
                                 }
                         }
-                        // couldn't unwrap — fall through and return the raw /ck/a URL
-                        // (better than nothing; the engine will try to fetch it)
                 }
         }
 
         return href;
 }
 
-
 //this is the poistion part
-// CHANGED WITH AI: uses WebColor instead of SDL_Color, otherwise identical to Windows.
 void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize, WebColor textColor, WebColor bgColor, bool hasBg, std::string currentHref, bool inFlex = false)
 {
-
         if (node->tag == NODETYPE::START)
         {
 
                 if (!node->href.empty())
                 {
-                        // CHANGED WITH AI: resolve relative hrefs against the current
-                        // page URL (g_currentURL) so the frontend always receives an
-                        // absolute URL. Without this, a link like <a href="/example/">
-                        // on https://somesite.com/foo was emitted as the raw string
-                        // "/example/", which the frontend then passed back to the
-                        // engine, where the URL regex didn't match it and the engine
-                        // fell through to the DuckDuckGo-search branch — so clicking
-                        // "/example/" searched DuckDuckGo for "/example/" instead of
-                        // going to https://somesite.com/example/.
-                        //
-                        // ResolveURL already exists for image src; we reuse it here.
-                        // It returns the input unchanged for absolute URLs (http://,
-                        // https://), and resolves protocol-relative, root-relative,
-                        // and path-relative URLs against the current page URL.
-                        //
-                        // Guard: skip resolution when g_currentURL is empty (the home
-                        // page). Home-page links come from BuildHomeHTML and are
-                        // already absolute URLs, so resolving them against "" would
-                        // produce a broken "https:///example/" string.
-                        //
-                        // After resolving, NormalizeHref() cleans up the result:
-                        //   - unwraps Bing /ck/a redirect tracker URLs to the real
-                        //     destination (otherwise clicking a Bing search result
-                        //     navigates to a JS-redirect page the engine can't run)
-                        //   - strips pure-fragment links (#foo) and javascript: URLs
-                        //     to "" so the frontend treats them as no-ops
-                        //   - strips fragments from real URLs (https://host/p#frag →
-                        //     https://host/p) since the engine can't scroll anyway
                         std::string resolved;
                         if (!g_currentURL.empty())
                         {
@@ -604,7 +521,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
                                         fontsize = std::stoi(fs) * 2;
                                 }
                         }
-
 
 
                         std::string bg = FindProperty(id, "background-color");
@@ -682,8 +598,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
                         }
                 }
 
-
-
                 //we are gonna handle our flex stuff here.
                 if (IsFlex(node))
                 {
@@ -744,9 +658,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
                         return;
                 }
 
-
-
-
                 if (!inFlex)
                 {
 
@@ -765,7 +676,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
                         currentXpos = ((currentXpos / 200) + 1) * 200;
                 }
 
-
                 //check if its an image
                 if (node->tagValue == "img" && !node->src.empty())
                 {
@@ -775,9 +685,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
                         imgLayout.y = currentYpos;
                         imgLayout.isImage = true;
 
-                        // CHANGED WITH AI: resolve the image src against the page URL (was done
-                        // in GUI.cpp PreRender on Windows; here we do it at layout time so the
-                        // frontend gets a fully-qualified URL in the JSON).
                         imgLayout.imageSrc = ResolveURL(node->src, g_currentURL);
 
                         imgLayout.fontSize = 0;
@@ -795,20 +702,12 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
                                 currentXpos = 20;
                                 currentYpos += node->measuredHeight + 15;
                         }
-
-
                 }
-
-
-
-
         }
-
 
         if (node->tag == NODETYPE::TEXT)
         {
                 Layout layouttree;
-
 
                 layouttree.x = currentXpos;
                 layouttree.y = currentYpos;
@@ -820,7 +719,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
                 }
 
                 layouttree.node = node;
-
 
                 layouttree.textColor = textColor;
 
@@ -834,9 +732,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
                 layouttree.hasBg = hasBg;
 
-
                 layouttree.href = currentHref;
-
 
                 layouttree.width = node->measuredWidth;
                 layouttree.hight = node->measuredHeight;
@@ -853,12 +749,7 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
                         currentXpos = 20;
                         currentYpos += fontsize + 4;
                 }
-
-
-
-
         }
-
 
         for (Node* child : node->children)
         {
@@ -867,7 +758,6 @@ void PositionNodes(Node* node, int& currentXpos, int& currentYpos, int fontsize,
 
 
 }
-
 
 // CHANGED WITH AI: JSON string escaper for the web port (Windows didn't need this
 // because it rendered text straight to SDL; we serialize to JSON instead).
@@ -908,13 +798,6 @@ std::string ColorToHex(const WebColor& c)
 }
 
 
-// CHANGED WITH AI: Ported the PreRender re-flow from the Windows GUI.cpp.
-// The Windows version re-flows all layout items in PreRender() using actual
-// text surface dimensions from TTF_RenderText_Solid. This web port re-flows
-// using the estimated dimensions from MeasureNodes, which produces the same
-// sequential left-to-right, line-by-line positioning with proper 15px line
-// gaps. Without this re-flow, items used the raw PositionNodes positions which
-// had tight 2px vertical gaps (causing overlap) and erratic horizontal spacing.
 void ReflowLayout()
 {
         int xtrack = 20;
@@ -924,9 +807,8 @@ void ReflowLayout()
 
         for (size_t i = 0; i < layoutList.size(); i++)
         {
-                int origY = layoutList[i].y; // save original y for line-break detection
+                int origY = layoutList[i].y; // save original y for line-break 
 
-                // detect a new line: the original y changed from the previous item
                 if (lasty != -1 && origY > lasty)
                 {
                         xtrack = 20;
@@ -935,7 +817,6 @@ void ReflowLayout()
                 }
                 lasty = origY;
 
-                // handle table column offsets (items with x > 20)
                 if (layoutList[i].x > 20)
                 {
                         int colX = (xtrack > layoutList[i].x) ? xtrack : layoutList[i].x;
@@ -949,12 +830,6 @@ void ReflowLayout()
 
                 layoutList[i].y = ytrack;
 
-                // CHANGED WITH AI: recalculate width/height for text items using
-                // the DISPLAY font size from PositionNodes (not the inherited
-                // font size from MeasureNodes which is too small). The Windows
-                // PreRender does this via TTF_RenderText_Solid; here we use the
-                // same 0.55 em-per-char estimate as MeasureNodes but with the
-                // correct display font size. This prevents line overlaps.
                 if (!layoutList[i].isImage && layoutList[i].fontSize > 0 && layoutList[i].node)
                 {
                         layoutList[i].width = (int)(layoutList[i].node->tagValue.size() * (layoutList[i].fontSize * 0.55));
