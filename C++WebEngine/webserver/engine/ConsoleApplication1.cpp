@@ -58,7 +58,8 @@ std::string BuildHomeHTML(const std::string& starredPath)
         html += "<h1>C++Browse</h1>";
         html += "<p>This is my C++ web browser project.</p>";
         html += "<h1>To start, search anything.</h1>";
-        html += "<p>NOTE: this runs on Nest, so you may get hit with captchas. Please enter full links (https://...)!</p>";
+        html += "<p>NOTE: this runs on Nest, so you may get hit with captchas.</p>";
+        html += "<p> Please enter full links(https://...)!</p>";
         html += "<h1>To start, search anything.</h1>";
 
         // load starred pages
