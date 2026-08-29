@@ -74,6 +74,19 @@ function getWinHServer() {
   return 800;
 }
 
+// CHANGED WITH AI: Subscribe to window WIDTH too — needed for the new
+// horizontal scrollbar (canScrollH depends on viewport width vs content width).
+function subscribeWinW(cb: () => void) {
+  window.addEventListener('resize', cb);
+  return () => window.removeEventListener('resize', cb);
+}
+function getWinW() {
+  return window.innerWidth;
+}
+function getWinWServer() {
+  return 1200;
+}
+
 export default function Home() {
   const [tabs, setTabs] = useState<Tab[]>(() => [makeTab('New Tab', 'home')]);
   const [activeTab, setActiveTab] = useState(0);
@@ -81,21 +94,36 @@ export default function Home() {
   const [loadingTabId, setLoadingTabId] = useState<number | null>(null);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [scrollTop, setScrollTop] = useState(0);
+  // CHANGED WITH AI: track horizontal scroll position for the new H-scrollbar.
+  const [scrollLeft, setScrollLeft] = useState(0);
   const [cursorVisible, setCursorVisible] = useState(true);
   const [urlFocused, setUrlFocused] = useState(false);
   const [textWidth, setTextWidth] = useState(0);
   // CHANGED WITH AI: track which nav button is hovered for inline hover highlight
   const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
   const winH = useSyncExternalStore(subscribeWinH, getWinH, getWinHServer);
+  // CHANGED WITH AI: track window width for the horizontal scrollbar.
+  const winW = useSyncExternalStore(subscribeWinW, getWinW, getWinWServer);
 
   const socketRef = useRef<Socket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navTabIdRef = useRef<number | null>(null);
   const urlMeasureRef = useRef<HTMLSpanElement>(null);
-  const dragStateRef = useRef<{ startY: number; startScroll: number } | null>(null);
+  // CHANGED WITH AI: dragState now tracks both vertical AND horizontal scrollbar
+  // drags. `axis` is 'v' or 'h'. For 'v' we use startY/startScroll (scrollTop);
+  // for 'h' we use startX/startScrollH (scrollLeft).
+  const dragStateRef = useRef<
+    | { axis: 'v'; startY: number; startScroll: number }
+    | { axis: 'h'; startX: number; startScroll: number }
+    | null
+  >(null);
   const tabScrollRef = useRef<Map<number, number>>(new Map());
   const viewportHRef = useRef(800);
   const contentHeightRef = useRef(800);
+  // CHANGED WITH AI: refs for the horizontal scroll range, used by the
+  // window-level drag listener (which reads refs, not state).
+  const viewportWRef = useRef(1200);
+  const contentWidthRef = useRef(1200);
 
   const activeTabData = tabs[Math.min(activeTab, tabs.length - 1)] ?? tabs[0];
   const currentLayout = activeTabData?.layout ?? null;
@@ -117,12 +145,36 @@ export default function Home() {
   }
   const contentHeight = computeContentHeight();
 
-  // Keep refs in sync with the latest viewport/content height for the
+  // CHANGED WITH AI: viewport width for the content area. The vertical scrollbar
+  // (SCROLL_W) eats into the available width when it's visible. Declared AFTER
+  // contentHeight so we can check whether the vertical scrollbar will show.
+  const viewportW = Math.max(100, winW - (contentHeight > viewportH ? SCROLL_W : 0));
+
+  // CHANGED WITH AI: compute the widest layout item so we know if a horizontal
+  // scrollbar is needed. Some pages (e.g. Bing search results) have wide text
+  // items that overflow the viewport — without horizontal scroll, the right
+  // side of those items is unreachable.
+  function computeContentWidth(): number {
+    if (!currentLayout?.items?.length) return viewportW;
+    let max = 0;
+    for (const item of currentLayout.items) {
+      // for text items, width is already estimated by the engine; for images,
+      // item.width is set. Fall back to a small value if neither is present.
+      const itemW = item.width || (item.fontSize ? item.fontSize * 8 : 20);
+      max = Math.max(max, item.x + itemW);
+    }
+    return Math.max(viewportW, max + 100);
+  }
+  const contentWidth = computeContentWidth();
+
+  // Keep refs in sync with the latest viewport/content size for the
   // window-level drag listeners (which read refs, not state).
   useEffect(() => {
     viewportHRef.current = viewportH;
     contentHeightRef.current = contentHeight;
-  }, [viewportH, contentHeight]);
+    viewportWRef.current = viewportW;
+    contentWidthRef.current = contentWidth;
+  }, [viewportH, contentHeight, viewportW, contentWidth]);
 
   const canScroll = contentHeight > viewportH;
   const barHeight = canScroll
@@ -131,6 +183,21 @@ export default function Home() {
   const barTop =
     canScroll && contentHeight - viewportH > 0
       ? (scrollTop / (contentHeight - viewportH)) * (viewportH - barHeight)
+      : 0;
+
+  // CHANGED WITH AI: horizontal scrollbar metrics — mirror the vertical ones.
+  // canScrollH is true when the widest layout item exceeds the viewport width.
+  // The H-scrollbar lives at the bottom of the content area, with height = SCROLL_W
+  // (same thickness as the vertical one). When the vertical scrollbar is also
+  // visible, the H-scrollbar stops SCROLL_W px short of the right edge so the
+  // two don't overlap (a small filler box occupies the bottom-right corner).
+  const canScrollH = contentWidth > viewportW;
+  const barWidth = canScrollH
+    ? Math.max(20, (viewportW / contentWidth) * viewportW)
+    : 0;
+  const barLeft =
+    canScrollH && contentWidth - viewportW > 0
+      ? (scrollLeft / (contentWidth - viewportW)) * (viewportW - barWidth)
       : 0;
 
   // ----- Socket.io connection -----
@@ -154,8 +221,13 @@ export default function Home() {
       );
       if (scrollRef.current) {
         scrollRef.current.scrollTop = 0;
+        // CHANGED WITH AI: also reset horizontal scroll on new navigation,
+        // so the new page starts at the left edge (not whatever scrollLeft
+        // the previous page had).
+        scrollRef.current.scrollLeft = 0;
       }
       setScrollTop(0);
+      setScrollLeft(0);
     });
 
     socket.on('bookmarks', (data: string[]) => {
@@ -183,20 +255,39 @@ export default function Home() {
   }, [urlInput]);
 
   // ----- Custom scrollbar drag (window-level listeners) -----
+  // CHANGED WITH AI: now handles BOTH vertical and horizontal scrollbar drags.
+  // The dragStateRef holds an `axis` field ('v' or 'h') so we know which
+  // scroll dimension to update. The math is the same in both cases — just
+  // swap Y/X and viewportH/viewportW.
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       const ds = dragStateRef.current;
       if (!ds || !scrollRef.current) return;
-      const vph = viewportHRef.current;
-      const ch = contentHeightRef.current;
-      if (ch <= vph) return;
-      const bH = Math.max(20, (vph / ch) * vph);
-      const dy = e.clientY - ds.startY;
-      const scrollRange = ch - vph;
-      const barRange = vph - bH;
-      if (barRange <= 0) return;
-      const newScroll = ds.startScroll + (dy / barRange) * scrollRange;
-      scrollRef.current.scrollTop = Math.max(0, Math.min(scrollRange, newScroll));
+
+      if (ds.axis === 'v') {
+        const vph = viewportHRef.current;
+        const ch = contentHeightRef.current;
+        if (ch <= vph) return;
+        const bH = Math.max(20, (vph / ch) * vph);
+        const dy = e.clientY - ds.startY;
+        const scrollRange = ch - vph;
+        const barRange = vph - bH;
+        if (barRange <= 0) return;
+        const newScroll = ds.startScroll + (dy / barRange) * scrollRange;
+        scrollRef.current.scrollTop = Math.max(0, Math.min(scrollRange, newScroll));
+      } else {
+        // axis === 'h'
+        const vpw = viewportWRef.current;
+        const cw = contentWidthRef.current;
+        if (cw <= vpw) return;
+        const bW = Math.max(20, (vpw / cw) * vpw);
+        const dx = e.clientX - ds.startX;
+        const scrollRange = cw - vpw;
+        const barRange = vpw - bW;
+        if (barRange <= 0) return;
+        const newScroll = ds.startScroll + (dx / barRange) * scrollRange;
+        scrollRef.current.scrollLeft = Math.max(0, Math.min(scrollRange, newScroll));
+      }
     };
     const onUp = () => {
       dragStateRef.current = null;
@@ -384,17 +475,21 @@ export default function Home() {
   function handleScroll() {
     if (scrollRef.current) {
       setScrollTop(scrollRef.current.scrollTop);
+      setScrollLeft(scrollRef.current.scrollLeft);
       if (activeTabData) {
         tabScrollRef.current.set(activeTabData.id, scrollRef.current.scrollTop);
       }
     }
   }
 
+  // CHANGED WITH AI: renamed to make it clear this is the VERTICAL scrollbar
+  // thumb drag handler. Now sets `axis: 'v'` on the dragState.
   function handleScrollbarMouseDown(e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
     if (!canScroll) return;
     dragStateRef.current = {
+      axis: 'v',
       startY: e.clientY,
       startScroll: scrollRef.current?.scrollTop ?? 0,
     };
@@ -410,6 +505,34 @@ export default function Home() {
     if (barRange <= 0) return;
     const newScroll = (targetBarTop / barRange) * scrollRange;
     scrollRef.current.scrollTop = Math.max(0, Math.min(scrollRange, newScroll));
+  }
+
+  // CHANGED WITH AI: horizontal scrollbar thumb drag handler — mirror of
+  // handleScrollbarMouseDown but for the X axis.
+  function handleHScrollbarMouseDown(e: React.MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!canScrollH) return;
+    dragStateRef.current = {
+      axis: 'h',
+      startX: e.clientX,
+      startScroll: scrollRef.current?.scrollLeft ?? 0,
+    };
+  }
+
+  // CHANGED WITH AI: horizontal scrollbar track click — mirror of
+  // handleTrackMouseDown but for the X axis. Clicking the track jumps the
+  // thumb to that position.
+  function handleHTrackMouseDown(e: React.MouseEvent) {
+    if (!scrollRef.current || !canScrollH) return;
+    const trackRect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const clickX = e.clientX - trackRect.left;
+    const targetBarLeft = clickX - barWidth / 2;
+    const barRange = viewportW - barWidth;
+    const scrollRange = contentWidth - viewportW;
+    if (barRange <= 0) return;
+    const newScroll = (targetBarLeft / barRange) * scrollRange;
+    scrollRef.current.scrollLeft = Math.max(0, Math.min(scrollRange, newScroll));
   }
 
   function renderLayoutItem(item: LayoutItem, i: number) {
@@ -820,15 +943,22 @@ export default function Home() {
           className="hide-native-scroll"
           style={{
             position: 'absolute',
-            inset: 0,
+            // CHANGED WITH AI: reserve SCROLL_W at the bottom for the horizontal
+            // scrollbar when it's visible (mirrors how the vertical scrollbar
+            // reserves SCROLL_W on the right).
+            inset: canScrollH ? `0 ${canScroll ? SCROLL_W : 0}px ${SCROLL_W}px 0` : `0 ${canScroll ? SCROLL_W : 0}px 0 0`,
             overflowY: 'auto',
-            overflowX: 'hidden',
+            overflowX: 'auto',
           }}
         >
           <div
             style={{
               position: 'relative',
-              width: '100%',
+              // CHANGED WITH AI: use the computed contentWidth (which is the
+              // widest layout item) so the inner content can be wider than the
+              // viewport, enabling horizontal scrolling. Was `width: '100%'`
+              // which clamped everything to the viewport width.
+              width: contentWidth,
               height: contentHeight,
             }}
           >
@@ -885,7 +1015,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* Custom Windows-style scrollbar */}
+        {/* Custom Windows-style vertical scrollbar */}
+        {/* CHANGED WITH AI: shortened by SCROLL_W at the bottom when the
+            horizontal scrollbar is also visible, so the two don't overlap
+            (a separate corner box fills the bottom-right gap). */}
         {canScroll && (
           <div
             onMouseDown={handleTrackMouseDown}
@@ -894,7 +1027,7 @@ export default function Home() {
               right: 0,
               top: 0,
               width: SCROLL_W,
-              height: viewportH,
+              height: canScrollH ? viewportH - SCROLL_W : viewportH,
               background: '#e0e0e0',
               zIndex: 5,
             }}
@@ -914,6 +1047,62 @@ export default function Home() {
               }}
             />
           </div>
+        )}
+
+        {/* CHANGED WITH AI: Custom Windows-style HORIZONTAL scrollbar.
+            Mirrors the vertical one's styling (same colors, same inset bevel,
+            same SCROLL_W thickness) but rotated 90°. Shows up at the bottom
+            of the content area when the widest layout item exceeds the
+            viewport width (e.g. wide Bing search result text). */}
+        {canScrollH && (
+          <div
+            onMouseDown={handleHTrackMouseDown}
+            style={{
+              position: 'absolute',
+              left: 0,
+              bottom: 0,
+              // CHANGED WITH AI: when the vertical scrollbar is also visible,
+              // the H-scrollbar stops SCROLL_W short of the right edge so the
+              // two don't overlap (the corner box fills the bottom-right gap).
+              width: canScroll ? viewportW : viewportW,
+              height: SCROLL_W,
+              background: '#e0e0e0',
+              zIndex: 5,
+            }}
+          >
+            <div
+              onMouseDown={handleHScrollbarMouseDown}
+              style={{
+                position: 'absolute',
+                left: barLeft,
+                top: 0,
+                width: barWidth,
+                height: SCROLL_W,
+                background: '#c0c0c0',
+                cursor: 'grab',
+                boxShadow:
+                  'inset 1px 1px 0 #ffffff, inset -1px -1px 0 #646464',
+              }}
+            />
+          </div>
+        )}
+
+        {/* CHANGED WITH AI: corner box at the bottom-right where the two
+            scrollbars meet. Without this, you'd see the page background
+            through the gap. Filled with the same #e0e0e0 as the scrollbar
+            tracks so it looks like one continuous frame. */}
+        {canScroll && canScrollH && (
+          <div
+            style={{
+              position: 'absolute',
+              right: 0,
+              bottom: 0,
+              width: SCROLL_W,
+              height: SCROLL_W,
+              background: '#e0e0e0',
+              zIndex: 5,
+            }}
+          />
         )}
       </div>
     </div>

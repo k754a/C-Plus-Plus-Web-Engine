@@ -64,7 +64,6 @@ std::string BuildHomeHTML(const std::string& starredPath)
         // instead of searching for it.
         html += "<p>Sometimes you will be captcha'd.</p>";
         html += "<p>Use full URLs (https://...) if that happens.</p>";
-        html += "<h1>To start, search anything.</h1>";
 
         // load starred pages
         std::vector<std::string> starred;
