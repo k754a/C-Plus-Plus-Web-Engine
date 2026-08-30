@@ -20,7 +20,6 @@ WSAData wsaData; //structure to hold our network data, across our diffrent voids
 #define pclose _pclose
 #endif
 
-
 //this starts up our winsock at the begining
 int StartWinSock()
 {

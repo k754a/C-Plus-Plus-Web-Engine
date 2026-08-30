@@ -1,7 +1,4 @@
-/* CHANGED WITH AI: Minimal globals.css for the standalone C++Browse frontend.
-   Stripped the full shadcn/tailwind theme — the browser UI is all inline styles.
-   Only keeps: pixel font @font-face, body reset, URL-bar placeholder, and
-   native-scrollbar hiding for the content area. */
+/* CHANGED WITH AI: Some super basic css */
 
 /* ===== C++Browse pixel font ===== */
 /* The edited font files were converted from CFF/OTTO to TrueType (glyf) outlines

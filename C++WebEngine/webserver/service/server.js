@@ -1,14 +1,9 @@
-// CHANGED WITH AI: Node.js + socket.io mini-service for the C++Browse web port.
-// Spawns one SHORT-LIVED engine process per navigation, collects its JSON output,
-// and sends it back. Scales for a shared server — no persistent process per user.
 const { createServer } = require('http');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { Server } = require('socket.io');
 
-// CHANGED WITH AI: paths adjusted for the webserver/ package structure.
-// engine/ is a sibling of service/, and starred_pages.STAR lives in engine/.
 const ENGINE_DIR = path.join(__dirname, '..', 'engine');
 const ENGINE_PATH = path.join(ENGINE_DIR, 'engine');
 const STARRED_PATH = path.join(ENGINE_DIR, 'starred_pages.STAR');
@@ -25,28 +20,28 @@ const io = new Server(httpServer, {
   pingInterval: 25000,
 });
 
-// CHANGED WITH AI: read the shared starred_pages.STAR file.
+//js version of the C++ bookmarks thing.
 function readBookmarks() {
-  const out = [];
-  try {
-    const data = fs.readFileSync(STARRED_PATH, 'utf8');
-    for (const line of data.split('\n')) {
-      const trimmed = line.replace(/\r$/, '').trim();
-      if (trimmed) out.push(trimmed);
+   const starredPages = [];
+   try {
+      const data = fs.readFileSync(STARRED_PATH, 'utf8'); //open the starred_pages.STAR file, and read it as a string
+      for (const line of data.split('\n')) { //for each line
+        if(!line.trim()) continue; //ignore blank lines
+         starredPages.push(line.trim()); //add it to the array
+      }
+    } catch (e) {
+      //if the file is not found. just to prevent a crazy amount of errors
     }
-  } catch (e) {
-    // file may not exist yet
-  }
-  return out;
+    return starredPages;
 }
 
-// CHANGED WITH AI: write the shared starred_pages.STAR file.
-function writeBookmarks(list) {
-  fs.writeFileSync(STARRED_PATH, list.join('\n') + '\n', 'utf8');
+//write to the starred_pages.
+function writeBookmarks(list) { //takes in a list
+  fs.writeFileSync(STARRED_PATH, list.join('\n')); //adds each line of the list, with a new line \n
 }
 
 // CHANGED WITH AI: spawn the engine for one URL, collect stdout, extract the JSON
-// payload that follows the __BROWSE_JSON__ delimiter, and resolve with it.
+// payload that follows the __BROWSE_JSON__ delimiter, and resolve with it. 
 function runEngine(url) {
   return new Promise((resolve) => {
     let stdout = '';
@@ -128,11 +123,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3003;
-httpServer.listen(PORT, () => {
-  console.log(`[browse-engine] socket.io server running on port ${PORT}`);
-  console.log(`[browse-engine] engine binary: ${ENGINE_PATH}`);
-});
 
-process.on('SIGTERM', () => { httpServer.close(() => process.exit(0)); });
-process.on('SIGINT', () => { httpServer.close(() => process.exit(0)); });
+
+
+httpServer.listen(3003);

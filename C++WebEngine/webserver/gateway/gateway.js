@@ -1,49 +1,24 @@
-// CHANGED WITH AI: Node.js reverse-proxy gateway for C++Browse.
-// Replaces Caddy so the deployment only needs Node.js (no extra system packages).
-//
-// Listens on port 8080 (publicly accessible).
-// - Requests with ?XTransformPort=<port> are proxied to localhost:<port>
-//   (this is how the frontend's socket.io client reaches the engine service on 3003).
-// - All other requests are proxied to the Next.js frontend on port 3000.
-// - WebSocket upgrades are handled the same way (socket.io needs this).
-const http = require('http');
-const { createProxyServer } = require('http-proxy');
+const http = require('http'); //load node's http stuff
+const { createProxyServer } = require('http-proxy'); //load node's http-proxy stuff
 
-const FRONTEND_PORT = 3000;
-const GATEWAY_PORT = 8080;
+const proxy = createProxyServer({ ws: true }); //make a proxy server, that handles websockets
 
-const proxy = createProxyServer({ ws: true });
-
-proxy.on('error', (err, req, res) => {
-  console.error('[gateway] proxy error:', err.message);
-  if (res && !res.headersSent) {
-    res.writeHead(502, { 'Content-Type': 'text/plain' });
-    res.end('Bad Gateway');
-  }
-});
-
-function getTargetPort(req) {
-  const parsed = new URL(req.url, 'http://localhost');
-  const port = parsed.searchParams.get('XTransformPort');
-  return port || String(FRONTEND_PORT);
+function getPort(req) { //pull the port that we want to send too
+  //check for the port, if it does not exist, use 3000
+  return new URL(req.url, 'http://localhost').searchParams.get('XTransformPort') || 3000;
 }
 
+//create the server
 const server = http.createServer((req, res) => {
-  const port = getTargetPort(req);
-  proxy.web(req, res, { target: 'http://localhost:' + port });
+  //send the stuff to the port
+  proxy.web(req, res, { target: `http://localhost:${getPort(req)}` });
 });
 
-// Handle WebSocket upgrades (socket.io)
+//runs only when a websocket req is made
 server.on('upgrade', (req, socket, head) => {
-  const port = getTargetPort(req);
-  proxy.ws(req, socket, head, { target: 'ws://localhost:' + port });
+  //send to the websocket
+  proxy.ws(req, socket, head, { target: `ws://localhost:${getPort(req)}` });
 });
 
-server.listen(GATEWAY_PORT, () => {
-  console.log(`[gateway] listening on port ${GATEWAY_PORT}`);
-  console.log(`[gateway] frontend -> localhost:${FRONTEND_PORT}`);
-  console.log(`[gateway] engine   -> localhost:3003 (via ?XTransformPort=3003)`);
-});
-
-process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
-process.on('SIGINT', () => { server.close(() => process.exit(0)); });
+//wait on port 8080
+server.listen(8080);

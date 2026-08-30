@@ -360,8 +360,7 @@ std::string base64_decode(std::string const& encoded_string) {
     return ret;
 }
 
-// CHANGED WITH AI (Largest ai change): Normalize a resolved href into something the engine can
-// actually fetch. 
+// CHANGED WITH AI (Largest ai change): Changed the main search from duck duck go, to bing, and just handle it, overall tho, its a mix of my code, and ai, i would say about 40% ai, (it took) off the main engine.
 std::string NormalizeHref(std::string href)
 {
         // --- 2. javascript: URLs → empty ---

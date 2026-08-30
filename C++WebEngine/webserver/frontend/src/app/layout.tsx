@@ -1,6 +1,4 @@
-// CHANGED WITH AI: Minimal layout for the standalone C++Browse frontend.
-// Stripped the Geist fonts and shadcn Toaster from the scaffold version —
-// the browser UI uses only the PixelifySans pixel font (loaded in globals.css).
+// CHANGED WITH AI: just a small thing added, and allows for next.js to work with the structure (super simple)
 import type { Metadata } from "next";
 import "./globals.css";
 
