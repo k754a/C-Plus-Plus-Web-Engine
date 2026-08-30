@@ -138,7 +138,7 @@ The final favourite 'feature' I added was when I was working on my code, I thoug
 
 AI has been used in some aspects of this project.
 
-- GLM 5.2 was used to convert the Windows code to a web server for Linux (way before I supported Linux). Any code changes are clearly marked with (`// CHANGED WITH AI: ...`) if they have been changed with AI, and very little has been changed (as the backend is 99% me, with just allowing multiple users being the main change)
+- GLM 5.2 was used to convert the Windows code to a web server for Linux (way before I supported Linux). Any code changes are clearly marked with (`// CHANGED WITH AI: ...`) if they have been changed with AI. I would say about 5% of the backend is AI, (just sending to the html, and aswell preventing the captcha issues.)
 
 - The main windows project has **NOT** been coded with AI whatsoever.
 
