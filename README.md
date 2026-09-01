@@ -44,7 +44,7 @@ This project was created to help me learn C++ as well as understand and apprecia
 
 # How to Use/Demo
 
-There are quite a few ways to use the engine, if you would not like to download something, you can use the web demo (or [watch the video](https://www.youtube.com/watch?v=I-mCh9xSYeg&t=8s)). But if you want to run it on your own hardware, you can go to the [releases page](https://github.com/k754a/releases).
+There are quite a few ways to use the engine, if you would not like to download something, you can use the web demo (or [watch the video](https://www.youtube.com/watch?v=I-mCh9xSYeg&t=8s)). But if you want to run it on your own hardware, you can go to the [releases page](https://github.com/k754a/C-Plus-Plus-Web-Engine/releases/tag/v1.0.0).
 
 ### No download way:
 
