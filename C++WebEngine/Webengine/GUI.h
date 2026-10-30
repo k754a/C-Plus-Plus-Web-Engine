@@ -21,7 +21,8 @@ struct Tab //tab struct
 	std::string url = ""; //save the url
 	std::string title = ""; //save the title
 	std::vector<Layout> layout = {}; //the layout of the current tab (save this into ram)
-	int scrollpos = 0; //save the scroll pos for each tab
+	int scrollypos = 0; //save the scroll pos for each tab
+	int scrollxpos = 0;
 	int maxscroll = 3000; //the max scroll for the tab
 	std::vector<std::string> history = {}; //give each tab its own history (currently we have it for the main one)
 	int historypos = -1; //the pos for history/

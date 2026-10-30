@@ -6,7 +6,6 @@
 
 //That's it.
 
-
 //THIS IS THE WINDOW RENDER
 //(THIS WILL TAKE IN MULTIPLE INPUTS, FROM Layout.cpp, and Webengine.cpp.
 
@@ -338,7 +337,8 @@ int IMPORT(std::vector<Layout> layoutGOTTEN, Node* newRoot) //IMPORT
 	for (auto& item : layoutGOTTEN) item.loadGen = tab.loadGen; //for each item in layoutGOTTEN, we assign the loadgen value from our tab.loadgen
 
 	tab.domRoot = newRoot; //update the tab with our new domRoot
-	tab.scrollpos = 40; //reset the tabs scroll pos to '40'
+	tab.scrollypos = 40; //reset the tabs scroll y pos to '40'
+	tab.scrollxpos = 0; //reset the tabs scroll x pos to '0' (centerd)
 	tab.layout = layoutGOTTEN; //update the old layout with our newer layoutGOTTEN vector
 
 	if (cssUpdated)
@@ -509,7 +509,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 				}
 				active.layout.clear(); //clear the layout
 
-				active.scrollpos = 40; //reset the scroll pos
+				active.scrollypos = 40; //reset the scroll pos
+				active.scrollxpos = 0; //reset the scroll pos
 				lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
 
 				urlInput = path; 	//clear the url input, as it is a new tab
@@ -557,7 +558,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 				}
 				active.layout.clear(); //clear the layout
 
-				active.scrollpos = 40; //reset the scroll pos
+				active.scrollypos = 40; //reset the scroll pos
+				active.scrollxpos = 0;
 				lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
 
 				urlInput = path; 	//clear the url input, as it is a new tab
@@ -591,7 +593,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 				}
 				active.layout.clear(); //clear the layout
 
-				active.scrollpos = 40; //reset the scroll pos
+				active.scrollypos = 40; //reset the scroll y pos
+				active.scrollxpos = 0; //reset the scroll x pos
 				lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
 
 				urlInput = path; 	//clear the url input, as it is a new tab
@@ -619,7 +622,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 			}
 			active.layout.clear(); //clear the layout
 
-			active.scrollpos = 40; //reset the scroll pos
+			active.scrollypos = 40; //reset the scroll pos
+			active.scrollxpos = 40; //reset the scroll pos
 			//lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
 
 			urlInput = "history::tab";
@@ -671,7 +675,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 			}
 			active.layout.clear(); //clear the layout
 
-			active.scrollpos = 40; //reset the scroll pos
+			active.scrollxpos = 40; //reset the scroll pos
+			active.scrollypos = 0; //reset the scroll pos
 			lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
 
 			urlInput = "settings::tab"; 
@@ -721,7 +726,8 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 			}
 			active.layout.clear(); //clear the layout
 
-			active.scrollpos = 40; //reset the scroll pos
+			active.scrollypos = 40; //reset the scroll pos
+			active.scrollxpos = 0; //reset the scroll pos
 			lastsearchedtabID = tabs[activeTab].tabID; //reset the tab id
 
 			urlInput = ""; 	//clear the url input, as it is a new tab
@@ -735,7 +741,6 @@ void NavigateTo(std::string target, SDL_Renderer* render, TTF_Font* font, bool a
 
 	//its a url if any of these conditions are met, as well as no spaces
 	bool isUrl = (target.find("http://") == 0 || target.find("https://") == 0 || target[0] == '/' || target.find('.') != std::string::npos) && (target.find(' ') == std::string::npos);
-
 	{
 
 		std::lock_guard<std::mutex> lock(gTabsMutex); //create the lock to prevent other possesses from editing, and preventing a crash
@@ -997,7 +1002,6 @@ void PreRender(SDL_Renderer* render, TTF_Font* font) //PreRender Takes in a SDL 
 						//TTF_SetFontStyle(threadFont, fontweight); //RENDER THE FONT WEIGHT
 
 						if (isLink) { TTF_SetFontStyle(threadFont, TTF_STYLE_NORMAL); } //reset the style after to prevent leaks
-
 					}
 
 					if (nodeSurf != nullptr) { //if the nodeSurf contains things
@@ -1242,13 +1246,14 @@ bool isLinkClicked(std::string &clickedURL, bool RightClicked)
 			if (tabs[activeTab].layout[i].textTex == nullptr) continue; //check if its text, if it is, skip
 			if (tabs[activeTab].layout[i].href.empty()) continue; //check if its a herf, if it does'nt contain anything, skip
 
-			float screeny = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos; //ok we have a link, now lets adjust the activator block to be over it
+			float screeny = tabs[activeTab].layout[i].y - tabs[activeTab].scrollypos; //ok we have a link, now lets adjust the activator block to be over it
+			float screenx = tabs[activeTab].layout[i].x - tabs[activeTab].scrollxpos; //ok we have a link, now lets adjust the activator block to be over it
 
 			//test if the tabs activator button is pressed, checking the x of our mouse, and the x of the button, to see if the mouse click overlaps with it
 
 			if (RightClicked) //RightClicked
 			{
-				if (ContextMenuXPos >= tabs[activeTab].layout[i].x && ContextMenuXPos <= (tabs[activeTab].layout[i].x + tabs[activeTab].layout[i].width) &&
+				if (ContextMenuXPos >= screenx && ContextMenuXPos <= (screenx + tabs[activeTab].layout[i].width) &&
 					ContextMenuYPos >= screeny && ContextMenuYPos <= (screeny + tabs[activeTab].layout[i].height))
 				{
 					std::string finalUrl = tabs[activeTab].layout[i].href; //grab the URL of the link, of what I just pressed
@@ -1262,7 +1267,7 @@ bool isLinkClicked(std::string &clickedURL, bool RightClicked)
 				}
 			}
 			else {
-				if (mouseX >= tabs[activeTab].layout[i].x && mouseX <= (tabs[activeTab].layout[i].x + tabs[activeTab].layout[i].width) &&
+				if (mouseX >= screenx && mouseX <= (screenx + tabs[activeTab].layout[i].width) &&
 					mouseY >= screeny && mouseY <= (screeny + tabs[activeTab].layout[i].height))
 				{
 					std::cout << "link pressed" << std::endl; //DEBUG
@@ -1301,8 +1306,8 @@ void ReloadTabLayout()
 		return;
 	}
 	//now that we know we are for SURE loading the new stuff, first save the current scroll pos
-	float oldScrollPos = tabs[activeTab].scrollpos;
-
+	float oldScrollyPos = tabs[activeTab].scrollypos;
+	float oldScrollxPos = tabs[activeTab].scrollxpos;
 	std::unordered_map<std::string, SDL_Texture*> oldImageCache; //holds the old images
 	
 	{ //LOCK
@@ -1326,7 +1331,8 @@ void ReloadTabLayout()
 
 	LayoutTree(root); //regen
 
-	tabs[activeTab].scrollpos = oldScrollPos; //make sure to set the scroll pos, to prevent teleportation to the top of the page
+	tabs[activeTab].scrollypos = oldScrollyPos; //make sure to set the scroll pos, to prevent teleportation to the top of the page
+	tabs[activeTab].scrollxpos = oldScrollxPos; //make sure to set the scroll pos, to prevent teleportation to the top of the page
 
 	//ok, load images back
 	{ //LOCK
@@ -1359,9 +1365,6 @@ void ReloadTabLayout()
 	{
 		if (pair.second) { SDL_DestroyTexture(pair.second); } //if the second part contains an image, rm
 	}
-
-
-	
 
 }
 
@@ -1506,7 +1509,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 						float scrollPercentage = (newBarY - minBarY) / (maxBarY - minBarY); //convert the Y to the %
 
 						std::lock_guard<std::mutex> lock(gTabsMutex); //make sure no other threads can change this while this changes it, to prevent a crash
-						tabs[activeTab].scrollpos = scrollPercentage * tabs[activeTab].maxscroll; //update the pos
+						tabs[activeTab].scrollypos = scrollPercentage * tabs[activeTab].maxscroll; //update the pos
 					}
 				}
 			}
@@ -1525,12 +1528,12 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 					std::lock_guard<std::mutex> lock(gTabsMutex); //make sure no other threads can change this while this changes it, to prevent a crash
 					auto& active = tabs[activeTab]; //create a temp holder for the activetab
 
-					float targetScroll = active.scrollpos - (wheelY * 80); //figure out the scrollpos, a bit simpler
+					float targetScroll = active.scrollypos - (wheelY * 80); //figure out the scrollpos, a bit simpler
 
 					float minScroll = 40.0f; //hold the minimum max
 					float maxScroll = (std::max)(minScroll, static_cast<float>(active.maxscroll)); //make sure maxScroll isn't less than minScroll if content is short
 
-					active.scrollpos = std::clamp(targetScroll, minScroll, maxScroll); //Clamp scroll pos
+					active.scrollypos = std::clamp(targetScroll, minScroll, maxScroll); //Clamp scroll pos
 				}
 			}
 
@@ -1991,7 +1994,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 						if (barHeight < 20.0f) barHeight = 20.0f; //we also make sure it cant get smaller than this, or it might disappear!
 						if (barHeight > 50.0f) barHeight = 50.0f;
 
-						float scrollPercentage = (float)tabs[activeTab].scrollpos / (float)tabs[activeTab].maxscroll; //calculate its pos out of the len of the bar, based on how far we are down the page
+						float scrollPercentage = (float)tabs[activeTab].scrollypos / (float)tabs[activeTab].maxscroll; //calculate its pos out of the len of the bar, based on how far we are down the page
 						float barY = uiTopBarHeight + (scrollPercentage * (trackHeight - barHeight)); //then using the scrollPercentage float, we use it to draw the bar accurately
 
 						SDL_FRect scrollbarRect = { WinW - scrollBarWidth, barY, scrollBarWidth, barHeight }; //create a rect to hold the scroll bar, like backBtnRect
@@ -2347,9 +2350,9 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 		//recalc layout
 		if (RecalcLayout && SDL_GetTicks() - LastTickSinceRecalcLayout > 100)
 		{
-			float OldScrollPos = tabs[activeTab].scrollpos; //save the old scrollPos
+			float OldScrollPos = tabs[activeTab].scrollypos; //save the old scrollPos
 			ReloadTabLayout(); //reload
-			tabs[activeTab].scrollpos = OldScrollPos; //New scroll pos
+			tabs[activeTab].scrollypos = OldScrollPos; //New scroll pos
 
 			RecalcLayout = false;
 		}
@@ -2378,7 +2381,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 				
 				SDL_FRect textrec; //create a temp rect, to hold our text
 				textrec.x = tabs[activeTab].layout[i].x; //give our textrec the layout.x part
-				textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollpos;//give our textrec the layout.y part - the scroll offset
+				textrec.y = tabs[activeTab].layout[i].y - tabs[activeTab].scrollypos;//give our textrec the layout.y part - the scroll offset
 				textrec.w = tabs[activeTab].layout[i].width; //give our textrec the layout.width part
 				textrec.h = tabs[activeTab].layout[i].height; //give our textrec the layout.height part
 
@@ -2440,7 +2443,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 		if (barHeight > 50.0f) barHeight = 50.0f; //we also make sure it cant get bigger than this, or it looks dumb!
 
 		//we calculate its pos out of 100, with the size and stuff, so that we get an accurate bar!
-		float scrollPercentage = (float)tabs[activeTab].scrollpos / (float)tabs[activeTab].maxscroll; //calculate its pos out of the len of the bar, based on how far we are down the page
+		float scrollPercentage = (float)tabs[activeTab].scrollypos / (float)tabs[activeTab].maxscroll; //calculate its pos out of the len of the bar, based on how far we are down the page
 		float barY = uiTopBarHeight + (scrollPercentage * (trackHeight - barHeight)); //then using the scrollPercentage float, we use it to draw the bar accurately
 
 		//color it
@@ -2491,7 +2494,6 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 		// --- BACK+FORWARD BUTTON'S --- \\
 		
 				//BACK-BUTTON\\
-
 
 		SDL_FRect backBtn; //create a rect to hold the backBtn
 
@@ -2856,8 +2858,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 					SDL_DestroyTexture(xTex); //we are done, destroy the texture
 					
 				}
-				SDL_DestroySurface(buttnSerf); //we are done, destroy the surface
-				
+				SDL_DestroySurface(buttnSerf); //we are done, destroy the surface		
 
 			}	
 
@@ -2879,8 +2880,7 @@ int GUIRENDER(std::string StartingTab) //GUIRENDER returns an ' int ' and takes 
 
 					SDL_RenderRect(render, &border);
 				}
-			}
-			
+			}	
 
 		}
 

@@ -15,12 +15,12 @@
 
 int main(int argc, char* argv[]) //we give the start of main, a starting int and char 
 {
-    #ifndef _WIN32
-        curl_global_init(CURL_GLOBAL_DEFAULT);
-    #endif // !_WIN32
+    //#ifndef _WIN32
+    //    curl_global_init(CURL_GLOBAL_DEFAULT);
+    //#endif // !_WIN32
 
-    std::ios_base::sync_with_stdio(false);  std::cin.tie(NULL); //these lines allow the terminal to run a bit faster in debug, saves some time
-    
+    //std::ios_base::sync_with_stdio(false);  std::cin.tie(NULL); //these lines allow the terminal to run a bit faster in debug, saves some time
+    //
     #if defined(_WIN32) && defined(DEBUG) //only work for windows, on debug
         SetConsoleOutputCP(CP_UTF8); //we do this for ╨á╤â and other weird chars, to render right
     #endif 
